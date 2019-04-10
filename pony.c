@@ -1,10 +1,13 @@
-//#include "stdafx.h"
 #include <stdlib.h>
-//#include <stdio.h>
+
+#include "pony.h"
+
+pony_struct pony;
 
 char pony_strncmpeff(char* s1, char* s2, char n)
 {
-	for (int i = 0; i < n; i++)
+	int i;
+	for (i = 0; i < n; i++)
 	{
 		if (s1[i] != s2[i])
 		{
@@ -40,12 +43,14 @@ char* pony_locatesubstr(char* str, char* substr)
 
 char* pony_locatesubstrend(char* str, char* substr)
 {
+	int n;
+
 	char* res = pony_locatesubstr(str, substr);
 	if (res == NULL)
 	{
 		return NULL;
 	}
-	int n = 0;
+	n = 0;
 	while (substr[n] != '\0')
 	{
 		n++;
@@ -57,6 +62,7 @@ char* pony_locatesubstreff(char* str, char* substr)
 {
 	char* res = str;
 	int n = 0;
+
 	while (substr[n] != '\0')
 	{
 		n++;
@@ -96,7 +102,6 @@ unsigned short pony_conpartlength(char* str)
 	return pony_locatesubstreff(str, "}") - str;
 }
 
-
 void add_plugin(void(***pluginarray)(), void(*newplugin)(), int* pluginnum)
 {
 	if (*pluginarray == NULL)
@@ -111,91 +116,16 @@ void add_plugin(void(***pluginarray)(), void(*newplugin)(), int* pluginnum)
 	(*pluginnum)++;
 }
 
-
-
-typedef struct                 //для измерений, выражающихся через одно число
-{
-	double val;                //измерение
-	int count;                 //счётчик
-	char valid;                //признак валидности
-} pony_data;
-
-typedef struct                 //для измерений, выражающихся через несколько чисел
-{
-	double *val;               //массив измерений
-	int count;                 //счётчик
-	char valid;                //признак валидности
-	unsigned char arrsize;     //размер массива
-} pony_dataArray;
-
 void pony_setDASize(pony_dataArray *dataarr, int size)  //чтобы было проще задавать размер массива в конфигураторе
 {
 	(*dataarr).arrsize = size;
 	(*dataarr).val = (double*)calloc(sizeof(double), size);
 }
 
-
-
-typedef struct                 //инерциальные данные
-{
-	char* conf;                //конфигурация
-	char conflength;           //длина строки конфигурации
-
-	pony_dataArray w;          //гироскопы
-	pony_dataArray f;          //акселерометры
-	pony_dataArray q;          //кватернион
-}pony_imu;
-
-typedef struct                 //спутниковые данные
-{
-	char* conf;                //конфигурация
-	char conflength;           //длина строки конфигурации
-
-}pony_gnss;
-
-typedef struct                 //шина
-{
-	int mode;                  //признак работы
-	pony_imu* imu;
-	pony_gnss* gnss;
-
-	pony_data t;               //время
-
-	char* conf;                //конфигурация
-	char conflength;           //длина строки конфигурации
-} pony_bus;
-
-struct
-{
-	pony_bus bus;
-
-	void(**plugins)();         //указатель на массив указателей на плагины
-	int pluginsNum;            //количество плагинов
-
-	char* conf;                //конфигурация
-	char conflength;           //длина строки конфигурации
-
-	unsigned char exitplnum;   //номер плагина, вызвавшего завершившение работы
-} pony;
-
-
-
-void pony_add_plugin(void(*newplugin)())
-{
-	if (pony.plugins == NULL)
-	{
-		pony.plugins = (void**)malloc(sizeof(void(*)()));
-	}
-	else
-	{
-		pony.plugins = (void**)realloc(pony.plugins, (pony.pluginsNum + 1) * sizeof(void(*)()));
-	}
-	pony.plugins[pony.pluginsNum] = newplugin;
-	pony.pluginsNum++;
-}
-
 void pony_free()
 {
+	int i;
+
 	if (pony.bus.imu != NULL)
 	{
 		free((*pony.bus.imu).f.val);
@@ -216,12 +146,28 @@ void pony_free()
 
 	free(pony.conf);
 
-	for (int i = 0; i < pony.pluginsNum; i++)
+	for (i = 0; i < pony.pluginsNum; i++)
 	{
 		free(pony.plugins[i]);
 	}
 
 	free(pony.plugins);
+}
+
+
+
+void pony_add_plugin(void(*newplugin)())
+{
+	if (pony.plugins == NULL)
+	{
+		pony.plugins = (void**)malloc(sizeof(void(*)()));
+	}
+	else
+	{
+		pony.plugins = (void**)realloc(pony.plugins, (pony.pluginsNum + 1) * sizeof(void(*)()));
+	}
+	pony.plugins[pony.pluginsNum] = newplugin;
+	pony.pluginsNum++;
 }
 
 
@@ -267,7 +213,9 @@ void pony_init(char* config)
 
 char pony_step()
 {
-	for (int i = 0; i < pony.pluginsNum; i++)
+	int i;
+
+	for (i = 0; i < pony.pluginsNum; i++)
 	{
 		pony.plugins[i]();
 
@@ -293,9 +241,11 @@ char pony_step()
 
 void pony_terminate()
 {
+	int i;
+
 	pony.bus.mode = -1;
 
-	for (int i = 0; i < pony.pluginsNum; i++)
+	for (i = 0; i < pony.pluginsNum; i++)
 	{
 		pony.plugins[i]();
 	}

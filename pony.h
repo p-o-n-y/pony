@@ -1,10 +1,7 @@
-#pragma once
-
-extern void pony_init(char*);
-extern char pony_step();
-extern void pony_terminate();
-extern void pony_add_plugin(void(*newplugin)());
-extern void pony_free();
+void pony_add_plugin(void*newplugin(void));
+void pony_init(char*);
+char pony_step();
+void pony_terminate();
 
 typedef struct                 //для измерений, выражающихся через одно число
 {
@@ -29,14 +26,14 @@ typedef struct                 //инерциальные данные
 	pony_dataArray w;          //гироскопы
 	pony_dataArray f;          //акселерометры
 	pony_dataArray q;          //кватернион
-}pony_imu;
+} pony_imu;
 
 typedef struct                 //спутниковые данные
 {
 	char* conf;                //конфигурация
 	char conflength;           //длина строки конфигурации
 
-}pony_gnss;
+} pony_gnss;
 
 typedef struct                 //шина
 {
@@ -50,7 +47,7 @@ typedef struct                 //шина
 	char conflength;           //длина строки конфигурации
 } pony_bus;
 
-extern struct
+typedef struct
 {
 	pony_bus bus;
 
@@ -61,4 +58,6 @@ extern struct
 	char conflength;           //длина строки конфигурации
 
 	unsigned char exitplnum;   //номер плагина, вызвавшего завершившение работы
-} pony;
+} pony_struct;
+
+extern pony_struct pony;
