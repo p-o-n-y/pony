@@ -135,7 +135,7 @@ void pony_free()
 
 
 
-void pony_add_plugin(void(*newplugin)(void))
+char pony_add_plugin(void(*newplugin)(void))
 {
 	if (pony.plugins == NULL)
 	{
@@ -147,11 +147,13 @@ void pony_add_plugin(void(*newplugin)(void))
 	}
 	pony.plugins[pony.pluginsNum] = newplugin;
 	pony.pluginsNum++;
+
+	return 1; // пока единица - успешное завершение
 }
 
 
 
-void pony_init(char* config)
+char pony_init(char* config)
 {
 	pony.conf = config;
 
@@ -188,6 +190,8 @@ void pony_init(char* config)
 	pony.bus.conflength = pony_conpartlength(pony.bus.conf);
 
 	pony.exitplnum = -1;
+
+	return 1; // пока единица - успешное завершение
 }
 
 char pony_step(void)
@@ -218,7 +222,7 @@ char pony_step(void)
 	return (pony.bus.mode >= 0) || (pony.exitplnum > 0);
 }
 
-void pony_terminate()
+char pony_terminate()
 {
 	int i;
 
@@ -230,4 +234,6 @@ void pony_terminate()
 	}
 
 	pony_free();
+
+	return 1; // пока единица - успешное завершение
 }

@@ -1,7 +1,7 @@
-void pony_add_plugin(void(*newplugin)(void));
-void pony_init(char*);
+char pony_add_plugin(void(*newplugin)(void));
+char pony_init(char*);
 char pony_step(void);
-void pony_terminate(void);
+char pony_terminate(void);
 
 typedef struct                 //для измерений, выражающихся через одно число
 {
