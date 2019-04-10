@@ -2,9 +2,9 @@
 
 #include "pony.h"
 
-pony_struct pony;
+pony_struct pony = {pony_bus_version,0};
 
-char pony_strncmpeff(char* s1, char* s2, char n)
+char pony_strncmpeff(char* s1, char* s2, int n)
 {
 	int i;
 	for (i = 0; i < n; i++)
@@ -97,23 +97,9 @@ char* pony_locatesubstrendeff(char* str, char* substr)
 	return NULL;
 }
 
-unsigned short pony_conpartlength(char* str)
+int pony_conpartlength(char* str)
 {
-	return pony_locatesubstreff(str, "}") - str;
-}
-
-void add_plugin(void(***pluginarray)(), void(*newplugin)(), int* pluginnum)
-{
-	if (*pluginarray == NULL)
-	{
-		*pluginarray = (void**)malloc(sizeof(void(*)()));
-	}
-	else
-	{
-		*pluginarray = (void**)realloc(*pluginarray, (*pluginnum + 1) * sizeof(void(*)()));
-	}
-	(*pluginarray)[*pluginnum] = newplugin;
-	(*pluginnum)++;
+	return (int)(pony_locatesubstreff(str, "}") - str);
 }
 
 void pony_setDASize(pony_dataArray *dataarr, int size)  //чтобы было проще задавать размер массива в конфигураторе
@@ -124,7 +110,6 @@ void pony_setDASize(pony_dataArray *dataarr, int size)  //чтобы было проще задав
 
 void pony_free()
 {
-	int i;
 
 	if (pony.bus.imu != NULL)
 	{
@@ -145,26 +130,20 @@ void pony_free()
 	}
 
 	free(pony.conf);
-
-	for (i = 0; i < pony.pluginsNum; i++)
-	{
-		free(pony.plugins[i]);
-	}
-
 	free(pony.plugins);
 }
 
 
 
-void pony_add_plugin(void(*newplugin)())
+void pony_add_plugin(void(*newplugin)(void))
 {
 	if (pony.plugins == NULL)
 	{
-		pony.plugins = (void**)malloc(sizeof(void(*)()));
+		pony.plugins = (void(**)(void))malloc(sizeof(void(*)(void)));
 	}
 	else
 	{
-		pony.plugins = (void**)realloc(pony.plugins, (pony.pluginsNum + 1) * sizeof(void(*)()));
+		pony.plugins = (void(**)(void))realloc(pony.plugins, (pony.pluginsNum + 1) * sizeof(void(*)(void)));
 	}
 	pony.plugins[pony.pluginsNum] = newplugin;
 	pony.pluginsNum++;
@@ -211,7 +190,7 @@ void pony_init(char* config)
 	pony.exitplnum = -1;
 }
 
-char pony_step()
+char pony_step(void)
 {
 	int i;
 
