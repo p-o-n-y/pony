@@ -15,7 +15,7 @@ typedef struct                 //для измерений, выражающихся через несколько чис
 	double *val;               //массив значений
 	int count;                 //счётчик
 	char valid;                //признак валидности
-	int arrsize;     //размер массива
+	int arrsize;               //размер массива
 } pony_dataArray;
 
 typedef struct                 //инерциальные данные
@@ -28,10 +28,30 @@ typedef struct                 //инерциальные данные
 	pony_dataArray q;          //кватернион
 } pony_imu;
 
+typedef struct                 //
+{
+	char* conf;                //конфигурация
+	int conflength;            //длина строки конфигурации
+
+} pony_gnss_gps;
+
+typedef struct                 //
+{
+	char* conf;                //конфигурация
+	int conflength;            //длина строки конфигурации
+
+} pony_gnss_glo;
+
 typedef struct                 //спутниковые данные
 {
 	char* conf;                //конфигурация
 	int conflength;            //длина строки конфигурации
+
+	pony_gnss_gps* gps;
+	pony_gnss_glo* glo;
+
+	char* wconf;
+	int wconflength;
 
 } pony_gnss;
 
@@ -54,13 +74,13 @@ typedef struct
 {
 	pony_bus bus;
 
-	void(**plugins)(void);         //указатель на массив указателей на плагины
+	void(**plugins)(void);     //указатель на массив указателей на плагины
 	int pluginsNum;            //количество плагинов
 
 	char* conf;                //конфигурация
-	int conflength;           //длина строки конфигурации
+	int conflength;            //длина строки конфигурации
 
-	int exitplnum;   //номер плагина, вызвавшего завершившение работы
+	int exitplnum;             //номер плагина, вызвавшего завершившение работы
 } pony_struct;
 
 extern pony_struct pony;

@@ -1,3 +1,4 @@
+#include "stdafx.h" //мне пришлось
 #include <stdlib.h>
 
 #include "pony.h"
@@ -58,40 +59,53 @@ char* pony_locatesubstrend(char* str, char* substr)
 	return res + n;
 }
 
-char* pony_locatesubstreff(char* str, char* substr)
+char* pony_locatesubstreff(char* str, char* substr, int len)
 {
 	char* res = str;
-	int n = 0;
 
-	while (substr[n] != '\0')
-	{
-		n++;
-	}
+	int in = 0;
+
 	while ((*res) != '\0')
 	{
-		if (pony_strncmpeff(res, substr, n) == 0)
+		if (in == 0 && pony_strncmpeff(res, substr, len) == 0)
 		{
 			return res;
 		}
+		if (res[0] == '{')
+		{
+			in++;
+		}
+		if (res[0] == '}')
+		{
+			in--;
+		}
+		
 		res++;
 	}
 	return NULL;
 }
 
-char* pony_locatesubstrendeff(char* str, char* substr)
+char* pony_locatesubstrendeff(char* str, char* substr, int len)
 {
 	char* res = str;
-	int n = 0;
-	while (substr[n] != '\0')
-	{
-		n++;
-	}
+
+	int in = 0;
+	
 	while ((*res) != '\0')
 	{
-		if (pony_strncmpeff(res, substr, n) == 0)
+		if (in == 0 && pony_strncmpeff(res, substr, len) == 0)
 		{
-			return res + n;
+			return res + len;
 		}
+		if (res[0] == '{')
+		{
+			in++;
+		}
+		if (res[0] == '}')
+		{
+			in--;
+		}
+		
 		res++;
 	}
 	return NULL;
@@ -99,10 +113,67 @@ char* pony_locatesubstrendeff(char* str, char* substr)
 
 int pony_conpartlength(char* str)
 {
-	return (int)(pony_locatesubstreff(str, "}") - str);
+	return (int)(pony_locatesubstreff(str, "}", 1) - str);
 }
 
-void pony_setDASize(pony_dataArray *dataarr, int size)  //чтобы было проще задавать размер массива в конфигураторе
+char pony_extractconsubstr(char* filter, char* str, int len, char** substr, int* substrlen)
+{
+	if (filter[0] == '\0')
+	{
+		int in = 0;
+		*substr = str;
+		*substrlen = len - 1;
+		while (*substr[0] == ' ' || *substr[0] == '{' || in != 0)
+		{
+			if (*substr[0] == '{')
+			{
+				in++;
+			}
+			if (*substr[0] == '}')
+			{
+				in--;
+			}
+			if (*substr-str == len)
+			{
+				return 0;
+			}
+			(*substr)++;
+		}
+		
+		while (1)
+		{
+			if ((str + *substrlen)[0] == '{')
+			{
+				in++;
+			}
+			if ((str + *substrlen)[0] == '}')
+			{
+				in--;
+			}
+			if ((str + *substrlen)[0] != ' ' && in == 0)
+			{
+				return 1;
+			}
+			(*substrlen)--;
+		}
+	}
+	else
+	{
+		int fillen = 0;
+		while (filter[fillen] != '\0')
+		{
+			fillen++;
+		}
+		if ((*substr = pony_locatesubstrendeff(str, filter, fillen)) == NULL) 
+		{
+			return 0;
+		}
+		*substrlen = pony_conpartlength(*substr);
+		return 1;
+	}
+}
+
+void pony_setDASize(pony_dataArray *dataarr, int size)
 {
 	(*dataarr).arrsize = size;
 	(*dataarr).val = (double*)calloc(sizeof(double), size);
@@ -157,37 +228,54 @@ char pony_init(char* config)
 {
 	pony.conf = config;
 
+	pony.conflength = 0;
+
 	while (pony.conf[pony.conflength] != '\0')
 	{
 		pony.conflength++;
 	}
 
-	{
-		char* buffer;
+	pony_extractconsubstr("", pony.conf, pony.conflength, &pony.bus.conf, &pony.bus.conflength);
 
-		if ((buffer = pony_locatesubstrendeff(pony.conf, "imu:{")) != NULL)
+	{
+		char* strbuffer=NULL;
+		int lbuffer=0;
+
+		if (pony_extractconsubstr("{imu:", pony.conf, pony.conflength, &strbuffer, &lbuffer))
 		{
 			pony.bus.imu = (pony_imu*)calloc(sizeof(pony_imu), 1);
-			(*pony.bus.imu).conf = buffer;
-			(*pony.bus.imu).conflength = pony_conpartlength((*pony.bus.imu).conf);
+			(*pony.bus.imu).conf = strbuffer;
+			(*pony.bus.imu).conflength = lbuffer;
 
 			pony_setDASize(&(*pony.bus.imu).f, 3);
 			pony_setDASize(&(*pony.bus.imu).q, 4);
 			pony_setDASize(&(*pony.bus.imu).w, 3);
-
-
 		}
 
-		if ((buffer = pony_locatesubstrendeff(pony.conf, "gnss:{")) != NULL)
+		if (pony_extractconsubstr("{gnss:", pony.conf, pony.conflength, &strbuffer, &lbuffer))
 		{
 			pony.bus.gnss = (pony_gnss*)calloc(sizeof(pony_gnss), 1);
-			(*pony.bus.gnss).conf = buffer;
-			(*pony.bus.gnss).conflength = pony_conpartlength((*pony.bus.gnss).conf);
+			(*pony.bus.gnss).wconf = strbuffer;
+			(*pony.bus.gnss).wconflength = lbuffer;
+
+			pony_extractconsubstr("", (*pony.bus.gnss).wconf, (*pony.bus.gnss).wconflength, &(*pony.bus.gnss).conf, &(*pony.bus.gnss).conflength);
+
+			if (pony_extractconsubstr("{gps:", (*pony.bus.gnss).wconf, (*pony.bus.gnss).wconflength, &strbuffer, &lbuffer))
+			{
+				(*pony.bus.gnss).gps = (pony_gnss_gps*)calloc(sizeof(pony_gnss_gps), 1);
+				(*(*pony.bus.gnss).gps).conf = strbuffer;
+				(*(*pony.bus.gnss).gps).conflength = lbuffer;
+			}
+
+			if (pony_extractconsubstr("{glo:", (*pony.bus.gnss).wconf, (*pony.bus.gnss).wconflength, &strbuffer, &lbuffer))
+			{
+				(*pony.bus.gnss).glo = (pony_gnss_glo*)calloc(sizeof(pony_gnss_glo), 1);
+				(*(*pony.bus.gnss).glo).conf = strbuffer;
+				(*(*pony.bus.gnss).glo).conflength = lbuffer;
+			}
+
 		}
 	}
-
-	pony.bus.conf = pony_locatesubstrendeff(pony.conf, "general:{");
-	pony.bus.conflength = pony_conpartlength(pony.bus.conf);
 
 	pony.exitplnum = -1;
 
