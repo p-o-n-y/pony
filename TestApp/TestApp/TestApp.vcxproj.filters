@@ -32,7 +32,7 @@
     <ClCompile Include="TestApp.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\testApplication\testApplication\pony.c">
+    <ClCompile Include="pony.c">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
   </ItemGroup>
