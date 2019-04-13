@@ -173,6 +173,29 @@ char pony_extractconsubstr(char* filter, char* str, int len, char** substr, int*
 	}
 }
 
+void pony_format(char** tostr, char* fromstr)
+{
+	int n = 0;
+	int i = 0;
+	while (fromstr[i] != '\0')
+	{
+		if (fromstr[i] == '\'')
+		{
+			n = !n;
+		}
+		if (n == 0 && fromstr[i] > 0 && fromstr[i] < 32)
+		{
+			(*tostr)[i] = ' ';
+		}
+		else
+		{
+			(*tostr)[i] = fromstr[i];
+		}
+		i++;
+	}
+	(*tostr)[i] = '\0';
+}
+
 void pony_setDASize(pony_dataArray *dataarr, int size)
 {
 	(*dataarr).arrsize = size;
@@ -188,8 +211,6 @@ void pony_free()
 		free((*pony.bus.imu).q.val);
 		free((*pony.bus.imu).w.val);
 
-		free((*pony.bus.imu).conf);
-
 		free(pony.bus.imu);
 	}
 
@@ -198,32 +219,20 @@ void pony_free()
 
 		if ((*pony.bus.gnss).gps != NULL)
 		{
-			free((*(*pony.bus.gnss).gps).conf);
 			free((*pony.bus.gnss).gps);
 		}
 
 		if ((*pony.bus.gnss).glo != NULL)
 		{
-			free((*(*pony.bus.gnss).glo).conf);
 			free((*pony.bus.gnss).glo);
 		}
 
-		free((*pony.bus.gnss).wconf);
-
-
-		free((*pony.bus.gnss).conf);
 
 		free(pony.bus.gnss);
 	}
 
-	free(pony.bus.conf);
 
 	free(pony.conf);
-
-	for (int i = 0; i < pony.pluginsNum; i++)
-	{
-		free(pony.plugins[i]);
-	}
 
 	free(pony.plugins);
 }
@@ -250,14 +259,15 @@ char pony_add_plugin(void(*newplugin)(void))
 
 char pony_init(char* config)
 {
-	pony.conf = config;
-
 	pony.conflength = 0;
 
-	while (pony.conf[pony.conflength] != '\0')
+	while (config[pony.conflength] != '\0')
 	{
 		pony.conflength++;
 	}
+
+	pony.conf = malloc(sizeof(char)* pony.conflength + 1);
+	pony_format(&pony.conf, config);
 
 	pony_extractconsubstr("", pony.conf, pony.conflength, &pony.bus.conf, &pony.bus.conflength);
 
@@ -331,7 +341,7 @@ char pony_step(void)
 	{
 		pony.bus.mode = 1;
 	}
-	return (pony.bus.mode >= 0) || (pony.exitplnum > 0);
+	return (pony.bus.mode >= 0) || (pony.exitplnum >= 0);
 }
 
 char pony_terminate()
