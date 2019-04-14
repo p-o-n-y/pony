@@ -1,6 +1,6 @@
 #include "stdafx.h" //мне пришлось
 #include <stdlib.h>
-
+#include <string.h>
 #include "pony.h"
 
 pony_struct pony = { pony_bus_version,0 };
@@ -28,34 +28,34 @@ char pony_strcmptofixed(char* str, char* substr)  //not used
 	return pony_strncmpeff(str, substr, n);
 }
 
-char* pony_locatesubstr(char* str, char* substr)  //not used
+char* pony_locatesubstrn(char* str, int len, char* substr, int substrlen)
 {
-	char* res = str;
-	while ((*res) != '\0')
+	int n = 0;
+	while (n + substrlen <= len )
 	{
-		if (pony_strcmptofixed(res, substr) == 0)
+		if (pony_strcmptofixed(str + n, substr) == 0)
 		{
-			return res;
+			return str + n;
 		}
-		res++;
+		n++;
 	}
 	return NULL;
 }
 
-char* pony_locatesubstrend(char* str, char* substr)  //not used
+char* pony_locatesubstrendn(char* str, int len, char* substr)  //not used
 {
 	int n;
-
-	char* res = pony_locatesubstr(str, substr);
-	if (res == NULL)
-	{
-		return NULL;
-	}
 	n = 0;
 	while (substr[n] != '\0')
 	{
 		n++;
 	}
+	char* res = pony_locatesubstrn(str, len, substr, n);
+	if (res == NULL)
+	{
+		return NULL;
+	}
+	
 	return res + n;
 }
 
@@ -173,7 +173,7 @@ char pony_extractconsubstr(char* filter, char* str, int len, char** substr, int*
 	}
 }
 
-void pony_format(char** tostr, char* fromstr)
+void pony_format(char* fromstr, char** tostr)
 {
 	int n = 0;
 	int i = 0;
@@ -266,8 +266,8 @@ char pony_init(char* config)
 		pony.conflength++;
 	}
 
-	pony.conf = malloc(sizeof(char)* pony.conflength + 1);
-	pony_format(&pony.conf, config);
+	pony.conf = malloc(sizeof(char) * (pony.conflength + 1));
+	pony_format(config, &pony.conf);
 
 	pony_extractconsubstr("", pony.conf, pony.conflength, &pony.bus.conf, &pony.bus.conflength);
 
@@ -358,4 +358,103 @@ char pony_terminate()
 	pony_free();
 
 	return 1; // пока единица - успешное завершение
+}
+
+char pony_extract_string(char* confstr, int length, char* identifier, char** res)
+{
+	int i = 0;
+	confstr = pony_locatesubstrendn(confstr, length, identifier);
+	if (confstr == NULL)
+	{
+		return 0;
+	}
+	while (confstr[i] != '\"' || confstr[i + 1] == '\"')
+	{
+		(*res)[i] = confstr[i];
+		if (confstr[i] == '\"' && confstr[i + 1] == '\"')
+		{
+			i++;
+		}
+		i++;
+	}
+	return 1;
+}
+
+char pony_extract_string_length(char* confstr, int length, char* identifier, int* res)
+{
+	int i = 0;
+	*res = 0;
+	confstr = pony_locatesubstrendn(confstr, length, identifier);
+	if (confstr == NULL)
+	{
+		return 0;
+	}
+	while (confstr[i] != '\"' || confstr[i + 1] == '\"')
+	{
+		if (confstr[i] == '\"')
+		{
+			i++;
+		}
+		i++;
+		(*res)++;
+	}
+	return 1;
+}
+
+char pony_extract_int(char* confstr, int length, char* identifier, int* res)
+{
+	confstr = pony_locatesubstrendn(confstr, length, identifier);
+	if (confstr == NULL)
+	{
+		return 0;
+	}
+	if (fscanf(confstr, "%d%*s", res) == 0)
+	{
+		return 0;
+	}
+	return 1;
+}
+
+char pony_extract_double(char* confstr, int length, char* identifier, double* res)
+{
+	confstr = pony_locatesubstrendn(confstr, length, identifier);
+	if (confstr == NULL)
+	{
+		return 0;
+	}
+	if (fscanf(confstr, "%lg%*s", res) == 0)
+	{
+		return 0;
+	}
+	return 1;
+}
+
+char pony_extract_float(char* confstr, int length, char* identifier, float* res)
+{
+	confstr = pony_locatesubstrendn(confstr, length, identifier);
+	if (confstr == NULL)
+	{
+		return 0;
+	}
+	if ((confstr[0] - '0' > 9 || confstr[0] - '0' < 0) && confstr[0] != '.')
+	{
+		return 0;
+	}
+	*res = atof(confstr);
+	return 1;
+}
+
+char pony_extract_bool(char* confstr, int length, char* identifier, char* res)
+{
+
+}
+
+char pony_extract_char_as_char(char* confstr, int length, char* identifier, char* res)
+{
+
+}
+
+char pony_extract_char_as_num(char* confstr, int length, char* identifier, char* res)
+{
+
 }

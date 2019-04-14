@@ -3,6 +3,14 @@ char pony_init(char*);
 char pony_step(void);
 char pony_terminate(void);
 
+
+char pony_extract_string_length(char* confstr, int length, char* identifier, int* res);
+char pony_extract_string(char* confstr, int length, char* identifier, char** res);
+char pony_extract_double(char* confstr, int length, char* identifier, double* res);
+char pony_extract_float(char* confstr, int length, char* identifier, float* res);
+char pony_extract_int(char* confstr, int length, char* identifier, int* res);
+
+
 typedef struct                 //для измерений, выражающихся через одно число
 {
 	double val;                //значение
