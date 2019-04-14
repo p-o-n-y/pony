@@ -3,6 +3,18 @@
 #include <string.h>
 #include "pony.h"
 
+
+
+
+
+///
+///     Internal pony functions and definitions
+///
+
+
+
+
+
 pony_struct pony = { pony_bus_version,0 };
 
 // function for comparing strings up to a given length (like strncmp from string.h) but with a limited functionality (0 - equal, 1 - not equal)
@@ -138,7 +150,12 @@ int pony_conpartlength(char* str)
 	return (int)(pony_locatesubstreff(str, "}", 1) - str);
 }
 
-
+// function for "distributing" substrings from configuration to their intended destinations
+// char* filter is the string used as an identifier of an inner configurator group (use "" for getting general settings substring)
+// char* str is the string of configurator that directly contains the searched substring ( if "a {b: c {d: e} }" is passed only "a" or " c {d: e} " can be obtained, not "c" or " e")
+// int len is the length of str
+// char** substr is the pointer to be used for setting the pony pointer to the beginning of the searched substring
+// int* substrlen is the pointer to be used for setting the length of (*substr) in pony
 char pony_extractconsubstr(char* filter, char* str, int len, char** substr, int* substrlen)
 {
 	if (filter[0] == '\0')
@@ -246,7 +263,6 @@ void pony_free()
 
 	if (pony.bus.gnss != NULL)
 	{
-
 		if ((*pony.bus.gnss).gps != NULL)
 		{
 			free((*pony.bus.gnss).gps);
@@ -257,15 +273,24 @@ void pony_free()
 			free((*pony.bus.gnss).glo);
 		}
 
-
 		free(pony.bus.gnss);
 	}
 
-
 	free(pony.conf);
-
 	free(pony.plugins);
+
 }
+
+
+
+
+
+///
+///     Main pony functions for external programs
+///
+
+
+
 
 
 // function for adding user functions to the list of pony plugins, plugins are called in the order of being added
@@ -287,7 +312,7 @@ char pony_add_plugin(void(*newplugin)(void))
 }
 
 
-// function for initialising pony with a given configuration string
+// function for initialising pony with a user-passed configuration string
 // char* config is the configuration for pony
 char pony_init(char* config)
 {
@@ -349,7 +374,7 @@ char pony_init(char* config)
 	return 1; // пока единица - успешное завершение
 }
 
-// function that is called in an iteration of a cycle of external programm
+// function that is called by user during an iteration of a cycle of external program
 char pony_step(void)
 {
 	int i;
@@ -378,7 +403,7 @@ char pony_step(void)
 	return (pony.bus.mode >= 0) || (pony.exitplnum >= 0);
 }
 
-// function that is called from external programm if the user wishes to terminate pony's activity
+// function that is called by user from external program if the user wishes to terminate pony's activity
 char pony_terminate()
 {
 	int i;
@@ -395,6 +420,24 @@ char pony_terminate()
 	return 1; // пока единица - успешное завершение
 }
 
+
+
+
+
+///
+///     Standard extraction functions for variables defined by configurator
+///
+
+
+
+
+
+// function for getting the length of the string that would have been obtained using this identifier on pony_extract_string function, functions are not merged as memory is normally allocated in between them
+// works only for standard strings, for symbol " that does not mean the end of the string use ""
+// char* confstr is the configuration string containing the needed data
+// int length is the length of the configuration string
+// char* identifier is the string preceding the needed data
+// int* res is the pointer to the variable the data should be written to
 char pony_extract_string_length(char* confstr, int length, char* identifier, int* res)
 {
 	int i = 0;
@@ -416,6 +459,12 @@ char pony_extract_string_length(char* confstr, int length, char* identifier, int
 	return 1;
 }
 
+// function for obtaining the string by identifier, as memory should be allocated in advance this function is not merged with pony_extract_string_length function
+// works only for standard strings, for symbol " that does not mean the end of the string use ""
+// char* confstr is the configuration string containing the needed data
+// int length is the length of the configuration string
+// char* identifier is the string preceding the needed data
+// char** res is the pointer to the variable the data should be written to
 char pony_extract_string(char* confstr, int length, char* identifier, char** res)
 {
 	int i = 0;
@@ -436,6 +485,11 @@ char pony_extract_string(char* confstr, int length, char* identifier, char** res
 	return 1;
 }
 
+// function for obtaining symbol by identifier
+// char* confstr is the configuration string containing the needed data
+// int length is the length of the configuration string
+// char* identifier is the string preceding the needed data
+// char* res is the pointer to the variable the data should be written to
 char pony_extract_char_sym(char* confstr, int length, char* identifier, char* res)
 {
 	confstr = pony_locatesubstrendn(confstr, length, identifier);
@@ -447,6 +501,11 @@ char pony_extract_char_sym(char* confstr, int length, char* identifier, char* re
 	return 1;
 }
 
+// function for obtaining number of type char by identifier
+// char* confstr is the configuration string containing the needed data
+// int length is the length of the configuration string
+// char* identifier is the string preceding the needed data
+// char* res is the pointer to the variable the data should be written to
 char pony_extract_char_num(char* confstr, int length, char* identifier, char* res)
 {
 	confstr = pony_locatesubstrendn(confstr, length, identifier);
@@ -454,7 +513,7 @@ char pony_extract_char_num(char* confstr, int length, char* identifier, char* re
 	{
 		return 0;
 	}
-	if (confstr[0] - '0' > 9 || confstr[0] - '0' < 0)
+	if ((confstr[0] - '0' > 9 || confstr[0] - '0' < 0) && confstr[0] != '-')
 	{
 		return 0;
 	}
@@ -462,6 +521,11 @@ char pony_extract_char_num(char* confstr, int length, char* identifier, char* re
 	return 1;
 }
 
+// function for obtaining number of type short by identifier
+// char* confstr is the configuration string containing the needed data
+// int length is the length of the configuration string
+// char* identifier is the string preceding the needed data
+// short* res is the pointer to the variable the data should be written to
 char pony_extract_short(char* confstr, int length, char* identifier, short* res)
 {
 	confstr = pony_locatesubstrendn(confstr, length, identifier);
@@ -469,7 +533,7 @@ char pony_extract_short(char* confstr, int length, char* identifier, short* res)
 	{
 		return 0;
 	}
-	if (confstr[0] - '0' > 9 || confstr[0] - '0' < 0)
+	if ((confstr[0] - '0' > 9 || confstr[0] - '0' < 0) && confstr[0] != '-')
 	{
 		return 0;
 	}
@@ -477,6 +541,11 @@ char pony_extract_short(char* confstr, int length, char* identifier, short* res)
 	return 1;
 }
 
+// function for obtaining number of type int by identifier
+// char* confstr is the configuration string containing the needed data
+// int length is the length of the configuration string
+// char* identifier is the string preceding the needed data
+// int* res is the pointer to the variable the data should be written to
 char pony_extract_int(char* confstr, int length, char* identifier, int* res)
 {
 	confstr = pony_locatesubstrendn(confstr, length, identifier);
@@ -484,7 +553,7 @@ char pony_extract_int(char* confstr, int length, char* identifier, int* res)
 	{
 		return 0;
 	}
-	if (confstr[0] - '0' > 9 || confstr[0] - '0' < 0)
+	if ((confstr[0] - '0' > 9 || confstr[0] - '0' < 0) && confstr[0] != '-')
 	{
 		return 0;
 	}
@@ -492,6 +561,11 @@ char pony_extract_int(char* confstr, int length, char* identifier, int* res)
 	return 1;
 }
 
+// function for obtaining number of type long by identifier
+// char* confstr is the configuration string containing the needed data
+// int length is the length of the configuration string
+// char* identifier is the string preceding the needed data
+// long* res is the pointer to the variable the data should be written to
 char pony_extract_long(char* confstr, int length, char* identifier, long* res)
 {
 	confstr = pony_locatesubstrendn(confstr, length, identifier);
@@ -499,7 +573,7 @@ char pony_extract_long(char* confstr, int length, char* identifier, long* res)
 	{
 		return 0;
 	}
-	if (confstr[0] - '0' > 9 || confstr[0] - '0' < 0)
+	if ((confstr[0] - '0' > 9 || confstr[0] - '0' < 0) && confstr[0] != '-')
 	{
 		return 0;
 	}
@@ -507,6 +581,11 @@ char pony_extract_long(char* confstr, int length, char* identifier, long* res)
 	return 1;
 }
 
+// function for obtaining number of type float by identifier
+// char* confstr is the configuration string containing the needed data
+// int length is the length of the configuration string
+// char* identifier is the string preceding the needed data
+// float* res is the pointer to the variable the data should be written to
 char pony_extract_float(char* confstr, int length, char* identifier, float* res)
 {
 	confstr = pony_locatesubstrendn(confstr, length, identifier);
@@ -514,7 +593,7 @@ char pony_extract_float(char* confstr, int length, char* identifier, float* res)
 	{
 		return 0;
 	}
-	if ((confstr[0] - '0' > 9 || confstr[0] - '0' < 0) && confstr[0] != '.' && confstr[0] != 'e' && confstr[0] != 'E')
+	if ((confstr[0] - '0' > 9 || confstr[0] - '0' < 0) && confstr[0] != '.' && confstr[0] != 'e' && confstr[0] != 'E' && confstr[0] != '-')
 	{
 		return 0;
 	}
@@ -522,6 +601,11 @@ char pony_extract_float(char* confstr, int length, char* identifier, float* res)
 	return 1;
 }
 
+// function for obtaining number of type double by identifier
+// char* confstr is the configuration string containing the needed data
+// int length is the length of the configuration string
+// char* identifier is the string preceding the needed data
+// double* res is the pointer to the variable the data should be written to
 char pony_extract_double(char* confstr, int length, char* identifier, double* res)
 {
 	confstr = pony_locatesubstrendn(confstr, length, identifier);
@@ -529,7 +613,7 @@ char pony_extract_double(char* confstr, int length, char* identifier, double* re
 	{
 		return 0;
 	}
-	if ((confstr[0] - '0' > 9 || confstr[0] - '0' < 0) && confstr[0] != '.' && confstr[0] != 'e' && confstr[0] != 'E')
+	if ((confstr[0] - '0' > 9 || confstr[0] - '0' < 0) && confstr[0] != '.' && confstr[0] != 'e' && confstr[0] != 'E' && confstr[0] != '-')
 	{
 		return 0;
 	}
@@ -537,6 +621,11 @@ char pony_extract_double(char* confstr, int length, char* identifier, double* re
 	return 1;
 }
 
+// function for obtaining boolean by identifier (true - 1, false - 0)
+// char* confstr is the configuration string containing the needed data
+// int length is the length of the configuration string
+// char* identifier is the string preceding the needed data
+// char* res is the pointer to the variable the data should be written to
 char pony_extract_bool(char* confstr, int length, char* identifier, char* res)
 {
 	confstr = pony_locatesubstrendn(confstr, length, identifier);
