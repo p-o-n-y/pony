@@ -1,4 +1,4 @@
-#include "stdafx.h" //for Visual studio
+//#include "stdafx.h" //for Visual studio
 #include <stdlib.h>
 #include <string.h>
 #include "pony.h"
@@ -69,12 +69,14 @@ char* pony_locatesubstrn(char* str, int len, char* substr, int substrlen)
 char* pony_locatesubstrendn(char* str, int len, char* substr)
 {
 	int n;
+	char* res;
+
 	n = 0;
 	while (substr[n] != '\0')
 	{
 		n++;
 	}
-	char* res = pony_locatesubstrn(str, len, substr, n);
+	res = pony_locatesubstrn(str, len, substr, n);
 	if (res == NULL)
 	{
 		return NULL;
@@ -119,9 +121,8 @@ char* pony_locatesubstreff(char* str, char* substr, int substrlen)
 // int substrlen is the pre-calculated substring length
 char* pony_locatesubstrendeff(char* str, char* substr, int substrlen)
 {
-	char* res = str;
-
 	int in = 0;
+	char* res = str;
 
 	while ((*res) != '\0')
 	{
@@ -316,6 +317,9 @@ char pony_add_plugin(void(*newplugin)(void))
 // char* config is the configuration for pony
 char pony_init(char* config)
 {
+	int lbuffer = 0;
+	char* strbuffer = NULL;
+
 	pony.conflength = 0;
 
 	while (config[pony.conflength] != '\0')
@@ -323,15 +327,11 @@ char pony_init(char* config)
 		pony.conflength++;
 	}
 
-	pony.conf = malloc(sizeof(char) * (pony.conflength + 1));
+	pony.conf = (char *)malloc(sizeof(char) * (pony.conflength + 1));
 	pony_format(config, &pony.conf);
 
 
 	pony_extractconsubstr("", pony.conf, pony.conflength, &pony.bus.conf, &pony.bus.conflength);
-
-	
-	char* strbuffer = NULL;
-	int lbuffer = 0;
 
 	if (pony_extractconsubstr("{imu:", pony.conf, pony.conflength, &strbuffer, &lbuffer))
 	{
