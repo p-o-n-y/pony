@@ -1,6 +1,5 @@
-//#include "stdafx.h" //for Visual studio
+//#include "stdafx.h" //for Visual studio -- should remain removed in future versions
 #include <stdlib.h>
-#include <string.h>
 #include "pony.h"
 
 
@@ -157,87 +156,99 @@ int pony_conpartlength(char* str)
 // int len is the length of str
 // char** substr is the pointer to be used for setting the pony pointer to the beginning of the searched substring
 // int* substrlen is the pointer to be used for setting the length of (*substr) in pony
-char pony_extractconsubstr(char* filter, char* str, int len, char** substr, int* substrlen)
+char pony_locateconfgroup(const char* groupname, char* confstr, const int conflen, char** groupptr, int* grouplen)
 {
-	if (filter[0] == '\0')
-	{
-		int in = 0;
-		*substr = str;
-		*substrlen = len - 1;
-		while (*substr[0] == ' ' || *substr[0] == '{' || in != 0)
-		{
-			if (*substr[0] == '{')
-			{
-				in++;
+	int i, j;
+	int group_layer;
+	char group_found = 0;
+
+	*groupptr = NULL;
+	*grouplen = 0;
+
+	// locate configuration substring that is outside of any group
+	if (groupname[0] == '\0') {
+		for (i = 0; confstr[i] && i < conflen; i++) {
+			// skip all non-printable characters, blank spaces and commas between groups
+			for (; confstr[i] && (confstr[i] <= ' ' || confstr[i] == ',') && i < conflen; i++); 
+			// if no group started at this point
+			if (confstr[i] != '{')
+				break;
+			// if a group started
+			else {
+				group_layer = 1;
+				while (group_layer > 0 && confstr[i] && i < conflen) {
+					i++;
+					if (confstr[i] == '{')
+						group_layer++;
+					if (confstr[i] == '}')
+						group_layer--;
+				}
 			}
-			if (*substr[0] == '}')
-			{
-				in--;
-			}
-			if (*substr - str == len)
-			{
-				return 0;
-			}
-			(*substr)++;
 		}
 
-		while (1)
-		{
-			if ((str + *substrlen)[0] == '{')
-			{
-				in++;
+		// skip all non-printable characters, blank spaces and commas between groups
+		for (i++; confstr[i] && (confstr[i] <= ' ' || confstr[i] == ',') && i < conflen; i++);
+		// start from this point
+		*groupptr = confstr + i;
+
+		// determine the length, counting until the end of the string or when a group started
+		for (; (*groupptr)[*grouplen] && (*groupptr)[*grouplen] != '{'; (*grouplen)++);
+	}
+
+	// locate configuration substring inside a requested group
+	else {
+		for (i = 0; confstr[i] && !group_found && i < conflen; i++) {
+			// skip all non-printable characters, blank spaces and commas between groups
+			for (; confstr[i] && (confstr[i] <= ' ' || confstr[i] == ',') && i < conflen; i++); 
+			// if a group started
+			if (confstr[i] == '{') {
+				group_layer = 1;
+				// skip all non-printable characters and blank spaces at the beginning of the group
+				for (i++; confstr[i] && (confstr[i] <= ' ') && i < conflen; i++); 
+
+				// check if the group is the one that has been requested
+				group_found = 1;
+				for (j = 0; confstr[i] && groupname[j] && i < conflen; i++, j++)
+					if (confstr[i] != groupname[j]) {
+						group_found = 0;
+						break;
+					}
+				// if did not reach the last character of groupname
+				if (groupname[j])
+					group_found = 0;
+
+				if (group_found)
+					// start from this point
+					*groupptr = confstr + i;
+
+				// go through the rest of the group
+				while (group_layer > 0 && confstr[i] && i < conflen) {
+					if (confstr[i] == '{')
+						group_layer++;
+					if (confstr[i] == '}')
+						group_layer--;
+					i++;
+					// count if inside the requested group, except for the last symbol
+					if (group_found && group_layer > 0)
+						(*grouplen)++;
+				}
 			}
-			if ((str + *substrlen)[0] == '}')
-			{
-				in--;
-			}
-			if ((str + *substrlen)[0] != ' ' && in == 0)
-			{
-				return 1;
-			}
-			(*substrlen)--;
 		}
 	}
-	else
-	{
-		int fillen = 0;
-		while (filter[fillen] != '\0')
-		{
-			fillen++;
-		}
-		if ((*substr = pony_locatesubstrendeff(str, filter, fillen)) == NULL)
-		{
-			return 0;
-		}
-		*substrlen = pony_conpartlength(*substr);
-		return 1;
-	}
+
+	return (*grouplen)>0 ? 1 : 0;
 }
 
-// function that copies all the symbols from one string to the other, but all symbols with codes between (and including) 1 to 31 are changed to ' ' with the exception of the ones in double quotes
+// function that replaces all symbols with codes from 1 to 31 to whitespaces (' ')
 // char* fromstr is the configuration initial string
 // char** tostr is the pointer to the string to which the formatted configuration is copied
-void pony_format(char* fromstr, char** tostr)
+void pony_format(char* str)
 {
-	int n = 0;
-	int i = 0;
-	while (fromstr[i] != '\0')
-	{
-		if (fromstr[i] == '\"')
-		{
-			n = !n;
-		}
-		if (n == 0 && fromstr[i] > 0 && fromstr[i] < 32)
-		{
-			(*tostr)[i] = ' ';
-		}
-		else
-		{
-			(*tostr)[i] = fromstr[i];
-		}
-		i++;
-	}
-	(*tostr)[i] = '\0';
+	int i;
+
+	for (i = 0; str[i]; i++)
+		if (str[i] < 32)
+			str[i] = ' ';
 }
 
 // function for initialising pony_dataArrays depending on their sizes
@@ -287,15 +298,18 @@ void pony_free()
 
 
 ///
-///     Main pony functions for external programs
+///     Core pony functions for host application
 ///
 
 
 
 
 
-// function for adding user functions to the list of pony plugins, plugins are called in the order of being added
-// void(*newplugin)(void) is the plugin that the user wishes to add
+// add external functions as pony plugins, plugins are then called in the order of being added
+//
+// void(*newplugin)(void) - a pointer to a new plugin function you wish to add
+//
+// return value - TBD
 char pony_add_plugin(void(*newplugin)(void))
 {
 	if (pony.plugins == NULL)
@@ -314,67 +328,72 @@ char pony_add_plugin(void(*newplugin)(void))
 
 
 // function for initialising pony with a user-passed configuration string
-// char* config is the configuration for pony
+// 
+// char* config - pony configuration string (see documentation for syntax)
+//
+// return value - TBD
 char pony_init(char* config)
 {
-	int lbuffer = 0;
-	char* strbuffer = NULL;
+	int i;
+	int grouplen;
+	char* groupptr;
 
-	pony.conflength = 0;
-
-	while (config[pony.conflength] != '\0')
-	{
-		pony.conflength++;
-	}
+	for (pony.conflength = 0; config[pony.conflength]; pony.conflength++);
 
 	pony.conf = (char *)malloc(sizeof(char) * (pony.conflength + 1));
-	pony_format(config, &pony.conf);
+	for (i = 0; i < pony.conflength; i++)
+		pony.conf[i] = config[i];
+	pony.conf[pony.conflength] = '\0';
+	pony_format(pony.conf);
 
 
-	pony_extractconsubstr("", pony.conf, pony.conflength, &pony.bus.conf, &pony.bus.conflength);
+	pony_locateconfgroup("", pony.conf, pony.conflength, &pony.bus.conf, &pony.bus.conflength);
+	
 
-	if (pony_extractconsubstr("{imu:", pony.conf, pony.conflength, &strbuffer, &lbuffer))
+	if (pony_locateconfgroup("imu:", pony.conf, pony.conflength, &groupptr, &grouplen))
 	{
 		pony.bus.imu = (pony_imu*)calloc(sizeof(pony_imu), 1);
-		(*pony.bus.imu).conf = strbuffer;
-		(*pony.bus.imu).conflength = lbuffer;
+		pony.bus.imu->conf = groupptr;
+		pony.bus.imu->conflength = grouplen;
 
-		pony_setDASize(&(*pony.bus.imu).f, 3);
-		pony_setDASize(&(*pony.bus.imu).q, 4);
-		pony_setDASize(&(*pony.bus.imu).w, 3);
+		pony_setDASize(&(pony.bus.imu->f), 3);
+		pony_setDASize(&(pony.bus.imu->q), 4);
+		pony_setDASize(&(pony.bus.imu->w), 3);
 	}
 
-	if (pony_extractconsubstr("{gnss:", pony.conf, pony.conflength, &strbuffer, &lbuffer))
+	if (pony_locateconfgroup("gnss:", pony.conf, pony.conflength, &groupptr, &grouplen))
 	{
 		pony.bus.gnss = (pony_gnss*)calloc(sizeof(pony_gnss), 1);
-		(*pony.bus.gnss).wconf = strbuffer;
-		(*pony.bus.gnss).wconflength = lbuffer;
+		pony.bus.gnss->conf = groupptr;
+		pony.bus.gnss->conflength = grouplen;
 
-		pony_extractconsubstr("", (*pony.bus.gnss).wconf, (*pony.bus.gnss).wconflength, &(*pony.bus.gnss).conf, &(*pony.bus.gnss).conflength);
+		
+		pony_locateconfgroup("", pony.bus.gnss->conf, pony.bus.gnss->conflength, &(pony.bus.gnss->wconf), &(pony.bus.gnss->wconflength));
 
-		if (pony_extractconsubstr("{gps:", (*pony.bus.gnss).wconf, (*pony.bus.gnss).wconflength, &strbuffer, &lbuffer))
+		if (pony_locateconfgroup("gps:", pony.bus.gnss->conf, pony.bus.gnss->conflength, &groupptr, &grouplen))
 		{
-			(*pony.bus.gnss).gps = (pony_gnss_gps*)calloc(sizeof(pony_gnss_gps), 1);
-			(*(*pony.bus.gnss).gps).conf = strbuffer;
-			(*(*pony.bus.gnss).gps).conflength = lbuffer;
+			pony.bus.gnss->gps = (pony_gnss_gps*)calloc(sizeof(pony_gnss_gps), 1);
+			pony.bus.gnss->gps->conf = groupptr;
+			pony.bus.gnss->gps->conflength = grouplen;
 		}
 
-		if (pony_extractconsubstr("{glo:", (*pony.bus.gnss).wconf, (*pony.bus.gnss).wconflength, &strbuffer, &lbuffer))
+		if (pony_locateconfgroup("glo:", pony.bus.gnss->conf, pony.bus.gnss->conflength, &groupptr, &grouplen))
 		{
-			(*pony.bus.gnss).glo = (pony_gnss_glo*)calloc(sizeof(pony_gnss_glo), 1);
-			(*(*pony.bus.gnss).glo).conf = strbuffer;
-			(*(*pony.bus.gnss).glo).conflength = lbuffer;
+			pony.bus.gnss->glo = (pony_gnss_glo*)calloc(sizeof(pony_gnss_glo), 1);
+			pony.bus.gnss->glo->conf = groupptr;
+			pony.bus.gnss->glo->conflength = grouplen;
 		}
-
 	}
 	
 
 	pony.exitplnum = -1;
-
+	
 	return 1; // пока единица - успешное завершение
 }
 
-// function that is called by user during an iteration of a cycle of external program
+// function to be called by host application in a main loop
+//
+// return value - TBD
 char pony_step(void)
 {
 	int i;
@@ -403,7 +422,9 @@ char pony_step(void)
 	return (pony.bus.mode >= 0) || (pony.exitplnum >= 0);
 }
 
-// function that is called by user from external program if the user wishes to terminate pony's activity
+// function to be called by host application to force pony termination
+//
+// return value - TBD
 char pony_terminate()
 {
 	int i;
