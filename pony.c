@@ -150,12 +150,25 @@ int pony_conpartlength(char* str)
 	return (int)(pony_locatesubstreff(str, "}", 1) - str);
 }
 
-// function for "distributing" substrings from configuration to their intended destinations
-// char* filter is the string used as an identifier of an inner configurator group (use "" for getting general settings substring)
-// char* str is the string of configurator that directly contains the searched substring ( if "a {b: c {d: e} }" is passed only "a" or " c {d: e} " can be obtained, not "c" or " e")
-// int len is the length of str
-// char** substr is the pointer to be used for setting the pony pointer to the beginning of the searched substring
-// int* substrlen is the pointer to be used for setting the length of (*substr) in pony
+// locate parameter group within a configuration string
+// input:
+// char* groupname	-	group identifier (see documentation) 
+//						or 
+//						empty string to locate a substring that is outside of any group
+// char* confstr	-	configuration string to parse
+// int conflen		-	number of characters in confstr to parse
+//
+// output:
+// char** groupptr	-	reference to a pointer to the starting character of the group contents within a configuration string
+// int* grouplen	-	reference to a number of characters in the group contents
+//
+// return value:		1 if the requested group found and grouplen > 0
+//						0 otherwise
+//
+// working example:
+// groupname = "gnss:"
+// confstr = "{gnss: {gps: eph_in="gpsa.nav", obs_in="gpsa.obs"}}, out="sol.txt""
+// conflen = 66
 char pony_locateconfgroup(const char* groupname, char* confstr, const int conflen, char** groupptr, int* grouplen)
 {
 	int i, j;
