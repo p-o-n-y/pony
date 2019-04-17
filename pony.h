@@ -33,6 +33,8 @@ typedef struct                 //для измерений, выражающихся через несколько чис
 	int arrsize;               //размер массива
 } pony_dataArray;
 
+
+// IMU
 typedef struct                 //инерциальные данные
 {
 	char* conf;                //конфигурация
@@ -43,11 +45,31 @@ typedef struct                 //инерциальные данные
 	pony_dataArray q;          //кватернион
 } pony_imu;
 
+
+
+// GNSS
+typedef struct {
+
+	char prn;
+
+	double x[3];
+	double v[3];
+	double t_em;
+
+	double eph[32];
+	
+	char visible;
+	double sinEl;
+
+} pony_gps_sat;
+
 typedef struct                 //
 {
 	char* conf;                //конфигурация
 	int conflength;            //длина строки конфигурации
 
+	pony_gps_sat *sat;
+	int max_sat_num;
 } pony_gnss_gps;
 
 typedef struct                 //
@@ -70,6 +92,8 @@ typedef struct                 //спутниковые данные
 
 } pony_gnss;
 
+
+// CORE
 #define pony_bus_version 0     //версия шины 
 typedef struct                 //шина
 {

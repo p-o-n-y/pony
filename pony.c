@@ -16,6 +16,7 @@
 
 pony_struct pony = { pony_bus_version,0 };
 
+
 // function for comparing strings up to a given length (like strncmp from string.h) but with a limited functionality (0 - equal, 1 - not equal)
 // char* s1, char* s2 are the compared strings
 // substrlen is the lenght up to which strings are compared, in pony is usually the lenght of a smaller string
@@ -150,6 +151,7 @@ int pony_conpartlength(char* str)
 	return (int)(pony_locatesubstreff(str, "}", 1) - str);
 }
 
+
 // locate parameter group within a configuration string
 // input:
 // char* groupname	-	group identifier (see documentation) 
@@ -252,6 +254,7 @@ char pony_locateconfgroup(const char* groupname, char* confstr, const int confle
 	return (*grouplen)>0 ? 1 : 0;
 }
 
+/*
 // function that replaces all symbols with codes from 1 to 31 to whitespaces (' ')
 // char* fromstr is the configuration initial string
 // char** tostr is the pointer to the string to which the formatted configuration is copied
@@ -263,6 +266,7 @@ void pony_format(char* str)
 		if (str[i] < 32)
 			str[i] = ' ';
 }
+*/
 
 // function for initialising pony_dataArrays depending on their sizes
 // pony_dataArray *dataarr is the pony_dataArray to be initialised
@@ -347,6 +351,8 @@ char pony_add_plugin(void(*newplugin)(void))
 // return value - TBD
 char pony_init(char* config)
 {
+	const int gps_max_number = 48;
+
 	int i;
 	int grouplen;
 	char* groupptr;
@@ -357,7 +363,7 @@ char pony_init(char* config)
 	for (i = 0; i < pony.conflength; i++)
 		pony.conf[i] = config[i];
 	pony.conf[pony.conflength] = '\0';
-	pony_format(pony.conf);
+	//pony_format(pony.conf);
 
 
 	pony_locateconfgroup("", pony.conf, pony.conflength, &pony.bus.conf, &pony.bus.conflength);
@@ -388,6 +394,10 @@ char pony_init(char* config)
 			pony.bus.gnss->gps = (pony_gnss_gps*)calloc(sizeof(pony_gnss_gps), 1);
 			pony.bus.gnss->gps->conf = groupptr;
 			pony.bus.gnss->gps->conflength = grouplen;
+
+			pony.bus.gnss->gps->max_sat_num = gps_max_number;
+			pony.bus.gnss->gps->sat = (pony_gps_sat*)calloc(sizeof(pony_gps_sat), pony.bus.gnss->gps->max_sat_num);
+
 		}
 
 		if (pony_locateconfgroup("glo:", pony.bus.gnss->conf, pony.bus.gnss->conflength, &groupptr, &grouplen))
