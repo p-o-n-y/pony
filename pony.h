@@ -49,27 +49,41 @@ typedef struct                 //инерциальные данные
 
 // GNSS
 typedef struct {
+	int Y;
+	int M;
+	int D;
+	int h;
+	int m;
+	double s;
+} pony_time_epoch;
 
-	char prn;
+typedef struct {
 
+	double *eph;
+
+	double t_em;
 	double x[3];
 	double v[3];
-	double t_em;
-
-	double eph[32];
 	
 	char visible;
 	double sinEl;
 
-} pony_gps_sat;
+	double *obs;			// массив измерений на текущий момент, определяется at runtime
+
+} pony_gnss_gps_sat;
 
 typedef struct                 //
 {
 	char* conf;                //конфигурация
 	int conflength;            //длина строки конфигурации
 
-	pony_gps_sat *sat;
+	pony_gnss_gps_sat *sat;			// спутники
 	int max_sat_num;
+	int max_eph_count;
+
+	pony_dataArray iono_a;
+	pony_dataArray iono_b;
+	pony_dataArray clock_corr;
 } pony_gnss_gps;
 
 typedef struct                 //
@@ -86,6 +100,8 @@ typedef struct                 //спутниковые данные
 
 	pony_gnss_gps* gps;
 	pony_gnss_glo* glo;
+
+	pony_time_epoch epoch;
 
 	char* wconf;
 	int wconflength;

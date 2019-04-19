@@ -202,12 +202,12 @@ char pony_locateconfgroup(const char* groupname, char* confstr, const int confle
 		}
 
 		// skip all non-printable characters, blank spaces and commas between groups
-		for (i++; confstr[i] && (confstr[i] <= ' ' || confstr[i] == ',') && i < conflen; i++);
+		for (; confstr[i] && (confstr[i] <= ' ' || confstr[i] == ',') && i < conflen; i++);
 		// start from this point
 		*groupptr = confstr + i;
 
-		// determine the length, counting until the end of the string or when a group started
-		for (; (*groupptr)[*grouplen] && (*groupptr)[*grouplen] != '{'; (*grouplen)++);
+		// determine the length, counting until the end of the string or when a group started or ended
+		for (; (*groupptr)[*grouplen] && (*groupptr)[*grouplen] != '{' && (*groupptr)[*grouplen] != '}'; (*grouplen)++);
 	}
 
 	// locate configuration substring inside a requested group
@@ -251,7 +251,7 @@ char pony_locateconfgroup(const char* groupname, char* confstr, const int confle
 		}
 	}
 
-	return (*grouplen)>0 ? 1 : 0;
+	return (*groupptr == NULL) ? 0 : 1;
 }
 
 /*
@@ -273,33 +273,42 @@ void pony_format(char* str)
 // int size is the size of the array
 void pony_setDASize(pony_dataArray *dataarr, int size)
 {
-	(*dataarr).arrsize = size;
-	(*dataarr).val = (double*)calloc(sizeof(double), size);
+	dataarr->arrsize = size;
+	dataarr->val = (double*)calloc(sizeof(double), size);
 }
 
 // function for freeing the memory allocated to pony, should be used only as the last step of terminating pony's activity
 void pony_free()
 {
+	int i;
 
 	if (pony.bus.imu != NULL)
 	{
-		free((*pony.bus.imu).f.val);
-		free((*pony.bus.imu).q.val);
-		free((*pony.bus.imu).w.val);
+		free(pony.bus.imu->f.val);
+		free(pony.bus.imu->q.val);
+		free(pony.bus.imu->w.val);
 
 		free(pony.bus.imu);
 	}
 
 	if (pony.bus.gnss != NULL)
 	{
-		if ((*pony.bus.gnss).gps != NULL)
+		if (pony.bus.gnss->gps != NULL)
 		{
-			free((*pony.bus.gnss).gps);
+			if (pony.bus.gnss->gps->sat != NULL)
+			{
+				for (i = 0; i < pony.bus.gnss->gps->max_sat_num; i++)
+					if (pony.bus.gnss->gps->sat[i].eph != NULL)
+						free(pony.bus.gnss->gps->sat[i].eph);
+
+				free(pony.bus.gnss->gps->sat);
+			}
+			free(pony.bus.gnss->gps);
 		}
 
-		if ((*pony.bus.gnss).glo != NULL)
+		if (pony.bus.gnss->glo != NULL)
 		{
-			free((*pony.bus.gnss).glo);
+			free(pony.bus.gnss->glo);
 		}
 
 		free(pony.bus.gnss);
@@ -351,7 +360,9 @@ char pony_add_plugin(void(*newplugin)(void))
 // return value - TBD
 char pony_init(char* config)
 {
-	const int gps_max_number = 48;
+	// defaults
+	const int gps_max_sat_number = 36;
+	const int gps_max_eph_count = 32;
 
 	int i;
 	int grouplen;
@@ -395,8 +406,17 @@ char pony_init(char* config)
 			pony.bus.gnss->gps->conf = groupptr;
 			pony.bus.gnss->gps->conflength = grouplen;
 
-			pony.bus.gnss->gps->max_sat_num = gps_max_number;
-			pony.bus.gnss->gps->sat = (pony_gps_sat*)calloc(sizeof(pony_gps_sat), pony.bus.gnss->gps->max_sat_num);
+			pony.bus.gnss->gps->max_sat_num = gps_max_sat_number;
+			pony.bus.gnss->gps->sat = (pony_gnss_gps_sat*)calloc(sizeof(pony_gnss_gps_sat), pony.bus.gnss->gps->max_sat_num);
+			for (i = 0; i < pony.bus.gnss->gps->max_sat_num; i++)
+				pony.bus.gnss->gps->sat[i].obs = NULL;
+			pony.bus.gnss->gps->max_eph_count = gps_max_eph_count;
+			for (i = 0; i < pony.bus.gnss->gps->max_sat_num; i++)
+				pony.bus.gnss->gps->sat[i].eph = (double *)calloc(sizeof(double),pony.bus.gnss->gps->max_eph_count);
+
+			pony_setDASize(&(pony.bus.gnss->gps->iono_a), 4);
+			pony_setDASize(&(pony.bus.gnss->gps->iono_b), 4);
+			pony_setDASize(&(pony.bus.gnss->gps->clock_corr), 3);
 
 		}
 
