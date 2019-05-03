@@ -307,6 +307,14 @@ void pony_free()
 
 		if (pony.bus.gnss->glo != NULL)
 		{
+			if (pony.bus.gnss->glo->sat != NULL)
+			{
+				for (i = 0; i < pony.bus.gnss->glo->max_sat_num; i++)
+					if (pony.bus.gnss->glo->sat[i].eph != NULL)
+						free(pony.bus.gnss->glo->sat[i].eph);
+
+				free(pony.bus.gnss->glo->sat);
+			}
 			free(pony.bus.gnss->glo);
 		}
 
