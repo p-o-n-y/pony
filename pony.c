@@ -321,7 +321,7 @@ void pony_free()
 		free(pony.bus.gnss);
 	}
 
-	free(pony.conf);
+	free(pony.cfg);
 	free(pony.plugins);
 
 }
@@ -377,23 +377,23 @@ char pony_init(char* config)
 	int grouplen;
 	char* groupptr;
 
-	for (pony.conflength = 0; config[pony.conflength]; pony.conflength++);
+	for (pony.cfglength = 0; config[pony.cfglength]; pony.cfglength++);
 
-	pony.conf = (char *)malloc(sizeof(char) * (pony.conflength + 1));
-	for (i = 0; i < pony.conflength; i++)
-		pony.conf[i] = config[i];
-	pony.conf[pony.conflength] = '\0';
-	//pony_format(pony.conf);
-
-
-	pony_locateconfgroup("", pony.conf, pony.conflength, &pony.bus.conf, &pony.bus.conflength);
+	pony.cfg = (char *)malloc(sizeof(char) * (pony.cfglength + 1));
+	for (i = 0; i < pony.cfglength; i++)
+		pony.cfg[i] = config[i];
+	pony.cfg[pony.cfglength] = '\0';
+	//pony_format(pony.cfg);
 
 
-	if (pony_locateconfgroup("imu:", pony.conf, pony.conflength, &groupptr, &grouplen))
+	pony_locateconfgroup("", pony.cfg, pony.cfglength, &pony.bus.cfg, &pony.bus.cfglength);
+
+
+	if (pony_locateconfgroup("imu:", pony.cfg, pony.cfglength, &groupptr, &grouplen))
 	{
 		pony.bus.imu = (pony_imu*)calloc(sizeof(pony_imu), 1);
-		pony.bus.imu->conf = groupptr;
-		pony.bus.imu->conflength = grouplen;
+		pony.bus.imu->cfg = groupptr;
+		pony.bus.imu->cfglength = grouplen;
 
 		pony_setDASize(&(pony.bus.imu->f), 3);
 		pony_setDASize(&(pony.bus.imu->q), 4);
@@ -401,7 +401,7 @@ char pony_init(char* config)
 		
 		double fs;
 
-		if (pony_extract_double(pony.bus.imu->conf, pony.bus.imu->conflength, "fs = ", &fs))
+		if (pony_extract_double(pony.bus.imu->cfg, pony.bus.imu->cfglength, "fs = ", &fs))
 		{
 			pony.bus.imu->dt.val = 1 / fs;
 		}
@@ -412,20 +412,20 @@ char pony_init(char* config)
 
 	}
 
-	if (pony_locateconfgroup("gnss:", pony.conf, pony.conflength, &groupptr, &grouplen))
+	if (pony_locateconfgroup("gnss:", pony.cfg, pony.cfglength, &groupptr, &grouplen))
 	{
 		pony.bus.gnss = (pony_gnss*)calloc(sizeof(pony_gnss), 1);
-		pony.bus.gnss->conf = groupptr;
-		pony.bus.gnss->conflength = grouplen;
+		pony.bus.gnss->cfg = groupptr;
+		pony.bus.gnss->cfglength = grouplen;
 
 
-		pony_locateconfgroup("", pony.bus.gnss->conf, pony.bus.gnss->conflength, &(pony.bus.gnss->wconf), &(pony.bus.gnss->wconflength));
+		pony_locateconfgroup("", pony.bus.gnss->cfg, pony.bus.gnss->cfglength, &(pony.bus.gnss->wcfg), &(pony.bus.gnss->wcfglength));
 
-		if (pony_locateconfgroup("gps:", pony.bus.gnss->conf, pony.bus.gnss->conflength, &groupptr, &grouplen))
+		if (pony_locateconfgroup("gps:", pony.bus.gnss->cfg, pony.bus.gnss->cfglength, &groupptr, &grouplen))
 		{
 			pony.bus.gnss->gps = (pony_gnss_gps*)calloc(sizeof(pony_gnss_gps), 1);
-			pony.bus.gnss->gps->conf = groupptr;
-			pony.bus.gnss->gps->conflength = grouplen;
+			pony.bus.gnss->gps->cfg = groupptr;
+			pony.bus.gnss->gps->cfglength = grouplen;
 
 			pony.bus.gnss->gps->max_sat_num = gps_max_sat_number;
 			pony.bus.gnss->gps->sat = (pony_gnss_gps_sat*)calloc(sizeof(pony_gnss_gps_sat), pony.bus.gnss->gps->max_sat_num);
@@ -441,11 +441,11 @@ char pony_init(char* config)
 
 		}
 
-		if (pony_locateconfgroup("glo:", pony.bus.gnss->conf, pony.bus.gnss->conflength, &groupptr, &grouplen))
+		if (pony_locateconfgroup("glo:", pony.bus.gnss->cfg, pony.bus.gnss->cfglength, &groupptr, &grouplen))
 		{
 			pony.bus.gnss->glo = (pony_gnss_glo*)calloc(sizeof(pony_gnss_glo), 1);
-			pony.bus.gnss->glo->conf = groupptr;
-			pony.bus.gnss->glo->conflength = grouplen;
+			pony.bus.gnss->glo->cfg = groupptr;
+			pony.bus.gnss->glo->cfglength = grouplen;
 
 			pony.bus.gnss->glo->max_sat_num = glo_max_sat_number;
 			pony.bus.gnss->glo->sat = (pony_gnss_gps_sat*)calloc(sizeof(pony_gnss_gps_sat), pony.bus.gnss->glo->max_sat_num);

@@ -37,8 +37,8 @@ typedef struct                 //äëÿ èçìåðåíèé, âûðàæàþùèõ
 // IMU
 typedef struct                 //èíåðöèàëüíûå äàííûå
 {
-	char* conf;                //êîíôèãóðàöèÿ
-	int conflength;            //äëèíà ñòðîêè êîíôèãóðàöèè
+	char* cfg;                //êîíôèãóðàöèÿ
+	int cfglength;            //äëèíà ñòðîêè êîíôèãóðàöèè
 
 	pony_dataArray w;          //ãèðîñêîïû
 	pony_dataArray f;          //àêñåëåðîìåòðû
@@ -75,8 +75,8 @@ typedef struct {
 
 typedef struct                 //
 {
-	char* conf;                //êîíôèãóðàöèÿ
-	int conflength;            //äëèíà ñòðîêè êîíôèãóðàöèè
+	char* cfg;                //êîíôèãóðàöèÿ
+	int cfglength;            //äëèíà ñòðîêè êîíôèãóðàöèè
 
 	pony_gnss_gps_sat *sat;			// ñïóòíèêè
 	int max_sat_num;
@@ -89,8 +89,8 @@ typedef struct                 //
 
 typedef struct                 //
 {
-	char* conf;                //êîíôèãóðàöèÿ
-	int conflength;            //äëèíà ñòðîêè êîíôèãóðàöèè
+	char* cfg;                //êîíôèãóðàöèÿ
+	int cfglength;            //äëèíà ñòðîêè êîíôèãóðàöèè
 
 	pony_gnss_gps_sat *sat;			// ñïóòíèêè
 	int max_sat_num;
@@ -103,16 +103,16 @@ typedef struct                 //
 
 typedef struct                 //ñïóòíèêîâûå äàííûå
 {
-	char* conf;                //êîíôèãóðàöèÿ
-	int conflength;            //äëèíà ñòðîêè êîíôèãóðàöèè
+	char* cfg;                //êîíôèãóðàöèÿ
+	int cfglength;            //äëèíà ñòðîêè êîíôèãóðàöèè
 
 	pony_gnss_gps* gps;
 	pony_gnss_glo* glo;
 
 	pony_time_epoch epoch;
 
-	char* wconf;
-	int wconflength;
+	char* wcfg;
+	int wcfglength;
 
 } pony_gnss;
 
@@ -129,8 +129,8 @@ typedef struct                 //øèíà
 
 	pony_data t;               //âðåìÿ
 
-	char* conf;                //êîíôèãóðàöèÿ
-	int conflength;            //äëèíà ñòðîêè êîíôèãóðàöèè
+	char* cfg;                //êîíôèãóðàöèÿ
+	int cfglength;            //äëèíà ñòðîêè êîíôèãóðàöèè
 } pony_bus;
 
 typedef struct
@@ -140,8 +140,8 @@ typedef struct
 	void(**plugins)(void);     //óêàçàòåëü íà ìàññèâ óêàçàòåëåé íà ïëàãèíû
 	int pluginsNum;            //êîëè÷åñòâî ïëàãèíîâ
 
-	char* conf;                //êîíôèãóðàöèÿ
-	int conflength;            //äëèíà ñòðîêè êîíôèãóðàöèè
+	char* cfg;                //êîíôèãóðàöèÿ
+	int cfglength;            //äëèíà ñòðîêè êîíôèãóðàöèè
 
 	int exitplnum;             //íîìåð ïëàãèíà, âûçâàâøåãî çàâåðøèâøåíèå ðàáîòû
 } pony_struct;
