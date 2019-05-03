@@ -1,4 +1,4 @@
-//#include "stdafx.h" //for Visual studio -- should remain removed in future versions
+п»ї//#include "stdafx.h" //for Visual studio -- should remain removed in future versions
 #include <stdlib.h>
 #include "pony.h"
 
@@ -51,7 +51,7 @@ char pony_strcmptofixed(char* str, char* substr) //not used
 char* pony_locatesubstrn(char* str, int len, char* substr, int substrlen)
 {
 	int n = 0;
-	while (n + substrlen <= len )
+	while (n + substrlen <= len)
 	{
 		if (pony_strncmpeff(str + n, substr, substrlen) == 0)
 		{
@@ -81,7 +81,7 @@ char* pony_locatesubstrendn(char* str, int len, char* substr)
 	{
 		return NULL;
 	}
-	
+
 	return res + n;
 }
 
@@ -89,7 +89,7 @@ char* pony_locatesubstrendn(char* str, int len, char* substr)
 // char* str is a part of a configuration string
 // char* substr is the substring to be located
 // int substrlen is the pre-calculated substring length
-char* pony_locatesubstreff(char* str, char* substr, int substrlen)  
+char* pony_locatesubstreff(char* str, char* substr, int substrlen)
 {
 	char* res = str;
 
@@ -184,7 +184,7 @@ char pony_locateconfgroup(const char* groupname, char* confstr, const int confle
 	if (groupname[0] == '\0') {
 		for (i = 0; confstr[i] && i < conflen; i++) {
 			// skip all non-printable characters, blank spaces and commas between groups
-			for (; confstr[i] && (confstr[i] <= ' ' || confstr[i] == ',') && i < conflen; i++); 
+			for (; confstr[i] && (confstr[i] <= ' ' || confstr[i] == ',') && i < conflen; i++);
 			// if no group started at this point
 			if (confstr[i] != '{')
 				break;
@@ -214,12 +214,12 @@ char pony_locateconfgroup(const char* groupname, char* confstr, const int confle
 	else {
 		for (i = 0; confstr[i] && !group_found && i < conflen; i++) {
 			// skip all non-printable characters, blank spaces and commas between groups
-			for (; confstr[i] && (confstr[i] <= ' ' || confstr[i] == ',') && i < conflen; i++); 
+			for (; confstr[i] && (confstr[i] <= ' ' || confstr[i] == ',') && i < conflen; i++);
 			// if a group started
 			if (confstr[i] == '{') {
 				group_layer = 1;
 				// skip all non-printable characters and blank spaces at the beginning of the group
-				for (i++; confstr[i] && (confstr[i] <= ' ') && i < conflen; i++); 
+				for (i++; confstr[i] && (confstr[i] <= ' ') && i < conflen; i++);
 
 				// check if the group is the one that has been requested
 				group_found = 1;
@@ -260,11 +260,10 @@ char pony_locateconfgroup(const char* groupname, char* confstr, const int confle
 // char** tostr is the pointer to the string to which the formatted configuration is copied
 void pony_format(char* str)
 {
-	int i;
-
-	for (i = 0; str[i]; i++)
-		if (str[i] < 32)
-			str[i] = ' ';
+int i;
+for (i = 0; str[i]; i++)
+if (str[i] < 32)
+str[i] = ' ';
 }
 */
 
@@ -349,7 +348,7 @@ char pony_add_plugin(void(*newplugin)(void))
 	pony.plugins[pony.pluginsNum] = newplugin;
 	pony.pluginsNum++;
 
-	return 1; // пока единица - успешное завершение
+	return 1; // ГЇГ®ГЄГ  ГҐГ¤ГЁГ­ГЁГ¶Г  - ГіГ±ГЇГҐГёГ­Г®ГҐ Г§Г ГўГҐГ°ГёГҐГ­ГЁГҐ
 }
 
 
@@ -363,6 +362,8 @@ char pony_init(char* config)
 	// defaults
 	const int gps_max_sat_number = 36;
 	const int gps_max_eph_count = 32;
+	const int glo_max_sat_number = 36;
+	const int glo_max_eph_count = 16;
 
 	int i;
 	int grouplen;
@@ -378,7 +379,7 @@ char pony_init(char* config)
 
 
 	pony_locateconfgroup("", pony.conf, pony.conflength, &pony.bus.conf, &pony.bus.conflength);
-	
+
 
 	if (pony_locateconfgroup("imu:", pony.conf, pony.conflength, &groupptr, &grouplen))
 	{
@@ -389,6 +390,18 @@ char pony_init(char* config)
 		pony_setDASize(&(pony.bus.imu->f), 3);
 		pony_setDASize(&(pony.bus.imu->q), 4);
 		pony_setDASize(&(pony.bus.imu->w), 3);
+		
+		double fs;
+
+		if (pony_extract_double(pony.bus.imu->conf, pony.bus.imu->conflength, "fs = ", &fs))
+		{
+			pony.bus.imu->dt.val = 1 / fs;
+		}
+		else
+		{
+			pony.bus.imu->dt.val = 1;
+		}
+
 	}
 
 	if (pony_locateconfgroup("gnss:", pony.conf, pony.conflength, &groupptr, &grouplen))
@@ -397,7 +410,7 @@ char pony_init(char* config)
 		pony.bus.gnss->conf = groupptr;
 		pony.bus.gnss->conflength = grouplen;
 
-		
+
 		pony_locateconfgroup("", pony.bus.gnss->conf, pony.bus.gnss->conflength, &(pony.bus.gnss->wconf), &(pony.bus.gnss->wconflength));
 
 		if (pony_locateconfgroup("gps:", pony.bus.gnss->conf, pony.bus.gnss->conflength, &groupptr, &grouplen))
@@ -412,7 +425,7 @@ char pony_init(char* config)
 				pony.bus.gnss->gps->sat[i].obs = NULL;
 			pony.bus.gnss->gps->max_eph_count = gps_max_eph_count;
 			for (i = 0; i < pony.bus.gnss->gps->max_sat_num; i++)
-				pony.bus.gnss->gps->sat[i].eph = (double *)calloc(sizeof(double),pony.bus.gnss->gps->max_eph_count);
+				pony.bus.gnss->gps->sat[i].eph = (double *)calloc(sizeof(double), pony.bus.gnss->gps->max_eph_count);
 
 			pony_setDASize(&(pony.bus.gnss->gps->iono_a), 4);
 			pony_setDASize(&(pony.bus.gnss->gps->iono_b), 4);
@@ -425,13 +438,25 @@ char pony_init(char* config)
 			pony.bus.gnss->glo = (pony_gnss_glo*)calloc(sizeof(pony_gnss_glo), 1);
 			pony.bus.gnss->glo->conf = groupptr;
 			pony.bus.gnss->glo->conflength = grouplen;
+
+			pony.bus.gnss->glo->max_sat_num = glo_max_sat_number;
+			pony.bus.gnss->glo->sat = (pony_gnss_gps_sat*)calloc(sizeof(pony_gnss_gps_sat), pony.bus.gnss->glo->max_sat_num);
+			for (i = 0; i < pony.bus.gnss->glo->max_sat_num; i++)
+				pony.bus.gnss->glo->sat[i].obs = NULL;
+			pony.bus.gnss->glo->max_eph_count = glo_max_eph_count;
+			for (i = 0; i < pony.bus.gnss->glo->max_sat_num; i++)
+				pony.bus.gnss->glo->sat[i].eph = (double *)calloc(sizeof(double), pony.bus.gnss->glo->max_eph_count);
+
+			pony_setDASize(&(pony.bus.gnss->glo->iono_a), 4);
+			pony_setDASize(&(pony.bus.gnss->glo->iono_b), 4);
+			pony_setDASize(&(pony.bus.gnss->glo->clock_corr), 3);
 		}
 	}
-	
+
 
 	pony.exitplnum = -1;
-	
-	return 1; // пока единица - успешное завершение
+
+	return 1; // ГЇГ®ГЄГ  ГҐГ¤ГЁГ­ГЁГ¶Г  - ГіГ±ГЇГҐГёГ­Г®ГҐ Г§Г ГўГҐГ°ГёГҐГ­ГЁГҐ
 }
 
 // function to be called by host application in a main loop
@@ -481,7 +506,7 @@ char pony_terminate()
 
 	pony_free();
 
-	return 1; // пока единица - успешное завершение
+	return 1; // ГЇГ®ГЄГ  ГҐГ¤ГЁГ­ГЁГ¶Г  - ГіГ±ГЇГҐГёГ­Г®ГҐ Г§Г ГўГҐГ°ГёГҐГ­ГЁГҐ
 }
 
 

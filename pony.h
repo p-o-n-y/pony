@@ -1,4 +1,4 @@
-char pony_add_plugin(void(*newplugin)(void));
+п»їchar pony_add_plugin(void(*newplugin)(void));
 char pony_init(char*);
 char pony_step(void);
 char pony_terminate(void);
@@ -18,31 +18,32 @@ char pony_extract_bool(char* confstr, int length, char* identifier, char* res);
 
 
 
-typedef struct                 //для измерений, выражающихся через одно число
+typedef struct                 //Г¤Г«Гї ГЁГ§Г¬ГҐГ°ГҐГ­ГЁГ©, ГўГ»Г°Г Г¦Г ГѕГ№ГЁГµГ±Гї Г·ГҐГ°ГҐГ§ Г®Г¤Г­Г® Г·ГЁГ±Г«Г®
 {
-	double val;                //значение
-	unsigned char count;       //счётчик
-	unsigned char valid;       //признак валидности
+	double val;                //Г§Г­Г Г·ГҐГ­ГЁГҐ
+	unsigned char count;       //Г±Г·ВёГІГ·ГЁГЄ
+	unsigned char valid;       //ГЇГ°ГЁГ§Г­Г ГЄ ГўГ Г«ГЁГ¤Г­Г®Г±ГІГЁ
 } pony_data;
 
-typedef struct                 //для измерений, выражающихся через несколько чисел
+typedef struct                 //Г¤Г«Гї ГЁГ§Г¬ГҐГ°ГҐГ­ГЁГ©, ГўГ»Г°Г Г¦Г ГѕГ№ГЁГµГ±Гї Г·ГҐГ°ГҐГ§ Г­ГҐГ±ГЄГ®Г«ГјГЄГ® Г·ГЁГ±ГҐГ«
 {
-	double *val;               //массив значений
-	int count;                 //счётчик
-	char valid;                //признак валидности
-	int arrsize;               //размер массива
+	double *val;               //Г¬Г Г±Г±ГЁГў Г§Г­Г Г·ГҐГ­ГЁГ©
+	int count;                 //Г±Г·ВёГІГ·ГЁГЄ
+	char valid;                //ГЇГ°ГЁГ§Г­Г ГЄ ГўГ Г«ГЁГ¤Г­Г®Г±ГІГЁ
+	int arrsize;               //Г°Г Г§Г¬ГҐГ° Г¬Г Г±Г±ГЁГўГ 
 } pony_dataArray;
 
 
 // IMU
-typedef struct                 //инерциальные данные
+typedef struct                 //ГЁГ­ГҐГ°Г¶ГЁГ Г«ГјГ­Г»ГҐ Г¤Г Г­Г­Г»ГҐ
 {
-	char* conf;                //конфигурация
-	int conflength;            //длина строки конфигурации
+	char* conf;                //ГЄГ®Г­ГґГЁГЈГіГ°Г Г¶ГЁГї
+	int conflength;            //Г¤Г«ГЁГ­Г  Г±ГІГ°Г®ГЄГЁ ГЄГ®Г­ГґГЁГЈГіГ°Г Г¶ГЁГЁ
 
-	pony_dataArray w;          //гироскопы
-	pony_dataArray f;          //акселерометры
-	pony_dataArray q;          //кватернион
+	pony_dataArray w;          //ГЈГЁГ°Г®Г±ГЄГ®ГЇГ»
+	pony_dataArray f;          //Г ГЄГ±ГҐГ«ГҐГ°Г®Г¬ГҐГІГ°Г»
+	pony_dataArray q;          //ГЄГўГ ГІГҐГ°Г­ГЁГ®Г­
+	pony_data dt;
 } pony_imu;
 
 
@@ -64,20 +65,20 @@ typedef struct {
 	double t_em;
 	double x[3];
 	double v[3];
-	
+
 	char visible;
 	double sinEl;
 
-	double *obs;			// массив измерений на текущий момент, определяется at runtime
+	double *obs;			// Г¬Г Г±Г±ГЁГў ГЁГ§Г¬ГҐГ°ГҐГ­ГЁГ© Г­Г  ГІГҐГЄГіГ№ГЁГ© Г¬Г®Г¬ГҐГ­ГІ, Г®ГЇГ°ГҐГ¤ГҐГ«ГїГҐГІГ±Гї at runtime
 
 } pony_gnss_gps_sat;
 
 typedef struct                 //
 {
-	char* conf;                //конфигурация
-	int conflength;            //длина строки конфигурации
+	char* conf;                //ГЄГ®Г­ГґГЁГЈГіГ°Г Г¶ГЁГї
+	int conflength;            //Г¤Г«ГЁГ­Г  Г±ГІГ°Г®ГЄГЁ ГЄГ®Г­ГґГЁГЈГіГ°Г Г¶ГЁГЁ
 
-	pony_gnss_gps_sat *sat;			// спутники
+	pony_gnss_gps_sat *sat;			// Г±ГЇГіГІГ­ГЁГЄГЁ
 	int max_sat_num;
 	int max_eph_count;
 
@@ -88,15 +89,22 @@ typedef struct                 //
 
 typedef struct                 //
 {
-	char* conf;                //конфигурация
-	int conflength;            //длина строки конфигурации
+	char* conf;                //ГЄГ®Г­ГґГЁГЈГіГ°Г Г¶ГЁГї
+	int conflength;            //Г¤Г«ГЁГ­Г  Г±ГІГ°Г®ГЄГЁ ГЄГ®Г­ГґГЁГЈГіГ°Г Г¶ГЁГЁ
 
+	pony_gnss_gps_sat *sat;			// Г±ГЇГіГІГ­ГЁГЄГЁ
+	int max_sat_num;
+	int max_eph_count;
+
+	pony_dataArray iono_a;
+	pony_dataArray iono_b;
+	pony_dataArray clock_corr;
 } pony_gnss_glo;
 
-typedef struct                 //спутниковые данные
+typedef struct                 //Г±ГЇГіГІГ­ГЁГЄГ®ГўГ»ГҐ Г¤Г Г­Г­Г»ГҐ
 {
-	char* conf;                //конфигурация
-	int conflength;            //длина строки конфигурации
+	char* conf;                //ГЄГ®Г­ГґГЁГЈГіГ°Г Г¶ГЁГї
+	int conflength;            //Г¤Г«ГЁГ­Г  Г±ГІГ°Г®ГЄГЁ ГЄГ®Г­ГґГЁГЈГіГ°Г Г¶ГЁГЁ
 
 	pony_gnss_gps* gps;
 	pony_gnss_glo* glo;
@@ -110,33 +118,32 @@ typedef struct                 //спутниковые данные
 
 
 // CORE
-#define pony_bus_version 0     //версия шины 
-typedef struct                 //шина
+#define pony_bus_version 0     //ГўГҐГ°Г±ГЁГї ГёГЁГ­Г» 
+typedef struct                 //ГёГЁГ­Г 
 {
-	int ver;                   //версия шины, для использования в runtime
-	int mode;                  //режим работы: 0 инициализация, >0 работа, <0 завершение
+	int ver;                   //ГўГҐГ°Г±ГЁГї ГёГЁГ­Г», Г¤Г«Гї ГЁГ±ГЇГ®Г«ГјГ§Г®ГўГ Г­ГЁГї Гў runtime
+	int mode;                  //Г°ГҐГ¦ГЁГ¬ Г°Г ГЎГ®ГІГ»: 0 ГЁГ­ГЁГ¶ГЁГ Г«ГЁГ§Г Г¶ГЁГї, >0 Г°Г ГЎГ®ГІГ , <0 Г§Г ГўГҐГ°ГёГҐГ­ГЁГҐ
 
 	pony_imu* imu;
 	pony_gnss* gnss;
 
-	pony_data t;               //время
+	pony_data t;               //ГўГ°ГҐГ¬Гї
 
-	char* conf;                //конфигурация
-	int conflength;            //длина строки конфигурации
+	char* conf;                //ГЄГ®Г­ГґГЁГЈГіГ°Г Г¶ГЁГї
+	int conflength;            //Г¤Г«ГЁГ­Г  Г±ГІГ°Г®ГЄГЁ ГЄГ®Г­ГґГЁГЈГіГ°Г Г¶ГЁГЁ
 } pony_bus;
 
 typedef struct
 {
 	pony_bus bus;
 
-	void(**plugins)(void);     //указатель на массив указателей на плагины
-	int pluginsNum;            //количество плагинов
+	void(**plugins)(void);     //ГіГЄГ Г§Г ГІГҐГ«Гј Г­Г  Г¬Г Г±Г±ГЁГў ГіГЄГ Г§Г ГІГҐГ«ГҐГ© Г­Г  ГЇГ«Г ГЈГЁГ­Г»
+	int pluginsNum;            //ГЄГ®Г«ГЁГ·ГҐГ±ГІГўГ® ГЇГ«Г ГЈГЁГ­Г®Гў
 
-	char* conf;                //конфигурация
-	int conflength;            //длина строки конфигурации
+	char* conf;                //ГЄГ®Г­ГґГЁГЈГіГ°Г Г¶ГЁГї
+	int conflength;            //Г¤Г«ГЁГ­Г  Г±ГІГ°Г®ГЄГЁ ГЄГ®Г­ГґГЁГЈГіГ°Г Г¶ГЁГЁ
 
-	int exitplnum;             //номер плагина, вызвавшего завершившение работы
+	int exitplnum;             //Г­Г®Г¬ГҐГ° ГЇГ«Г ГЈГЁГ­Г , ГўГ»Г§ГўГ ГўГёГҐГЈГ® Г§Г ГўГҐГ°ГёГЁГўГёГҐГ­ГЁГҐ Г°Г ГЎГ®ГІГ»
 } pony_struct;
 
 extern pony_struct pony;
-
