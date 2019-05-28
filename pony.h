@@ -71,14 +71,14 @@ typedef struct {
 
 	double *obs;			// ìàññèâ èçìåðåíèé íà òåêóùèé ìîìåíò, îïðåäåëÿåòñÿ at runtime
 
-} pony_gnss_gps_sat;
+} pony_gnss_sat;
 
 typedef struct                 //
 {
 	char* cfg;                //êîíôèãóðàöèÿ
 	int cfglength;            //äëèíà ñòðîêè êîíôèãóðàöèè
 
-	pony_gnss_gps_sat *sat;			// ñïóòíèêè
+	pony_gnss_sat *sat;			// ñïóòíèêè
 	int max_sat_num;
 	int max_eph_count;
 
@@ -92,7 +92,7 @@ typedef struct                 //
 	char* cfg;                //êîíôèãóðàöèÿ
 	int cfglength;            //äëèíà ñòðîêè êîíôèãóðàöèè
 
-	pony_gnss_gps_sat *sat;			// ñïóòíèêè
+	pony_gnss_sat *sat;			// ñïóòíèêè
 	int max_sat_num;
 	int max_eph_count;
 

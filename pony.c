@@ -1,5 +1,4 @@
-﻿//#include "stdafx.h" //for Visual studio -- should remain removed in future versions
-#include <stdlib.h>
+﻿#include <stdlib.h>
 #include "pony.h"
 
 
@@ -146,7 +145,7 @@ char* pony_locatesubstrendeff(char* str, char* substr, int substrlen)
 
 // function specifically for measuring a configuration group length
 // char* str is the beginning of the group
-int pony_conpartlength(char* str)
+int pony_cfgpartlength(char* str)
 {
 	return (int)(pony_locatesubstreff(str, "}", 1) - str);
 }
@@ -157,8 +156,8 @@ int pony_conpartlength(char* str)
 // char* groupname	-	group identifier (see documentation) 
 //						or 
 //						empty string to locate a substring that is outside of any group
-// char* confstr	-	configuration string to parse
-// int conflen		-	number of characters in confstr to parse
+// char* cfgstr	-	configuration string to parse
+// int cfglen		-	number of characters in cfgstr to parse
 //
 // output:
 // char** groupptr	-	reference to a pointer to the starting character of the group contents within a configuration string
@@ -169,9 +168,9 @@ int pony_conpartlength(char* str)
 //
 // working example:
 // groupname = "gnss:"
-// confstr = "{gnss: {gps: eph_in="gpsa.nav", obs_in="gpsa.obs"}}, out="sol.txt""
-// conflen = 66
-char pony_locateconfgroup(const char* groupname, char* confstr, const int conflen, char** groupptr, int* grouplen)
+// cfgstr = "{gnss: {gps: eph_in="gpsa.nav", obs_in="gpsa.obs"}}, out="sol.txt""
+// cfglen = 66
+char pony_locatecfggroup(const char* groupname, char* cfgstr, const int cfglen, char** groupptr, int* grouplen)
 {
 	int i, j;
 	int group_layer;
@@ -182,29 +181,29 @@ char pony_locateconfgroup(const char* groupname, char* confstr, const int confle
 
 	// locate configuration substring that is outside of any group
 	if (groupname[0] == '\0') {
-		for (i = 0; confstr[i] && i < conflen; i++) {
+		for (i = 0; cfgstr[i] && i < cfglen; i++) {
 			// skip all non-printable characters, blank spaces and commas between groups
-			for (; confstr[i] && (confstr[i] <= ' ' || confstr[i] == ',') && i < conflen; i++);
+			for (; cfgstr[i] && (cfgstr[i] <= ' ' || cfgstr[i] == ',') && i < cfglen; i++);
 			// if no group started at this point
-			if (confstr[i] != '{')
+			if (cfgstr[i] != '{')
 				break;
 			// if a group started
 			else {
 				group_layer = 1;
-				while (group_layer > 0 && confstr[i] && i < conflen) {
+				while (group_layer > 0 && cfgstr[i] && i < cfglen) {
 					i++;
-					if (confstr[i] == '{')
+					if (cfgstr[i] == '{')
 						group_layer++;
-					if (confstr[i] == '}')
+					if (cfgstr[i] == '}')
 						group_layer--;
 				}
 			}
 		}
 
 		// skip all non-printable characters, blank spaces and commas between groups
-		for (; confstr[i] && (confstr[i] <= ' ' || confstr[i] == ',') && i < conflen; i++);
+		for (; cfgstr[i] && (cfgstr[i] <= ' ' || cfgstr[i] == ',') && i < cfglen; i++);
 		// start from this point
-		*groupptr = confstr + i;
+		*groupptr = cfgstr + i;
 
 		// determine the length, counting until the end of the string or when a group started or ended
 		for (; (*groupptr)[*grouplen] && (*groupptr)[*grouplen] != '{' && (*groupptr)[*grouplen] != '}'; (*grouplen)++);
@@ -212,19 +211,19 @@ char pony_locateconfgroup(const char* groupname, char* confstr, const int confle
 
 	// locate configuration substring inside a requested group
 	else {
-		for (i = 0; confstr[i] && !group_found && i < conflen; i++) {
+		for (i = 0; cfgstr[i] && !group_found && i < cfglen; i++) {
 			// skip all non-printable characters, blank spaces and commas between groups
-			for (; confstr[i] && (confstr[i] <= ' ' || confstr[i] == ',') && i < conflen; i++);
+			for (; cfgstr[i] && (cfgstr[i] <= ' ' || cfgstr[i] == ',') && i < cfglen; i++);
 			// if a group started
-			if (confstr[i] == '{') {
+			if (cfgstr[i] == '{') {
 				group_layer = 1;
 				// skip all non-printable characters and blank spaces at the beginning of the group
-				for (i++; confstr[i] && (confstr[i] <= ' ') && i < conflen; i++);
+				for (i++; cfgstr[i] && (cfgstr[i] <= ' ') && i < cfglen; i++);
 
 				// check if the group is the one that has been requested
 				group_found = 1;
-				for (j = 0; confstr[i] && groupname[j] && i < conflen; i++, j++)
-					if (confstr[i] != groupname[j]) {
+				for (j = 0; cfgstr[i] && groupname[j] && i < cfglen; i++, j++)
+					if (cfgstr[i] != groupname[j]) {
 						group_found = 0;
 						break;
 					}
@@ -234,13 +233,13 @@ char pony_locateconfgroup(const char* groupname, char* confstr, const int confle
 
 				if (group_found)
 					// start from this point
-					*groupptr = confstr + i;
+					*groupptr = cfgstr + i;
 
 				// go through the rest of the group
-				while (group_layer > 0 && confstr[i] && i < conflen) {
-					if (confstr[i] == '{')
+				while (group_layer > 0 && cfgstr[i] && i < cfglen) {
+					if (cfgstr[i] == '{')
 						group_layer++;
-					if (confstr[i] == '}')
+					if (cfgstr[i] == '}')
 						group_layer--;
 					i++;
 					// count if inside the requested group, except for the last symbol
@@ -362,10 +361,10 @@ char pony_add_plugin(void(*newplugin)(void))
 
 // function for initialising pony with a user-passed configuration string
 // 
-// char* config - pony configuration string (see documentation for syntax)
+// char* configuration - pony configuration string (see documentation for syntax)
 //
 // return value - TBD
-char pony_init(char* config)
+char pony_init(char* configuration)
 {
 	// defaults
 	const int gps_max_sat_number = 36;
@@ -377,19 +376,19 @@ char pony_init(char* config)
 	int grouplen;
 	char* groupptr;
 
-	for (pony.cfglength = 0; config[pony.cfglength]; pony.cfglength++);
+	for (pony.cfglength = 0; configuration[pony.cfglength]; pony.cfglength++);
 
 	pony.cfg = (char *)malloc(sizeof(char) * (pony.cfglength + 1));
 	for (i = 0; i < pony.cfglength; i++)
-		pony.cfg[i] = config[i];
+		pony.cfg[i] = configuration[i];
 	pony.cfg[pony.cfglength] = '\0';
 	//pony_format(pony.cfg);
 
 
-	pony_locateconfgroup("", pony.cfg, pony.cfglength, &pony.bus.cfg, &pony.bus.cfglength);
+	pony_locatecfggroup("", pony.cfg, pony.cfglength, &pony.bus.cfg, &pony.bus.cfglength);
 
 
-	if (pony_locateconfgroup("imu:", pony.cfg, pony.cfglength, &groupptr, &grouplen))
+	if (pony_locatecfggroup("imu:", pony.cfg, pony.cfglength, &groupptr, &grouplen))
 	{
 		pony.bus.imu = (pony_imu*)calloc(sizeof(pony_imu), 1);
 		pony.bus.imu->cfg = groupptr;
@@ -398,7 +397,7 @@ char pony_init(char* config)
 		pony_setDASize(&(pony.bus.imu->f), 3);
 		pony_setDASize(&(pony.bus.imu->q), 4);
 		pony_setDASize(&(pony.bus.imu->w), 3);
-		
+
 		double fs;
 
 		if (pony_extract_double(pony.bus.imu->cfg, pony.bus.imu->cfglength, "fs = ", &fs))
@@ -412,23 +411,23 @@ char pony_init(char* config)
 
 	}
 
-	if (pony_locateconfgroup("gnss:", pony.cfg, pony.cfglength, &groupptr, &grouplen))
+	if (pony_locatecfggroup("gnss:", pony.cfg, pony.cfglength, &groupptr, &grouplen))
 	{
 		pony.bus.gnss = (pony_gnss*)calloc(sizeof(pony_gnss), 1);
 		pony.bus.gnss->cfg = groupptr;
 		pony.bus.gnss->cfglength = grouplen;
 
 
-		pony_locateconfgroup("", pony.bus.gnss->cfg, pony.bus.gnss->cfglength, &(pony.bus.gnss->wcfg), &(pony.bus.gnss->wcfglength));
+		pony_locatecfggroup("", pony.bus.gnss->cfg, pony.bus.gnss->cfglength, &(pony.bus.gnss->wcfg), &(pony.bus.gnss->wcfglength));
 
-		if (pony_locateconfgroup("gps:", pony.bus.gnss->cfg, pony.bus.gnss->cfglength, &groupptr, &grouplen))
+		if (pony_locatecfggroup("gps:", pony.bus.gnss->cfg, pony.bus.gnss->cfglength, &groupptr, &grouplen))
 		{
 			pony.bus.gnss->gps = (pony_gnss_gps*)calloc(sizeof(pony_gnss_gps), 1);
 			pony.bus.gnss->gps->cfg = groupptr;
 			pony.bus.gnss->gps->cfglength = grouplen;
 
 			pony.bus.gnss->gps->max_sat_num = gps_max_sat_number;
-			pony.bus.gnss->gps->sat = (pony_gnss_gps_sat*)calloc(sizeof(pony_gnss_gps_sat), pony.bus.gnss->gps->max_sat_num);
+			pony.bus.gnss->gps->sat = (pony_gnss_sat*)calloc(sizeof(pony_gnss_sat), pony.bus.gnss->gps->max_sat_num);
 			for (i = 0; i < pony.bus.gnss->gps->max_sat_num; i++)
 				pony.bus.gnss->gps->sat[i].obs = NULL;
 			pony.bus.gnss->gps->max_eph_count = gps_max_eph_count;
@@ -441,14 +440,14 @@ char pony_init(char* config)
 
 		}
 
-		if (pony_locateconfgroup("glo:", pony.bus.gnss->cfg, pony.bus.gnss->cfglength, &groupptr, &grouplen))
+		if (pony_locatecfggroup("glo:", pony.bus.gnss->cfg, pony.bus.gnss->cfglength, &groupptr, &grouplen))
 		{
 			pony.bus.gnss->glo = (pony_gnss_glo*)calloc(sizeof(pony_gnss_glo), 1);
 			pony.bus.gnss->glo->cfg = groupptr;
 			pony.bus.gnss->glo->cfglength = grouplen;
 
 			pony.bus.gnss->glo->max_sat_num = glo_max_sat_number;
-			pony.bus.gnss->glo->sat = (pony_gnss_gps_sat*)calloc(sizeof(pony_gnss_gps_sat), pony.bus.gnss->glo->max_sat_num);
+			pony.bus.gnss->glo->sat = (pony_gnss_sat*)calloc(sizeof(pony_gnss_sat), pony.bus.gnss->glo->max_sat_num);
 			for (i = 0; i < pony.bus.gnss->glo->max_sat_num; i++)
 				pony.bus.gnss->glo->sat[i].obs = NULL;
 			pony.bus.gnss->glo->max_eph_count = glo_max_eph_count;
@@ -531,22 +530,22 @@ char pony_terminate()
 
 // function for getting the length of the string that would have been obtained using this identifier on pony_extract_string function, functions are not merged as memory is normally allocated in between them
 // works only for standard strings, for symbol " that does not mean the end of the string use ""
-// char* confstr is the configuration string containing the needed data
+// char* cfgstr is the configuration string containing the needed data
 // int length is the length of the configuration string
 // char* identifier is the string preceding the needed data
 // int* res is the pointer to the variable the data should be written to
-char pony_extract_string_length(char* confstr, int length, char* identifier, int* res)
+char pony_extract_string_length(char* cfgstr, int length, char* identifier, int* res)
 {
 	int i = 0;
 	*res = 0;
-	confstr = pony_locatesubstrendn(confstr, length, identifier);
-	if (confstr == NULL)
+	cfgstr = pony_locatesubstrendn(cfgstr, length, identifier);
+	if (cfgstr == NULL)
 	{
 		return 0;
 	}
-	while (confstr[i] != '\"' || confstr[i + 1] == '\"')
+	while (cfgstr[i] != '\"' || cfgstr[i + 1] == '\"')
 	{
-		if (confstr[i] == '\"')
+		if (cfgstr[i] == '\"')
 		{
 			i++;
 		}
@@ -558,22 +557,22 @@ char pony_extract_string_length(char* confstr, int length, char* identifier, int
 
 // function for obtaining the string by identifier, as memory should be allocated in advance this function is not merged with pony_extract_string_length function
 // works only for standard strings, for symbol " that does not mean the end of the string use ""
-// char* confstr is the configuration string containing the needed data
+// char* cfgstr is the configuration string containing the needed data
 // int length is the length of the configuration string
 // char* identifier is the string preceding the needed data
 // char** res is the pointer to the variable the data should be written to
-char pony_extract_string(char* confstr, int length, char* identifier, char** res)
+char pony_extract_string(char* cfgstr, int length, char* identifier, char** res)
 {
 	int i = 0;
-	confstr = pony_locatesubstrendn(confstr, length, identifier);
-	if (confstr == NULL)
+	cfgstr = pony_locatesubstrendn(cfgstr, length, identifier);
+	if (cfgstr == NULL)
 	{
 		return 0;
 	}
-	while (confstr[i] != '\"' || confstr[i + 1] == '\"')
+	while (cfgstr[i] != '\"' || cfgstr[i + 1] == '\"')
 	{
-		(*res)[i] = confstr[i];
-		if (confstr[i] == '\"' && confstr[i + 1] == '\"')
+		(*res)[i] = cfgstr[i];
+		if (cfgstr[i] == '\"' && cfgstr[i + 1] == '\"')
 		{
 			i++;
 		}
@@ -583,159 +582,159 @@ char pony_extract_string(char* confstr, int length, char* identifier, char** res
 }
 
 // function for obtaining symbol by identifier
-// char* confstr is the configuration string containing the needed data
+// char* cfgstr is the configuration string containing the needed data
 // int length is the length of the configuration string
 // char* identifier is the string preceding the needed data
 // char* res is the pointer to the variable the data should be written to
-char pony_extract_char_sym(char* confstr, int length, char* identifier, char* res)
+char pony_extract_char_sym(char* cfgstr, int length, char* identifier, char* res)
 {
-	confstr = pony_locatesubstrendn(confstr, length, identifier);
-	if (confstr == NULL)
+	cfgstr = pony_locatesubstrendn(cfgstr, length, identifier);
+	if (cfgstr == NULL)
 	{
 		return 0;
 	}
-	*res = confstr[0];
+	*res = cfgstr[0];
 	return 1;
 }
 
 // function for obtaining number of type char by identifier
-// char* confstr is the configuration string containing the needed data
+// char* cfgstr is the configuration string containing the needed data
 // int length is the length of the configuration string
 // char* identifier is the string preceding the needed data
 // char* res is the pointer to the variable the data should be written to
-char pony_extract_char_num(char* confstr, int length, char* identifier, char* res)
+char pony_extract_char_num(char* cfgstr, int length, char* identifier, char* res)
 {
-	confstr = pony_locatesubstrendn(confstr, length, identifier);
-	if (confstr == NULL)
+	cfgstr = pony_locatesubstrendn(cfgstr, length, identifier);
+	if (cfgstr == NULL)
 	{
 		return 0;
 	}
-	if ((confstr[0] - '0' > 9 || confstr[0] - '0' < 0) && confstr[0] != '-')
+	if ((cfgstr[0] - '0' > 9 || cfgstr[0] - '0' < 0) && cfgstr[0] != '-')
 	{
 		return 0;
 	}
-	*res = (char)atoi(confstr);
+	*res = (char)atoi(cfgstr);
 	return 1;
 }
 
 // function for obtaining number of type short by identifier
-// char* confstr is the configuration string containing the needed data
+// char* cfgstr is the configuration string containing the needed data
 // int length is the length of the configuration string
 // char* identifier is the string preceding the needed data
 // short* res is the pointer to the variable the data should be written to
-char pony_extract_short(char* confstr, int length, char* identifier, short* res)
+char pony_extract_short(char* cfgstr, int length, char* identifier, short* res)
 {
-	confstr = pony_locatesubstrendn(confstr, length, identifier);
-	if (confstr == NULL)
+	cfgstr = pony_locatesubstrendn(cfgstr, length, identifier);
+	if (cfgstr == NULL)
 	{
 		return 0;
 	}
-	if ((confstr[0] - '0' > 9 || confstr[0] - '0' < 0) && confstr[0] != '-')
+	if ((cfgstr[0] - '0' > 9 || cfgstr[0] - '0' < 0) && cfgstr[0] != '-')
 	{
 		return 0;
 	}
-	*res = (short)atoi(confstr);
+	*res = (short)atoi(cfgstr);
 	return 1;
 }
 
 // function for obtaining number of type int by identifier
-// char* confstr is the configuration string containing the needed data
+// char* cfgstr is the configuration string containing the needed data
 // int length is the length of the configuration string
 // char* identifier is the string preceding the needed data
 // int* res is the pointer to the variable the data should be written to
-char pony_extract_int(char* confstr, int length, char* identifier, int* res)
+char pony_extract_int(char* cfgstr, int length, char* identifier, int* res)
 {
-	confstr = pony_locatesubstrendn(confstr, length, identifier);
-	if (confstr == NULL)
+	cfgstr = pony_locatesubstrendn(cfgstr, length, identifier);
+	if (cfgstr == NULL)
 	{
 		return 0;
 	}
-	if ((confstr[0] - '0' > 9 || confstr[0] - '0' < 0) && confstr[0] != '-')
+	if ((cfgstr[0] - '0' > 9 || cfgstr[0] - '0' < 0) && cfgstr[0] != '-')
 	{
 		return 0;
 	}
-	*res = atoi(confstr);
+	*res = atoi(cfgstr);
 	return 1;
 }
 
 // function for obtaining number of type long by identifier
-// char* confstr is the configuration string containing the needed data
+// char* cfgstr is the configuration string containing the needed data
 // int length is the length of the configuration string
 // char* identifier is the string preceding the needed data
 // long* res is the pointer to the variable the data should be written to
-char pony_extract_long(char* confstr, int length, char* identifier, long* res)
+char pony_extract_long(char* cfgstr, int length, char* identifier, long* res)
 {
-	confstr = pony_locatesubstrendn(confstr, length, identifier);
-	if (confstr == NULL)
+	cfgstr = pony_locatesubstrendn(cfgstr, length, identifier);
+	if (cfgstr == NULL)
 	{
 		return 0;
 	}
-	if ((confstr[0] - '0' > 9 || confstr[0] - '0' < 0) && confstr[0] != '-')
+	if ((cfgstr[0] - '0' > 9 || cfgstr[0] - '0' < 0) && cfgstr[0] != '-')
 	{
 		return 0;
 	}
-	*res = atol(confstr);
+	*res = atol(cfgstr);
 	return 1;
 }
 
 // function for obtaining number of type float by identifier
-// char* confstr is the configuration string containing the needed data
+// char* cfgstr is the configuration string containing the needed data
 // int length is the length of the configuration string
 // char* identifier is the string preceding the needed data
 // float* res is the pointer to the variable the data should be written to
-char pony_extract_float(char* confstr, int length, char* identifier, float* res)
+char pony_extract_float(char* cfgstr, int length, char* identifier, float* res)
 {
-	confstr = pony_locatesubstrendn(confstr, length, identifier);
-	if (confstr == NULL)
+	cfgstr = pony_locatesubstrendn(cfgstr, length, identifier);
+	if (cfgstr == NULL)
 	{
 		return 0;
 	}
-	if ((confstr[0] - '0' > 9 || confstr[0] - '0' < 0) && confstr[0] != '.' && confstr[0] != 'e' && confstr[0] != 'E' && confstr[0] != '-')
+	if ((cfgstr[0] - '0' > 9 || cfgstr[0] - '0' < 0) && cfgstr[0] != '.' && cfgstr[0] != 'e' && cfgstr[0] != 'E' && cfgstr[0] != '-')
 	{
 		return 0;
 	}
-	*res = (float)atof(confstr);
+	*res = (float)atof(cfgstr);
 	return 1;
 }
 
 // function for obtaining number of type double by identifier
-// char* confstr is the configuration string containing the needed data
+// char* cfgstr is the configuration string containing the needed data
 // int length is the length of the configuration string
 // char* identifier is the string preceding the needed data
 // double* res is the pointer to the variable the data should be written to
-char pony_extract_double(char* confstr, int length, char* identifier, double* res)
+char pony_extract_double(char* cfgstr, int length, char* identifier, double* res)
 {
-	confstr = pony_locatesubstrendn(confstr, length, identifier);
-	if (confstr == NULL)
+	cfgstr = pony_locatesubstrendn(cfgstr, length, identifier);
+	if (cfgstr == NULL)
 	{
 		return 0;
 	}
-	if ((confstr[0] - '0' > 9 || confstr[0] - '0' < 0) && confstr[0] != '.' && confstr[0] != 'e' && confstr[0] != 'E' && confstr[0] != '-')
+	if ((cfgstr[0] - '0' > 9 || cfgstr[0] - '0' < 0) && cfgstr[0] != '.' && cfgstr[0] != 'e' && cfgstr[0] != 'E' && cfgstr[0] != '-')
 	{
 		return 0;
 	}
-	*res = atof(confstr);
+	*res = atof(cfgstr);
 	return 1;
 }
 
 // function for obtaining boolean by identifier (true - 1, false - 0)
-// char* confstr is the configuration string containing the needed data
+// char* cfgstr is the configuration string containing the needed data
 // int length is the length of the configuration string
 // char* identifier is the string preceding the needed data
 // char* res is the pointer to the variable the data should be written to
-char pony_extract_bool(char* confstr, int length, char* identifier, char* res)
+char pony_extract_bool(char* cfgstr, int length, char* identifier, char* res)
 {
-	confstr = pony_locatesubstrendn(confstr, length, identifier);
-	if (confstr == NULL)
+	cfgstr = pony_locatesubstrendn(cfgstr, length, identifier);
+	if (cfgstr == NULL)
 	{
 		return 0;
 	}
-	if (pony_strncmpeff(confstr, "true", 4))
+	if (pony_strncmpeff(cfgstr, "true", 4))
 	{
 		*res = 1;
 		return 1;
 	}
-	if (pony_strncmpeff(confstr, "false", 5))
+	if (pony_strncmpeff(cfgstr, "false", 5))
 	{
 		*res = 0;
 		return 1;
