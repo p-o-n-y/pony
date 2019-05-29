@@ -609,7 +609,7 @@ char pony_extract_char_num(char* cfgstr, int length, char* identifier, char* res
 	{
 		return 0;
 	}
-	if ((cfgstr[0] - '0' > 9 || cfgstr[0] - '0' < 0) && cfgstr[0] != '-')
+	if ((cfgstr[0] - '0' > 9 || cfgstr[0] - '0' < 0) && cfgstr[0] != '-' && cfgstr[0] != '+')
 	{
 		return 0;
 	}
@@ -629,7 +629,7 @@ char pony_extract_short(char* cfgstr, int length, char* identifier, short* res)
 	{
 		return 0;
 	}
-	if ((cfgstr[0] - '0' > 9 || cfgstr[0] - '0' < 0) && cfgstr[0] != '-')
+	if ((cfgstr[0] - '0' > 9 || cfgstr[0] - '0' < 0) && cfgstr[0] != '-' && cfgstr[0] != '+')
 	{
 		return 0;
 	}
@@ -649,7 +649,7 @@ char pony_extract_int(char* cfgstr, int length, char* identifier, int* res)
 	{
 		return 0;
 	}
-	if ((cfgstr[0] - '0' > 9 || cfgstr[0] - '0' < 0) && cfgstr[0] != '-')
+	if ((cfgstr[0] - '0' > 9 || cfgstr[0] - '0' < 0) && cfgstr[0] != '-' && cfgstr[0] != '+')
 	{
 		return 0;
 	}
@@ -669,7 +669,7 @@ char pony_extract_long(char* cfgstr, int length, char* identifier, long* res)
 	{
 		return 0;
 	}
-	if ((cfgstr[0] - '0' > 9 || cfgstr[0] - '0' < 0) && cfgstr[0] != '-')
+	if ((cfgstr[0] - '0' > 9 || cfgstr[0] - '0' < 0) && cfgstr[0] != '-' && cfgstr[0] != '+')
 	{
 		return 0;
 	}
@@ -689,7 +689,7 @@ char pony_extract_float(char* cfgstr, int length, char* identifier, float* res)
 	{
 		return 0;
 	}
-	if ((cfgstr[0] - '0' > 9 || cfgstr[0] - '0' < 0) && cfgstr[0] != '.' && cfgstr[0] != 'e' && cfgstr[0] != 'E' && cfgstr[0] != '-')
+	if ((cfgstr[0] - '0' > 9 || cfgstr[0] - '0' < 0) && cfgstr[0] != '.' && cfgstr[0] != 'e' && cfgstr[0] != 'E' && cfgstr[0] != '-' && cfgstr[0] != '+')
 	{
 		return 0;
 	}
@@ -709,7 +709,7 @@ char pony_extract_double(char* cfgstr, int length, char* identifier, double* res
 	{
 		return 0;
 	}
-	if ((cfgstr[0] - '0' > 9 || cfgstr[0] - '0' < 0) && cfgstr[0] != '.' && cfgstr[0] != 'e' && cfgstr[0] != 'E' && cfgstr[0] != '-')
+	if ((cfgstr[0] - '0' > 9 || cfgstr[0] - '0' < 0) && cfgstr[0] != '.' && cfgstr[0] != 'e' && cfgstr[0] != 'E' && cfgstr[0] != '-' && cfgstr[0] != '+')
 	{
 		return 0;
 	}
@@ -729,12 +729,12 @@ char pony_extract_bool(char* cfgstr, int length, char* identifier, char* res)
 	{
 		return 0;
 	}
-	if (pony_strncmpeff(cfgstr, "true", 4))
+	if (pony_strncmpeff(cfgstr, "true", 4) || pony_strncmpeff(cfgstr, "TRUE", 4))
 	{
 		*res = 1;
 		return 1;
 	}
-	if (pony_strncmpeff(cfgstr, "false", 5))
+	if (pony_strncmpeff(cfgstr, "false", 5) || pony_strncmpeff(cfgstr, "FALSE", 5))
 	{
 		*res = 0;
 		return 1;
