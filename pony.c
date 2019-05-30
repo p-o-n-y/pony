@@ -361,10 +361,10 @@ char pony_add_plugin(void(*newplugin)(void))
 
 // function for initialising pony with a user-passed configuration string
 // 
-// char* configuration - pony configuration string (see documentation for syntax)
+// char* cfg - pony configuration string (see documentation for syntax)
 //
 // return value - TBD
-char pony_init(char* configuration)
+char pony_init(char* cfg)
 {
 	// defaults
 	const int gps_max_sat_number = 36;
@@ -376,11 +376,11 @@ char pony_init(char* configuration)
 	int grouplen;
 	char* groupptr;
 
-	for (pony.cfglength = 0; configuration[pony.cfglength]; pony.cfglength++);
+	for (pony.cfglength = 0; cfg[pony.cfglength]; pony.cfglength++);
 
 	pony.cfg = (char *)malloc(sizeof(char) * (pony.cfglength + 1));
 	for (i = 0; i < pony.cfglength; i++)
-		pony.cfg[i] = configuration[i];
+		pony.cfg[i] = cfg[i];
 	pony.cfg[pony.cfglength] = '\0';
 	//pony_format(pony.cfg);
 
