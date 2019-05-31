@@ -272,7 +272,7 @@ str[i] = ' ';
 char pony_setDASize(pony_dataArray *dataarr, int size)
 {
 	dataarr->arrsize = size;
-	if (dataarr->val = (double*)calloc(sizeof(double), size) == NULL) 
+	if ((dataarr->val = (double*)calloc(sizeof(double), size)) == NULL) 
 	{
 		return 0;
 	}
@@ -393,7 +393,7 @@ char pony_init(char* cfg)
 
 	for (pony.cfglength = 0; cfg[pony.cfglength]; pony.cfglength++);
 
-	if (pony.cfg = (char *)malloc(sizeof(char) * (pony.cfglength + 1)) == NULL)
+	if ((pony.cfg = (char *)malloc(sizeof(char) * (pony.cfglength + 1))) == NULL)
 	{
 		return 0;
 	}
@@ -408,7 +408,7 @@ char pony_init(char* cfg)
 
 	if (pony_locatecfggroup("imu:", pony.cfg, pony.cfglength, &groupptr, &grouplen))
 	{
-		if (pony.bus.imu = (pony_imu*)calloc(sizeof(pony_imu), 1) == NULL)
+		if ((pony.bus.imu = (pony_imu*)calloc(sizeof(pony_imu), 1)) == NULL)
 		{
 			return 0;
 		}
@@ -439,7 +439,7 @@ char pony_init(char* cfg)
 
 	if (pony_locatecfggroup("gnss:", pony.cfg, pony.cfglength, &groupptr, &grouplen))
 	{
-		if (pony.bus.gnss = (pony_gnss*)calloc(sizeof(pony_gnss), 1) == NULL)
+		if ((pony.bus.gnss = (pony_gnss*)calloc(sizeof(pony_gnss), 1)) == NULL)
 		{
 			return 0;
 		}
@@ -451,7 +451,7 @@ char pony_init(char* cfg)
 
 		if (pony_locatecfggroup("gps:", pony.bus.gnss->cfg, pony.bus.gnss->cfglength, &groupptr, &grouplen))
 		{
-			if (pony.bus.gnss->gps = (pony_gnss_gps*)calloc(sizeof(pony_gnss_gps), 1) == NULL)
+			if ((pony.bus.gnss->gps = (pony_gnss_gps*)calloc(sizeof(pony_gnss_gps), 1)) == NULL)
 			{
 				return 0;
 			}
@@ -459,7 +459,7 @@ char pony_init(char* cfg)
 			pony.bus.gnss->gps->cfglength = grouplen;
 
 			pony.bus.gnss->gps->max_sat_num = gps_max_sat_number;
-			if (pony.bus.gnss->gps->sat = (pony_gnss_sat*)calloc(sizeof(pony_gnss_sat), pony.bus.gnss->gps->max_sat_num) == NULL)
+			if ((pony.bus.gnss->gps->sat = (pony_gnss_sat*)calloc(sizeof(pony_gnss_sat), pony.bus.gnss->gps->max_sat_num)) == NULL)
 			{
 				return 0;
 			}
@@ -468,7 +468,7 @@ char pony_init(char* cfg)
 			pony.bus.gnss->gps->max_eph_count = gps_max_eph_count;
 			for (i = 0; i < pony.bus.gnss->gps->max_sat_num; i++)
 			{
-				if (pony.bus.gnss->gps->sat[i].eph = (double *)calloc(sizeof(double), pony.bus.gnss->gps->max_eph_count) == NULL)
+				if ((pony.bus.gnss->gps->sat[i].eph = (double *)calloc(sizeof(double), pony.bus.gnss->gps->max_eph_count)) == NULL)
 				{
 					return 0;
 				}
@@ -486,7 +486,7 @@ char pony_init(char* cfg)
 
 		if (pony_locatecfggroup("glo:", pony.bus.gnss->cfg, pony.bus.gnss->cfglength, &groupptr, &grouplen))
 		{
-			if (pony.bus.gnss->glo = (pony_gnss_glo*)calloc(sizeof(pony_gnss_glo), 1) == NULL)
+			if ((pony.bus.gnss->glo = (pony_gnss_glo*)calloc(sizeof(pony_gnss_glo), 1)) == NULL)
 			{
 				return 0;
 			}
@@ -494,7 +494,7 @@ char pony_init(char* cfg)
 			pony.bus.gnss->glo->cfglength = grouplen;
 
 			pony.bus.gnss->glo->max_sat_num = glo_max_sat_number;
-			if (pony.bus.gnss->glo->sat = (pony_gnss_sat*)calloc(sizeof(pony_gnss_sat), pony.bus.gnss->glo->max_sat_num) == NULL)
+			if ((pony.bus.gnss->glo->sat = (pony_gnss_sat*)calloc(sizeof(pony_gnss_sat), pony.bus.gnss->glo->max_sat_num)) == NULL)
 			{
 				return 0;
 			}
@@ -503,7 +503,7 @@ char pony_init(char* cfg)
 			pony.bus.gnss->glo->max_eph_count = glo_max_eph_count;
 			for (i = 0; i < pony.bus.gnss->glo->max_sat_num; i++)
 			{
-				if (pony.bus.gnss->glo->sat[i].eph = (double *)calloc(sizeof(double), pony.bus.gnss->glo->max_eph_count) == NULL)
+				if ((pony.bus.gnss->glo->sat[i].eph = (double *)calloc(sizeof(double), pony.bus.gnss->glo->max_eph_count)) == NULL)
 				{
 					return 0;
 				}
