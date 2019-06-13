@@ -18,31 +18,31 @@ char pony_extract_bool(char* confstr, int length, char* identifier, char* res);
 
 
 
-typedef struct                 //äëÿ èçìåðåíèé, âûðàæàþùèõñÿ ÷åðåç îäíî ÷èñëî
+typedef struct                 
 {
-	double val;                //çíà÷åíèå
-	unsigned char count;       //ñ÷¸ò÷èê
-	unsigned char valid;       //ïðèçíàê âàëèäíîñòè
+	double val;                
+	unsigned char count;       
+	unsigned char valid;      
 } pony_data;
 
-typedef struct                 //äëÿ èçìåðåíèé, âûðàæàþùèõñÿ ÷åðåç íåñêîëüêî ÷èñåë
+typedef struct                 
 {
-	double *val;               //ìàññèâ çíà÷åíèé
-	int count;                 //ñ÷¸ò÷èê
-	char valid;                //ïðèçíàê âàëèäíîñòè
-	int arrsize;               //ðàçìåð ìàññèâà
+	double *val;               
+	int count;                 
+	char valid;                
+	int arrsize;               
 } pony_dataArray;
 
 
 // IMU
-typedef struct                 //èíåðöèàëüíûå äàííûå
+typedef struct                 
 {
-	char* cfg;                //êîíôèãóðàöèÿ
-	int cfglength;            //äëèíà ñòðîêè êîíôèãóðàöèè
+	char* cfg;                
+	int cfglength;            
 
-	pony_dataArray w;          //ãèðîñêîïû
-	pony_dataArray f;          //àêñåëåðîìåòðû
-	pony_dataArray q;          //êâàòåðíèîí
+	pony_dataArray w;          
+	pony_dataArray f;          
+	pony_dataArray q;          
 	pony_data dt;
 } pony_imu;
 
@@ -69,16 +69,16 @@ typedef struct {
 	char visible;
 	double sinEl;
 
-	double *obs;			// ìàññèâ èçìåðåíèé íà òåêóùèé ìîìåíò, îïðåäåëÿåòñÿ at runtime
+	double *obs;			
 
 } pony_gnss_sat;
 
-typedef struct                 //
+typedef struct                 
 {
-	char* cfg;                //êîíôèãóðàöèÿ
-	int cfglength;            //äëèíà ñòðîêè êîíôèãóðàöèè
+	char* cfg;                
+	int cfglength;            
 
-	pony_gnss_sat *sat;			// ñïóòíèêè
+	pony_gnss_sat *sat;			
 	int max_sat_num;
 	int max_eph_count;
 
@@ -87,12 +87,12 @@ typedef struct                 //
 	pony_dataArray clock_corr;
 } pony_gnss_gps;
 
-typedef struct                 //
+typedef struct                
 {
-	char* cfg;                //êîíôèãóðàöèÿ
-	int cfglength;            //äëèíà ñòðîêè êîíôèãóðàöèè
+	char* cfg;                
+	int cfglength;            
 
-	pony_gnss_sat *sat;			// ñïóòíèêè
+	pony_gnss_sat *sat;			
 	int max_sat_num;
 	int max_eph_count;
 
@@ -101,10 +101,10 @@ typedef struct                 //
 	pony_dataArray clock_corr;
 } pony_gnss_glo;
 
-typedef struct                 //ñïóòíèêîâûå äàííûå
+typedef struct                
 {
-	char* cfg;                //êîíôèãóðàöèÿ
-	int cfglength;            //äëèíà ñòðîêè êîíôèãóðàöèè
+	char* cfg;                
+	int cfglength;            
 
 	pony_gnss_gps* gps;
 	pony_gnss_glo* glo;
@@ -118,32 +118,32 @@ typedef struct                 //ñïóòíèêîâûå äàííûå
 
 
 // CORE
-#define pony_bus_version 0     //âåðñèÿ øèíû 
-typedef struct                 //øèíà
+#define pony_bus_version 0      
+typedef struct                 
 {
-	int ver;                   //âåðñèÿ øèíû, äëÿ èñïîëüçîâàíèÿ â runtime
-	int mode;                  //ðåæèì ðàáîòû: 0 èíèöèàëèçàöèÿ, >0 ðàáîòà, <0 çàâåðøåíèå
+	int ver;                   
+	int mode;                  
 
 	pony_imu* imu;
 	pony_gnss* gnss;
 
-	pony_data t;               //âðåìÿ
+	pony_data t;               
 
-	char* cfg;                //êîíôèãóðàöèÿ
-	int cfglength;            //äëèíà ñòðîêè êîíôèãóðàöèè
+	char* cfg;                
+	int cfglength;            
 } pony_bus;
 
 typedef struct
 {
 	pony_bus bus;
 
-	void(**plugins)(void);     //óêàçàòåëü íà ìàññèâ óêàçàòåëåé íà ïëàãèíû
-	int pluginsNum;            //êîëè÷åñòâî ïëàãèíîâ
+	void(**plugins)(void);     
+	int pluginsNum;            
 
-	char* cfg;                //êîíôèãóðàöèÿ
-	int cfglength;            //äëèíà ñòðîêè êîíôèãóðàöèè
+	char* cfg;                
+	int cfglength;            
 
-	int exitplnum;             //íîìåð ïëàãèíà, âûçâàâøåãî çàâåðøèâøåíèå ðàáîòû
+	int exitplnum;             
 } pony_struct;
 
 extern pony_struct pony;

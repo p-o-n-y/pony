@@ -32,16 +32,6 @@ char pony_strncmpeff(char* s1, char* s2, int substrlen)
 	return 0;
 }
 
-char pony_strcmptofixed(char* str, char* substr) //not used
-{
-	int n = 0;
-	while (substr[n] != '\0')
-	{
-		n++;
-	}
-	return pony_strncmpeff(str, substr, n);
-}
-
 // function for locating the beginning of a substring in a string with a given length
 // char* str is the general string
 // int len is the lenght of the general string
@@ -163,7 +153,7 @@ int pony_cfgpartlength(char* str)
 // char** groupptr	-	reference to a pointer to the starting character of the group contents within a configuration string
 // int* grouplen	-	reference to a number of characters in the group contents
 //
-// return value:		1 if the requested group found and grouplen > 0
+// return value:		1 if the requested group is found
 //						0 otherwise
 //
 // working example:
@@ -253,19 +243,6 @@ char pony_locatecfggroup(const char* groupname, char* cfgstr, const int cfglen, 
 	return (*groupptr == NULL) ? 0 : 1;
 }
 
-/*
-// function that replaces all symbols with codes from 1 to 31 to whitespaces (' ')
-// char* fromstr is the configuration initial string
-// char** tostr is the pointer to the string to which the formatted configuration is copied
-void pony_format(char* str)
-{
-int i;
-for (i = 0; str[i]; i++)
-if (str[i] < 32)
-str[i] = ' ';
-}
-*/
-
 // function for initialising pony_dataArrays depending on their sizes
 // pony_dataArray *dataarr is the pony_dataArray to be initialised
 // int size is the size of the array
@@ -345,7 +322,8 @@ void pony_free()
 //
 // void(*newplugin)(void) - a pointer to a new plugin function you wish to add
 //
-// return value - TBD
+// return value - 1 if the plugin is successfully added to pony.plugins
+//                0 otherwise
 char pony_add_plugin(void(*newplugin)(void))
 {
 	if (newplugin == NULL)
@@ -370,7 +348,7 @@ char pony_add_plugin(void(*newplugin)(void))
 	pony.plugins[pony.pluginsNum] = newplugin;
 	pony.pluginsNum++;
 
-	return 1; // ïîêà åäèíèöà - óñïåøíîå çàâåðøåíèå
+	return 1;
 }
 
 
@@ -378,7 +356,8 @@ char pony_add_plugin(void(*newplugin)(void))
 // 
 // char* cfg - pony configuration string (see documentation for syntax)
 //
-// return value - TBD
+// return value - 1 if pony is successfully initialised
+//                0 otherwise
 char pony_init(char* cfg)
 {
 	// defaults
@@ -400,7 +379,6 @@ char pony_init(char* cfg)
 	for (i = 0; i < pony.cfglength; i++)
 		pony.cfg[i] = cfg[i];
 	pony.cfg[pony.cfglength] = '\0';
-	//pony_format(pony.cfg);
 
 
 	pony_locatecfggroup("", pony.cfg, pony.cfglength, &pony.bus.cfg, &pony.bus.cfglength);
@@ -523,12 +501,13 @@ char pony_init(char* cfg)
 
 	pony.exitplnum = -1;
 
-	return 1; // ïîêà åäèíèöà - óñïåøíîå çàâåðøåíèå
+	return 1;
 }
 
 // function to be called by host application in a main loop
 //
-// return value - TBD
+// return value - 1 if pony needs to continue functioning in next iteration
+//                0 if pony's activity fully terminated
 char pony_step(void)
 {
 	int i;
@@ -573,7 +552,7 @@ char pony_terminate()
 
 	pony_free();
 
-	return 1; // ïîêà åäèíèöà - óñïåøíîå çàâåðøåíèå
+	return 1;
 }
 
 
