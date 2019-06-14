@@ -35,39 +35,6 @@ typedef struct
 
 
 
-// CORE
-#define pony_bus_version 0      
-typedef struct                 
-{
-	int ver;                   
-	int mode;                  
-
-	pony_imu* imu;
-	pony_gnss* gnss;
-
-	pony_data t;               
-
-	char* cfg;                
-	int cfglength;            
-} pony_bus;
-
-typedef struct
-{
-	pony_bus bus;
-
-	void(**plugins)(void);     
-	int pluginsNum;            
-
-	char* cfg;                
-	int cfglength;            
-
-	int exitplnum;             
-} pony_struct;
-
-extern pony_struct pony;
-
-
-
 // IMU
 typedef struct                 
 {
@@ -149,3 +116,36 @@ typedef struct
 	int wcfglength;
 
 } pony_gnss;
+
+
+
+// CORE
+#define pony_bus_version 0      
+typedef struct                 
+{
+	int ver;                   
+	int mode;                  
+
+	pony_imu* imu;
+	pony_gnss* gnss;
+
+	pony_data t;               
+
+	char* cfg;                
+	int cfglength;            
+} pony_bus;
+
+typedef struct
+{
+	pony_bus bus;
+
+	void(**plugins)(void);     
+	int pluginsNum;            
+
+	char* cfg;                
+	int cfglength;            
+
+	int exitplnum;             
+} pony_struct;
+
+extern pony_struct pony;
