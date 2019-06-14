@@ -34,7 +34,6 @@ typedef struct
 } pony_dataArray;
 
 
-
 // IMU
 typedef struct                 
 {
@@ -61,10 +60,11 @@ typedef struct {
 
 typedef struct {
 
-	double *eph;
+	pony_dataArray *eph;
 
 	double t_em;
 	double x[3];
+	char xVal;
 	double v[3];
 
 	char visible;
@@ -116,7 +116,6 @@ typedef struct
 	int wcfglength;
 
 } pony_gnss;
-
 
 
 // CORE
