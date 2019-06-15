@@ -1,4 +1,4 @@
-﻿char pony_add_plugin(void(*newplugin)(void));
+char pony_add_plugin(void(*newplugin)(void));
 char pony_init(char*);
 char pony_step(void);
 char pony_terminate(void);
@@ -18,31 +18,31 @@ char pony_extract_bool(char* confstr, int length, char* identifier, char* res);
 
 
 
-typedef struct                 
+typedef struct
 {
-	double val;                
-	unsigned char count;       
-	unsigned char valid;      
+	double val;
+	unsigned char count;
+	unsigned char valid;
 } pony_data;
 
-typedef struct                 
+typedef struct
 {
-	double *val;               
-	int count;                 
-	char valid;                
-	int arrsize;               
+	double *val;
+	int count;
+	char valid;
+	int arrsize;
 } pony_dataArray;
 
 
 // IMU
-typedef struct                 
+typedef struct
 {
-	char* cfg;                
-	int cfglength;            
+	char* cfg;
+	int cfglength;
 
-	pony_dataArray w;          
-	pony_dataArray f;          
-	pony_dataArray q;          
+	pony_dataArray w;
+	pony_dataArray f;
+	pony_dataArray q;
 	pony_data dt;
 } pony_imu;
 
@@ -60,7 +60,7 @@ typedef struct {
 
 typedef struct {
 
-	pony_dataArray *eph;
+	pony_dataArray eph;
 
 	double t_em;
 	double x[3];
@@ -70,16 +70,16 @@ typedef struct {
 	char visible;
 	double sinEl;
 
-	double *obs;			
+	double *obs;
 
 } pony_gnss_sat;
 
-typedef struct                 
+typedef struct
 {
-	char* cfg;                
-	int cfglength;            
+	char* cfg;
+	int cfglength;
 
-	pony_gnss_sat *sat;			
+	pony_gnss_sat *sat;
 	int max_sat_num;
 	int max_eph_count;
 
@@ -88,12 +88,12 @@ typedef struct
 	pony_dataArray clock_corr;
 } pony_gnss_gps;
 
-typedef struct                
+typedef struct
 {
-	char* cfg;                
-	int cfglength;            
+	char* cfg;
+	int cfglength;
 
-	pony_gnss_sat *sat;			
+	pony_gnss_sat *sat;
 	int max_sat_num;
 	int max_eph_count;
 
@@ -102,10 +102,10 @@ typedef struct
 	pony_dataArray clock_corr;
 } pony_gnss_glo;
 
-typedef struct                
+typedef struct
 {
-	char* cfg;                
-	int cfglength;            
+	char* cfg;
+	int cfglength;
 
 	pony_gnss_gps* gps;
 	pony_gnss_glo* glo;
@@ -120,31 +120,31 @@ typedef struct
 
 // CORE
 #define pony_bus_version 0      
-typedef struct                 
+typedef struct
 {
-	int ver;                   
-	int mode;                  
+	int ver;
+	int mode;
 
 	pony_imu* imu;
 	pony_gnss* gnss;
 
-	pony_data t;               
+	pony_data t;
 
-	char* cfg;                
-	int cfglength;            
+	char* cfg;
+	int cfglength;
 } pony_bus;
 
 typedef struct
 {
 	pony_bus bus;
 
-	void(**plugins)(void);     
-	int pluginsNum;            
+	void(**plugins)(void);
+	int pluginsNum;
 
-	char* cfg;                
-	int cfglength;            
+	char* cfg;
+	int cfglength;
 
-	int exitplnum;             
+	int exitplnum;
 } pony_struct;
 
 extern pony_struct pony;

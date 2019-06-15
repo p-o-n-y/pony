@@ -277,8 +277,7 @@ void pony_free()
 			if (pony.bus.gnss->gps->sat != NULL)
 			{
 				for (i = 0; i < pony.bus.gnss->gps->max_sat_num; i++)
-					if (pony.bus.gnss->gps->sat[i].eph != NULL)
-						free(pony.bus.gnss->gps->sat[i].eph->val);
+					free(pony.bus.gnss->gps->sat[i].eph.val);
 
 				free(pony.bus.gnss->gps->sat);
 			}
@@ -290,8 +289,7 @@ void pony_free()
 			if (pony.bus.gnss->glo->sat != NULL)
 			{
 				for (i = 0; i < pony.bus.gnss->glo->max_sat_num; i++)
-					if (pony.bus.gnss->glo->sat[i].eph != NULL)
-						free(pony.bus.gnss->glo->sat[i].eph->val);
+						free(pony.bus.gnss->glo->sat[i].eph.val);
 
 				free(pony.bus.gnss->glo->sat);
 			}
@@ -452,7 +450,7 @@ char pony_init(char* cfg)
 			pony.bus.gnss->gps->max_eph_count = gps_max_eph_count;
 			for (i = 0; i < pony.bus.gnss->gps->max_sat_num; i++)
 			{
-				if (!pony_setDASize(pony.bus.gnss->gps->sat->eph, gps_max_eph_count))
+				if (!pony_setDASize(&pony.bus.gnss->gps->sat[i].eph, gps_max_eph_count))
 				{
 					pony_free();
 					return 0;
@@ -491,7 +489,7 @@ char pony_init(char* cfg)
 			pony.bus.gnss->glo->max_eph_count = glo_max_eph_count;
 			for (i = 0; i < pony.bus.gnss->glo->max_sat_num; i++)
 			{
-				if (!pony_setDASize(pony.bus.gnss->glo->sat->eph, glo_max_eph_count))
+				if (!pony_setDASize(&pony.bus.gnss->glo->sat[i].eph, glo_max_eph_count))
 				{
 					pony_free();
 					return 0;
