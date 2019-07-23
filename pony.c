@@ -1,46 +1,56 @@
 #include <stdlib.h>
+
 #include "pony.h"
 
 
+// core functions to be used in host application
+char pony_add_plugin(void(*newplugin)(void));	// add plugin to the plugin execution list,		input: pointer to plugin function,				output: OK/not OK (1/0)
+char pony_init(char*);							// initialize the bus, except for core,			input: configuration string (see description),	output: OK/not OK (1/0)
+char pony_step(void);							// step through the plugin execution list,														output: OK/not OK (1/0)
+char pony_terminate(void);						// terminate operation,																			output: OK/not OK (1/0)
 
 
 
-///
-///     Internal pony functions and definitions
-///
+// bus instance
+pony_bus pony = {
+	pony_bus_version,			// ver
+	pony_add_plugin,			// add_plugin
+	pony_init,					// init
+	pony_step,					// step
+	pony_terminate,				// terminate
+	{NULL, 0, -1, NULL, 0}};	// core.plugins, core.plugin_count, core.exit_plugin_id, core.cfg, core.cfglength
 
 
 
 
 
-pony_struct pony = { pony_bus_version,0 };
 
 
-// function for comparing strings up to a given length (like strncmp from string.h) but with a limited functionality (0 - equal, 1 - not equal)
-// char* s1, char* s2 are the compared strings
-// substrlen is the lenght up to which strings are compared, in pony is usually the lenght of a smaller string
+// service subroutines
+
+	// compare substrings of two strings up to a given length
+	//
+	// input: pointers to strings s1, s2, substring length
+	// 
+	// output: 0 - equal, 1 - difference detected
 char pony_strncmpeff(char* s1, char* s2, int substrlen)
 {
 	int i;
 	for (i = 0; i < substrlen; i++)
-	{
 		if (s1[i] != s2[i])
-		{
 			return 1;
-		}
-	}
 	return 0;
 }
 
-// function for locating the beginning of a substring in a string with a given length
-// char* str is the general string
-// int len is the lenght of the general string
-// char* substr is the substring to be located
-// int substrlen is the length of the substring
+	// locate a substring within a string given theirs lengths
+	// 
+	// input: str - source string, len - source string length, susbtr - substring to locate, substrlen - susbtring length
+	// 
+	// output: pointer to the first occurence of substring within the source string
 char* pony_locatesubstrn(char* str, int len, char* substr, int substrlen)
 {
 	int n = 0;
-	while (n + substrlen <= len)
+	while (n + substrlen <= len )
 	{
 		if (pony_strncmpeff(str + n, substr, substrlen) == 0)
 		{
@@ -51,34 +61,13 @@ char* pony_locatesubstrn(char* str, int len, char* substr, int substrlen)
 	return NULL;
 }
 
-// function for locating the end of a substring in a string with a given length
-// char* str is the general string
-// int len is the lenght of the general string
-// char* substr is the substring to be located
-char* pony_locatesubstrendn(char* str, int len, char* substr)
-{
-	int n;
-	char* res;
 
-	n = 0;
-	while (substr[n] != '\0')
-	{
-		n++;
-	}
-	res = pony_locatesubstrn(str, len, substr, n);
-	if (res == NULL)
-	{
-		return NULL;
-	}
-
-	return res + n;
-}
-
-// function spesificaly for locating the beginning of a substring in given configuration group
-// char* str is a part of a configuration string
-// char* substr is the substring to be located
-// int substrlen is the pre-calculated substring length
-char* pony_locatesubstreff(char* str, char* substr, int substrlen)
+	// locate a substring within a configuration group
+	// 
+	// input: str - pointer to a string containing the configuration group, substr - substring to locate, substrlen - substring length
+	// 
+	// output: pointer to the first occurence of substring within the configuration group
+char* pony_locatesubstreff(char* str, char* substr, int substrlen)  
 {
 	char* res = str;
 
@@ -104,62 +93,28 @@ char* pony_locatesubstreff(char* str, char* substr, int substrlen)
 	return NULL;
 }
 
-// function spesificaly for locating the end of a substring in given configuration group
-// char* str is a part of a configuration string
-// char* substr is the substring to be located
-// int substrlen is the pre-calculated substring length
-char* pony_locatesubstrendeff(char* str, char* substr, int substrlen)
-{
-	int in = 0;
-	char* res = str;
-
-	while ((*res) != '\0')
-	{
-		if (in == 0 && pony_strncmpeff(res, substr, substrlen) == 0)
-		{
-			return res + substrlen;
-		}
-		if (res[0] == '{')
-		{
-			in++;
-		}
-		if (res[0] == '}')
-		{
-			in--;
-		}
-
-		res++;
-	}
-	return NULL;
-}
-
-// function specifically for measuring a configuration group length
-// char* str is the beginning of the group
-int pony_cfgpartlength(char* str)
-{
-	return (int)(pony_locatesubstreff(str, "}", 1) - str);
-}
 
 
-// locate parameter group within a configuration string
-// input:
-// char* groupname	-	group identifier (see documentation) 
-//						or 
-//						empty string to locate a substring that is outside of any group
-// char* cfgstr	-	configuration string to parse
-// int cfglen		-	number of characters in cfgstr to parse
-//
-// output:
-// char** groupptr	-	reference to a pointer to the starting character of the group contents within a configuration string
-// int* grouplen	-	reference to a number of characters in the group contents
-//
-// return value:		1 if the requested group is found
-//						0 otherwise
-//
-// working example:
-// groupname = "gnss:"
-// cfgstr = "{gnss: {gps: eph_in="gpsa.nav", obs_in="gpsa.obs"}}, out="sol.txt""
-// cfglen = 66
+
+	// locate parameter group within a configuration string
+	// input:
+	// char* groupname	-	group identifier (see documentation), may contain '?' as a wildcard for any character
+	//						or 
+	//						empty string to locate a substring that is outside of any group
+	// char* cfgstr	-	configuration string to parse
+	// int cfglen		-	number of characters in cfgstr to parse
+	//
+	// output:
+	// char** groupptr	-	reference to a pointer to the starting character of the group contents within a configuration string
+	// int* grouplen	-	reference to a number of characters in the group contents
+	//
+	// return value:		1 if the requested group found and grouplen > 0
+	//						0 otherwise
+	//
+	// working example:
+	// groupname = "gnss:"
+	// cfgstr = "{gnss: {gps: eph_in="gpsa.nav", obs_in="gpsa.obs"}}, out="sol.txt""
+	// cfglen = 66
 char pony_locatecfggroup(const char* groupname, char* cfgstr, const int cfglen, char** groupptr, int* grouplen)
 {
 	int i, j;
@@ -173,7 +128,7 @@ char pony_locatecfggroup(const char* groupname, char* cfgstr, const int cfglen, 
 	if (groupname[0] == '\0') {
 		for (i = 0; cfgstr[i] && i < cfglen; i++) {
 			// skip all non-printable characters, blank spaces and commas between groups
-			for (; cfgstr[i] && (cfgstr[i] <= ' ' || cfgstr[i] == ',') && i < cfglen; i++);
+			for (; cfgstr[i] && (cfgstr[i] <= ' ' || cfgstr[i] == ',') && i < cfglen; i++); 
 			// if no group started at this point
 			if (cfgstr[i] != '{')
 				break;
@@ -203,12 +158,12 @@ char pony_locatecfggroup(const char* groupname, char* cfgstr, const int cfglen, 
 	else {
 		for (i = 0; cfgstr[i] && !group_found && i < cfglen; i++) {
 			// skip all non-printable characters, blank spaces and commas between groups
-			for (; cfgstr[i] && (cfgstr[i] <= ' ' || cfgstr[i] == ',') && i < cfglen; i++);
+			for (; cfgstr[i] && (cfgstr[i] <= ' ' || cfgstr[i] == ',') && i < cfglen; i++); 
 			// if a group started
 			if (cfgstr[i] == '{') {
 				group_layer = 1;
 				// skip all non-printable characters and blank spaces at the beginning of the group
-				for (i++; cfgstr[i] && (cfgstr[i] <= ' ') && i < cfglen; i++);
+				for (i++; cfgstr[i] && (cfgstr[i] <= ' ') && i < cfglen; i++); 
 
 				// check if the group is the one that has been requested
 				group_found = 1;
@@ -243,66 +198,339 @@ char pony_locatecfggroup(const char* groupname, char* cfgstr, const int cfglen, 
 	return (*groupptr == NULL) ? 0 : 1;
 }
 
-// function for initialising pony_dataArrays depending on their sizes
-// pony_dataArray *dataarr is the pony_dataArray to be initialised
-// int size is the size of the array
-char pony_setDASize(pony_dataArray *dataarr, int size)
+
+
+
+// initialize solution
+char pony_init_solution(pony_sol *sol)
 {
-	dataarr->arrsize = size;
-	if ((dataarr->val = (double*)calloc(sizeof(double), size)) == NULL)
-	{
-		return 0;
+	int i;
+
+	// pos & vel
+	for (i = 0; i < 3; i++) {
+		sol->x[i]	= 0;
+		sol->llh[i]	= 0;
+		sol->v[i]	= 0;
 	}
+	sol->x_valid	= 0;
+	sol->llh_valid	= 0;
+	sol->v_valid	= 0;
+	// attitude
+	for (i = 0; i < 4; i++)
+		sol->q[i]	= 0; // quaternion
+	sol->q_valid	= 0;
+	for (i = 0; i < 9; i++)
+		sol->L[i]	= 0; // attitude matrix
+	sol->L_valid	= 0;
+	for (i = 0; i < 3; i++)
+		sol->rpy[i]	= 0; // attitude angles
+	sol->rpy_valid	= 0;
+	// clock
+	sol->dt			= 0;
+	sol->dt_valid	= 0;
+
 	return 1;
 }
 
-// function for freeing the memory allocated to pony, should be used only as the last step of terminating pony's activity
+
+
+
+// imu data handling subroutines
+	// initialize imu structure
+char pony_init_imu(void)
+{
+	// validity flags
+	pony.imu->w_valid = 0;
+	pony.imu->f_valid = 0;
+	// drop the solution
+	pony_init_solution(&(pony.imu->sol));
+
+	return 1;
+}
+
+	// free imu memory
+void pony_free_imu(void)
+{
+	if (pony.imu == NULL)
+		return;
+	free(pony.imu);
+	pony.imu = NULL;
+}
+
+
+
+
+// gnss data handling subroutines
+	// initialize gnss settings
+char pony_init_gnss_settings(pony_gnss *gnss)
+{
+	pony_locatecfggroup("", gnss->cfg, gnss->cfglength, &(gnss->settings_cfg), &(gnss->settings_length));
+
+	gnss->settings.sinEl_mask = 0;
+
+	return 1;
+}
+
+	// initialize gnss gps constants
+void pony_init_gnss_gps_const(void)
+{
+	pony.gnss->gps_const.pi = 3.1415926535898;	// pi as in IS-GPS-200J (22 May 2018)
+	pony.gnss->gps_const.c = 299792458;			// speed of light as in IS-GPS-200J (22 May 2018), m/s
+	pony.gnss->gps_const.mu = 3.986005e14;		// Earth grav constant as in IS-GPS-200J (22 May 2018), m^3/s^2
+	pony.gnss->gps_const.u = 7.2921151467e-5;	// Earth rotation rate as in IS-GPS-200J (22 May 2018), rad/s
+	pony.gnss->gps_const.a = 6378137.0;			// Earth ellipsoid semi-major axis as in WGS-84(G1762) 2014-07-08, m
+	pony.gnss->gps_const.F = -4.442807633e-10;	// relativistic correction constant as in IS-GPS-200J (22 May 2018), s/sqrt(m)
+	pony.gnss->gps_const.sec_in_w = 604800;		// seconds in a week
+	pony.gnss->gps_const.sec_in_d =  86400;		// seconds in a day
+}
+
+	// initialize gnss gps structure
+char pony_init_gnss_gps(pony_gnss_gps *gps, const int max_sat_count, const int max_eph_count)
+{
+	int i;
+
+	gps->sat = NULL;
+	gps->max_sat_count = 0;
+	gps->max_eph_count = 0;
+
+	// try to allocate memory for satellite data
+	gps->sat = (pony_gnss_sat*)calloc(sizeof(pony_gnss_sat), max_sat_count);
+	if (gps->sat == NULL)
+		return 0;
+	gps->max_sat_count = max_sat_count;
+
+	// initialize satellite data
+	for (i = 0; i < gps->max_sat_count; i++) {
+		gps->sat[i].eph			= NULL;
+		gps->sat[i].eph_valid	= 0;
+		gps->sat[i].obs			= NULL;
+		gps->sat[i].obs_valid	= NULL;
+		gps->sat[i].x_valid		= 0;
+		gps->sat[i].v_valid		= 0;
+		gps->sat[i].t_em_valid	= 0;
+		gps->sat[i].sinEl_valid	= 0;
+	}
+
+	// try to allocate memory for each satellite ephemeris
+	for (i = 0; i < gps->max_sat_count; i++) {
+		gps->sat[i].eph = (double *)calloc(sizeof(double),max_eph_count);
+		if (gps->sat[i].eph == NULL)
+			return 0;
+	}
+	gps->max_eph_count = max_eph_count;
+
+	// observation types
+	gps->obs_types = NULL;
+	gps->obs_count = 0;
+
+	// validity flags
+	gps->iono_valid = 0;
+	gps->clock_corr_valid = 0;
+
+	return 1;
+}
+
+	// free gnss gps memory
+void pony_free_gnss_gps(pony_gnss_gps *gps)
+{
+	int i;
+
+	if (gps == NULL)
+		return;
+
+	// satellites
+	if (gps->sat != NULL) 
+	{
+		for (i = 0; i < gps->max_sat_count; i++) 
+			if (gps->sat[i].eph != NULL)
+			{
+				free(gps->sat[i].eph);
+				gps->sat[i].eph = NULL;
+			}
+	
+		free(gps->sat);
+	}
+	gps->sat = NULL;
+
+	// gnss_gps structure
+	free(gps);
+}
+
+
+	// initialize gnss glo structure
+char pony_init_gnss_glo(pony_gnss_glo *glo, const int max_sat_count, const int max_eph_count)
+{
+	int i;
+
+	glo->sat = NULL;
+	glo->max_sat_count = 0;
+	glo->max_eph_count = 0;
+
+	// try to allocate memory for satellite data
+	glo->sat = (pony_gnss_sat*)calloc(sizeof(pony_gnss_sat), max_sat_count);
+	if (glo->sat == NULL)
+		return 0;
+	glo->max_sat_count = max_sat_count;
+
+	// initialize satellite data
+	for (i = 0; i < glo->max_sat_count; i++) {
+		glo->sat[i].eph			= NULL;
+		glo->sat[i].eph_valid	= 0;
+		glo->sat[i].obs			= NULL;
+		glo->sat[i].obs_valid	= NULL;
+		glo->sat[i].x_valid		= 0;
+		glo->sat[i].v_valid		= 0;
+		glo->sat[i].t_em_valid	= 0;
+		glo->sat[i].sinEl_valid	= 0;
+	}
+
+	// try to allocate memory for each satellite ephemeris
+	for (i = 0; i < glo->max_sat_count; i++) {
+		glo->sat[i].eph = (double *)calloc(sizeof(double),max_eph_count);
+		if (glo->sat[i].eph == NULL)
+			return 0;
+	}
+	glo->max_eph_count = max_eph_count;
+
+	// observation types
+	glo->obs_types = NULL;
+	glo->obs_count = 0;
+
+	return 1;
+}
+
+	// free gnss glonass memory
+void pony_free_gnss_glo(pony_gnss_glo *glo)
+{
+	int i;
+
+	if (glo == NULL)
+		return;
+
+	// satellites
+	if (glo->sat != NULL) 
+	{
+		for (i = 0; i < glo->max_sat_count; i++) 
+			if (glo->sat[i].eph != NULL)
+			{
+				free(glo->sat[i].eph);
+				glo->sat[i].eph = NULL;
+			}
+	
+		free(glo->sat);
+	}
+	glo->sat = NULL;
+
+	// gnss_gps structure
+	free(glo);
+}
+
+	// initialize gnss structure
+char pony_init_gnss(pony_gnss *gnss)
+{
+	// memory allocation limitations
+	const int max_sat_count = 36;
+	const int max_gps_eph_count = 36;
+	const int max_glo_eph_count = 24;
+
+	int grouplen;
+	char* groupptr;
+
+	if (gnss == NULL)
+		return 0;
+
+	// gps
+	pony_init_gnss_gps_const();
+	gnss->gps = NULL;
+	if (pony_locatecfggroup("gps:", gnss->cfg, gnss->cfglength, &groupptr, &grouplen))
+	{
+		gnss->gps = (pony_gnss_gps*)calloc(sizeof(pony_gnss_gps), 1);
+		if (gnss->gps == NULL)
+			return 0;
+		gnss->gps->cfg = groupptr;
+		gnss->gps->cfglength = grouplen;
+
+		if (!pony_init_gnss_gps(gnss->gps, max_sat_count, max_gps_eph_count))
+			return 0;
+	}
+
+	// glonass
+	gnss->glo = NULL;
+	if (pony_locatecfggroup("glo:", gnss->cfg, gnss->cfglength, &groupptr, &grouplen))
+	{
+		gnss->glo = (pony_gnss_glo*)calloc(sizeof(pony_gnss_glo), 1);
+		if (gnss->glo == NULL)
+			return 0;
+		gnss->glo->cfg = groupptr;
+		gnss->glo->cfglength = grouplen;
+
+		if (!pony_init_gnss_glo(gnss->glo, max_sat_count, max_glo_eph_count))
+			return 0;
+	}
+
+	// gnss settings
+	pony_init_gnss_settings(gnss);
+
+	// gnss solution
+	pony_init_solution(&(gnss->sol));
+
+	return 1;
+}
+
+	// free gnss memory
+void pony_free_gnss(pony_gnss *gnss)
+{
+	if (gnss == NULL)
+		return;
+
+	pony_free_gnss_gps(gnss->gps);
+	gnss->gps = NULL;
+
+	pony_free_gnss_glo(gnss->glo);
+	gnss->glo = NULL;
+}
+
+
+
+
+// general handling routines
+	// free all alocated memory and set pointers and counters to NULL
 void pony_free()
 {
 	int i;
 
-	if (pony.bus.imu != NULL)
+	// core
+	if (pony.core.plugins != NULL)
+		free(pony.core.plugins);
+	pony.core.plugins = NULL;
+	pony.core.plugin_count = 0;
+
+	// configuration string
+	if (pony.cfg != NULL)
+		free(pony.cfg);
+	pony.cfg = NULL;
+	pony.cfglength = 0;
+
+	// imu
+	pony_free_imu();
+
+	// gnss
+	if (pony.gnss != NULL)
 	{
-		free(pony.bus.imu->f.val);
-		free(pony.bus.imu->q.val);
-		free(pony.bus.imu->w.val);
-
-		free(pony.bus.imu);
+		for (i = 0; i < pony.gnss_count; i++)
+			pony_free_gnss(&(pony.gnss[i]));
+		free(pony.gnss);
+		pony.gnss = NULL;
 	}
-
-	if (pony.bus.gnss != NULL)
-	{
-		if (pony.bus.gnss->gps != NULL)
-		{
-			if (pony.bus.gnss->gps->sat != NULL)
-			{
-				for (i = 0; i < pony.bus.gnss->gps->max_sat_num; i++)
-					free(pony.bus.gnss->gps->sat[i].eph.val);
-
-				free(pony.bus.gnss->gps->sat);
-			}
-			free(pony.bus.gnss->gps);
-		}
-
-		if (pony.bus.gnss->glo != NULL)
-		{
-			if (pony.bus.gnss->glo->sat != NULL)
-			{
-				for (i = 0; i < pony.bus.gnss->glo->max_sat_num; i++)
-						free(pony.bus.gnss->glo->sat[i].eph.val);
-
-				free(pony.bus.gnss->glo->sat);
-			}
-			free(pony.bus.gnss->glo);
-		}
-
-		free(pony.bus.gnss);
-	}
-
-	free(pony.cfg);
-	free(pony.plugins);
+	pony.gnss_count = 0;
 
 }
+
+
+
+
+
+
 
 
 
@@ -314,479 +542,261 @@ void pony_free()
 
 
 
-
-
-// add external functions as pony plugins, plugins are then called in the order of being added
+// add plugin to the plugin execution list
 //
-// void(*newplugin)(void) - a pointer to a new plugin function you wish to add
+// input: pointer to plugin function
 //
-// return value - 1 if the plugin is successfully added to pony.plugins
-//                0 otherwise
+// output: OK/not OK (1/0)
 char pony_add_plugin(void(*newplugin)(void))
 {
-	if (newplugin == NULL)
-	{
-		return 0;
-	}
+	pony.core.plugins = (void(**)(void))realloc(pony.core.plugins, (pony.core.plugin_count + 1) * sizeof(void(*)(void)));
 
-	if (pony.plugins == NULL)
-	{
-		pony.plugins = (void(**)(void))malloc(sizeof(void(*)(void)));
-	}
-	else
-	{
-		pony.plugins = (void(**)(void))realloc(pony.plugins, (pony.pluginsNum + 1) * sizeof(void(*)(void)));
-	}
-
-	if (pony.plugins == NULL)
-	{
-		return 0;
-	}
-
-	pony.plugins[pony.pluginsNum] = newplugin;
-	pony.pluginsNum++;
-
-	return 1;
-}
-
-
-// function for initialising pony with a user-passed configuration string
-// 
-// char* cfg - pony configuration string (see documentation for syntax)
-//
-// return value - 1 if pony is successfully initialised
-//                0 otherwise
-char pony_init(char* cfg)
-{
-	// defaults
-	const int gps_max_sat_number = 36;
-	const int gps_max_eph_count = 32;
-	const int glo_max_sat_number = 36;
-	const int glo_max_eph_count = 16;
-
-	int i;
-	int grouplen;
-	char* groupptr;
-
-	for (pony.cfglength = 0; cfg[pony.cfglength]; pony.cfglength++);
-
-	if ((pony.cfg = (char *)malloc(sizeof(char) * (pony.cfglength + 1))) == NULL)
+	if (pony.core.plugins == NULL)	// failed to allocate/realocate memory
 	{
 		pony_free();
 		return 0;
 	}
+
+	pony.core.plugins[pony.core.plugin_count] = newplugin;
+	pony.core.plugin_count++;
+
+	return 1;
+}
+
+
+// initialize the bus, except for core
+// 
+// input: configuration string (see description)
+//
+// output: OK/not OK (1/0)
+char pony_init(char* cfg)
+{
+	int grouplen;
+	char* groupptr;
+
+	int i;
+
+	// determine configuration string length
+	for (pony.cfglength = 0; cfg[pony.cfglength]; pony.cfglength++);
+
+	// assign configuration string
+	pony.cfg = (char *)malloc(sizeof(char) * (pony.cfglength + 1));
+	if (pony.cfg == NULL)
+		return 0;
 	for (i = 0; i < pony.cfglength; i++)
 		pony.cfg[i] = cfg[i];
 	pony.cfg[pony.cfglength] = '\0';
 
-
-	pony_locatecfggroup("", pony.cfg, pony.cfglength, &pony.bus.cfg, &pony.bus.cfglength);
-
-
-	if (pony_locatecfggroup("imu:", pony.cfg, pony.cfglength, &groupptr, &grouplen))
+	// fetch a part of configuration that is outside of any group
+	pony_locatecfggroup("", pony.cfg, pony.cfglength, &pony.core.cfg, &pony.core.cfglength);
+	
+	// imu init
+	pony.imu = NULL;
+	if (pony_locatecfggroup("imu:", pony.cfg, pony.cfglength, &groupptr, &grouplen)) // if the group found in configuration
 	{
-		if ((pony.bus.imu = (pony_imu*)calloc(sizeof(pony_imu), 1)) == NULL)
-		{
-			pony_free();
-			return 0;
-		}
-		pony.bus.imu->cfg = groupptr;
-		pony.bus.imu->cfglength = grouplen;
-
-		if (!(
-			pony_setDASize(&(pony.bus.imu->f), 3)
-			&& pony_setDASize(&(pony.bus.imu->q), 4)
-			&& pony_setDASize(&(pony.bus.imu->w), 3)
-			))
-		{
+		// try to allocate memory
+		pony.imu = (pony_imu*)calloc(sizeof(pony_imu), 1);
+		if (pony.imu == NULL) {
 			pony_free();
 			return 0;
 		}
 
-		double fs;
+		// set configuration pointer
+		pony.imu->cfg = groupptr;
+		pony.imu->cfglength = grouplen;
 
-		if (pony_extract_double(pony.bus.imu->cfg, pony.bus.imu->cfglength, "fs = ", &fs))
-		{
-			pony.bus.imu->dt.val = 1 / fs;
+		// try to init
+		if (!pony_init_imu()) {
+			pony_free();
+			return 0;
 		}
-		else
-		{
-			pony.bus.imu->dt.val = 1;
-		}
-
 	}
 
+	// gnss init
+	pony.gnss = NULL;
+	pony.gnss_count = 0;
 	if (pony_locatecfggroup("gnss:", pony.cfg, pony.cfglength, &groupptr, &grouplen))
 	{
-		if ((pony.bus.gnss = (pony_gnss*)calloc(sizeof(pony_gnss), 1)) == NULL)
-		{
+		// try to allocate memory
+		pony.gnss = (pony_gnss*)calloc(sizeof(pony_gnss), 1);
+		if (pony.gnss == NULL) {
 			pony_free();
 			return 0;
 		}
-		pony.bus.gnss->cfg = groupptr;
-		pony.bus.gnss->cfglength = grouplen;
+		pony.gnss_count++;
 
+		// set configuration pointer
+		pony.gnss->cfg = groupptr;
+		pony.gnss->cfglength = grouplen;
 
-		pony_locatecfggroup("", pony.bus.gnss->cfg, pony.bus.gnss->cfglength, &(pony.bus.gnss->wcfg), &(pony.bus.gnss->wcfglength));
-
-		if (pony_locatecfggroup("gps:", pony.bus.gnss->cfg, pony.bus.gnss->cfglength, &groupptr, &grouplen))
-		{
-			if ((pony.bus.gnss->gps = (pony_gnss_gps*)calloc(sizeof(pony_gnss_gps), 1)) == NULL)
-			{
-				pony_free();
-				return 0;
-			}
-			pony.bus.gnss->gps->cfg = groupptr;
-			pony.bus.gnss->gps->cfglength = grouplen;
-
-			pony.bus.gnss->gps->max_sat_num = gps_max_sat_number;
-			if ((pony.bus.gnss->gps->sat = (pony_gnss_sat*)calloc(sizeof(pony_gnss_sat), pony.bus.gnss->gps->max_sat_num)) == NULL)
-			{
-				pony_free();
-				return 0;
-			}
-			for (i = 0; i < pony.bus.gnss->gps->max_sat_num; i++)
-				pony.bus.gnss->gps->sat[i].obs = NULL;
-			pony.bus.gnss->gps->max_eph_count = gps_max_eph_count;
-			for (i = 0; i < pony.bus.gnss->gps->max_sat_num; i++)
-			{
-				if (!pony_setDASize(&pony.bus.gnss->gps->sat[i].eph, gps_max_eph_count))
-				{
-					pony_free();
-					return 0;
-				}
-			}
-
-			if (!(
-				pony_setDASize(&(pony.bus.gnss->gps->iono_a), 4)
-				&& pony_setDASize(&(pony.bus.gnss->gps->iono_b), 4)
-				&& pony_setDASize(&(pony.bus.gnss->gps->clock_corr), 3)
-				))
-			{
-				pony_free();
-				return 0;
-			}
-		}
-
-		if (pony_locatecfggroup("glo:", pony.bus.gnss->cfg, pony.bus.gnss->cfglength, &groupptr, &grouplen))
-		{
-			if ((pony.bus.gnss->glo = (pony_gnss_glo*)calloc(sizeof(pony_gnss_glo), 1)) == NULL)
-			{
-				pony_free();
-				return 0;
-			}
-			pony.bus.gnss->glo->cfg = groupptr;
-			pony.bus.gnss->glo->cfglength = grouplen;
-
-			pony.bus.gnss->glo->max_sat_num = glo_max_sat_number;
-			if ((pony.bus.gnss->glo->sat = (pony_gnss_sat*)calloc(sizeof(pony_gnss_sat), pony.bus.gnss->glo->max_sat_num)) == NULL)
-			{
-				pony_free();
-				return 0;
-			}
-			for (i = 0; i < pony.bus.gnss->glo->max_sat_num; i++)
-				pony.bus.gnss->glo->sat[i].obs = NULL;
-			pony.bus.gnss->glo->max_eph_count = glo_max_eph_count;
-			for (i = 0; i < pony.bus.gnss->glo->max_sat_num; i++)
-			{
-				if (!pony_setDASize(&pony.bus.gnss->glo->sat[i].eph, glo_max_eph_count))
-				{
-					pony_free();
-					return 0;
-				}
-			}
-
-			if (!(
-				pony_setDASize(&(pony.bus.gnss->glo->iono_a), 4)
-				&& pony_setDASize(&(pony.bus.gnss->glo->iono_b), 4)
-				&& pony_setDASize(&(pony.bus.gnss->glo->clock_corr), 3)
-				))
-			{
-				pony_free();
-				return 0;
-			}
+		// try to init
+		if (!pony_init_gnss(pony.gnss)) {
+			pony_free();
+			return 0;
 		}
 	}
 
-
-	pony.exitplnum = -1;
-
+	// system time, operation mode and solution
+	pony.t = 0;
+	pony.mode = 0;
+	pony_init_solution(&(pony.sol));
+	
 	return 1;
 }
 
-// function to be called by host application in a main loop
+
+
+
+// step through the plugin execution list, to be called by host application in a main loop
 //
-// return value - 1 if pony needs to continue functioning in next iteration
-//                0 if pony's activity fully terminated
+// output: OK/not OK (1/0)
 char pony_step(void)
 {
 	int i;
 
-	for (i = 0; i < pony.pluginsNum; i++)
+	// loop through plugin execution list
+	for (i = 0; i < pony.core.plugin_count; i++)
 	{
-		pony.plugins[i]();
+		pony.core.plugins[i](); // execute the current plugin
 
-		if (pony.exitplnum == i)
+		if (pony.core.exit_plugin_id == i)	// if termination was initiated by the current plugin on the previous loop
 		{
-			pony.exitplnum = -1;
-			pony_free();
+			pony.core.exit_plugin_id = -1;		// set to default
+			pony_init_solution(&(pony.sol));	// drop the solution
+			pony_free();						// free memory
 			break;
 		}
 
-		if (pony.bus.mode < 0 && pony.exitplnum == -1)
-		{
-			pony.exitplnum = i;
-		}
+		if (pony.mode < 0 && pony.core.exit_plugin_id == -1)	// if termination was initiated by the current plugin on the current loop
+			pony.core.exit_plugin_id = i;							// set the index to use in the next loop
 	}
 
-	if (pony.bus.mode == 0)
-	{
-		pony.bus.mode = 1;
-	}
-	return (pony.bus.mode >= 0) || (pony.exitplnum >= 0);
+	if (pony.mode == 0)		// if initialization ended
+		pony.mode = 1;			// set operation mode to regular
+
+	// success if either staying in regular operation mode, or a termination by a plugin properly detected
+	return (pony.mode >= 0) || (pony.core.exit_plugin_id >= 0);
 }
 
-// function to be called by host application to force pony termination
-//
-// return value - TBD
+// terminate operation
 char pony_terminate()
 {
 	int i;
 
-	pony.bus.mode = -1;
+	// step through plugin execution list with mode switched to termination
+	pony.mode = -1;
+	for (i = 0; i < pony.core.plugin_count; i++)
+		pony.core.plugins[i]();
 
-	for (i = 0; i < pony.pluginsNum; i++)
-	{
-		pony.plugins[i]();
-	}
+	pony_init_solution(&(pony.sol));	// drop the solution
+	pony_free();						// free memory
 
-	pony_free();
-
-	return 1;
+	return 1; // always succeed in termination
 }
 
 
 
 
 
-///
-///     Standard extraction functions for variables defined by configurator
-///
 
 
 
 
 
-// function for getting the length of the string that would have been obtained using this identifier on pony_extract_string function, functions are not merged as memory is normally allocated in between them
-// works only for standard strings, for symbol " that does not mean the end of the string use ""
-// char* cfgstr is the configuration string containing the needed data
-// int length is the length of the configuration string
-// char* identifier is the string preceding the needed data
-// int* res is the pointer to the variable the data should be written to
-char pony_extract_string_length(char* cfgstr, int length, char* identifier, int* res)
-{
-	int i = 0;
-	*res = 0;
-	cfgstr = pony_locatesubstrendn(cfgstr, length, identifier);
-	if (cfgstr == NULL)
-	{
-		return 0;
+
+// if using linear algebra functions
+#ifdef PONY_LINAL
+#include <math.h>
+
+	// conventional operations
+		// dot product
+double pony_linal_dot(double *u, double *v, const int m) {
+	double res = 0;
+	int i;
+
+	for (i = 0; i < m; i++)
+		res += u[i]*v[i];
+
+	return res;
+}
+
+	// routines for m x m upper-triangular matrices lined up in a single-dimension array
+		// index conversion: (i,j) -> k
+void pony_linal_u_ij2k(int *k, const int i, const int j, const int m) {
+	*k = (i*(2*m - 1 - i))/2 + j;
+}
+
+		// index conversion: k -> (i,j)
+void pony_linal_u_k2ij(int *i, int *j, const int k, const int m) {
+	double onehalf_plus_m = 0.5+m;
+	*i = (int)(floor(onehalf_plus_m - sqrt(onehalf_plus_m*onehalf_plus_m - 2.0*k)) + 0.5);
+	*j = k - ((2*m - 1 - (*i))*(*i))/2;
+}
+
+		// matrix multiplication by vector: res = U*v
+void pony_linal_u_mul_v(double *res, double *u, double *v, const int m) {
+	int i, j, k;
+
+	for (i = 0, k = 0; i < m; i++) {
+		res[i] = u[k]*v[i];
+		for (j = i+1, k++; j < m; j++, k++)
+			res[i] += u[k]*v[j];
 	}
-	while (cfgstr[i] != '\"' || cfgstr[i + 1] == '\"')
-	{
-		if (cfgstr[i] == '\"')
-		{
-			i++;
+}
+
+		// transposed matrix multiplication by vector: res = U^T*v
+void pony_linal_uT_mul_v(double *res, double *u, double *v, const int m) {
+	int i, j, k;
+
+	for (i = 0; i < m; i++)
+		res[i] = u[i]*v[0];
+	for (j = 1, k = m; j < m; j++)
+		for (i = j; i < m; i++, k++)
+			res[i] += u[k]*v[j];
+}
+
+	// square root Kalman filtering
+double pony_linal_kalman_update(double *x, double *S, double *K, double z, double *h, double sigma, const int m) {
+
+	double d, d1, sdd1, f, e;
+	int i, j, k;
+
+	// e0 stored in K
+	for (i = 0; i < m; i++)
+		K[i] = 0;
+
+	// d0
+	d = sigma*sigma;
+
+	// S
+	for (i = 0; i < m; i++) {
+		// f = S^T*h
+		f = S[i]*h[0];
+		for (j = 1, k = i+m-1; j <= i; j++, k += m-j)
+			f += S[k]*h[j];
+		// d
+		d1 = d + f*f;
+		sdd1 = sqrt(d*d1);
+		// S^+, e
+		for (j = 0, k = i; j <= i; j++, k += m-j) {
+			e = K[j];
+			K[j] += S[k]*f;
+			S[k] = (S[k]*d - e*f)/sdd1;
 		}
-		i++;
-		(*res)++;
+		d = d1;
 	}
-	return 1;
+
+	// dz
+	for (i = 0; i < m; i++)
+		z -= h[i]*x[i];
+
+	// K, x
+	for (i = 0; i < m; i++) {
+		K[i] /= d;
+		x[i] += K[i]*z;
+	}
+
+	return z;
 }
 
-// function for obtaining the string by identifier, as memory should be allocated in advance this function is not merged with pony_extract_string_length function
-// works only for standard strings, for symbol " that does not mean the end of the string use ""
-// char* cfgstr is the configuration string containing the needed data
-// int length is the length of the configuration string
-// char* identifier is the string preceding the needed data
-// char** res is the pointer to the variable the data should be written to
-char pony_extract_string(char* cfgstr, int length, char* identifier, char** res)
-{
-	int i = 0;
-	cfgstr = pony_locatesubstrendn(cfgstr, length, identifier);
-	if (cfgstr == NULL)
-	{
-		return 0;
-	}
-	while (cfgstr[i] != '\"' || cfgstr[i + 1] == '\"')
-	{
-		(*res)[i] = cfgstr[i];
-		if (cfgstr[i] == '\"' && cfgstr[i + 1] == '\"')
-		{
-			i++;
-		}
-		i++;
-	}
-	return 1;
-}
-
-// function for obtaining symbol by identifier
-// char* cfgstr is the configuration string containing the needed data
-// int length is the length of the configuration string
-// char* identifier is the string preceding the needed data
-// char* res is the pointer to the variable the data should be written to
-char pony_extract_char_sym(char* cfgstr, int length, char* identifier, char* res)
-{
-	cfgstr = pony_locatesubstrendn(cfgstr, length, identifier);
-	if (cfgstr == NULL)
-	{
-		return 0;
-	}
-	*res = cfgstr[0];
-	return 1;
-}
-
-// function for obtaining number of type char by identifier
-// char* cfgstr is the configuration string containing the needed data
-// int length is the length of the configuration string
-// char* identifier is the string preceding the needed data
-// char* res is the pointer to the variable the data should be written to
-char pony_extract_char_num(char* cfgstr, int length, char* identifier, char* res)
-{
-	cfgstr = pony_locatesubstrendn(cfgstr, length, identifier);
-	if (cfgstr == NULL)
-	{
-		return 0;
-	}
-	if ((cfgstr[0] - '0' > 9 || cfgstr[0] - '0' < 0) && cfgstr[0] != '-' && cfgstr[0] != '+')
-	{
-		return 0;
-	}
-	*res = (char)atoi(cfgstr);
-	return 1;
-}
-
-// function for obtaining number of type short by identifier
-// char* cfgstr is the configuration string containing the needed data
-// int length is the length of the configuration string
-// char* identifier is the string preceding the needed data
-// short* res is the pointer to the variable the data should be written to
-char pony_extract_short(char* cfgstr, int length, char* identifier, short* res)
-{
-	cfgstr = pony_locatesubstrendn(cfgstr, length, identifier);
-	if (cfgstr == NULL)
-	{
-		return 0;
-	}
-	if ((cfgstr[0] - '0' > 9 || cfgstr[0] - '0' < 0) && cfgstr[0] != '-' && cfgstr[0] != '+')
-	{
-		return 0;
-	}
-	*res = (short)atoi(cfgstr);
-	return 1;
-}
-
-// function for obtaining number of type int by identifier
-// char* cfgstr is the configuration string containing the needed data
-// int length is the length of the configuration string
-// char* identifier is the string preceding the needed data
-// int* res is the pointer to the variable the data should be written to
-char pony_extract_int(char* cfgstr, int length, char* identifier, int* res)
-{
-	cfgstr = pony_locatesubstrendn(cfgstr, length, identifier);
-	if (cfgstr == NULL)
-	{
-		return 0;
-	}
-	if ((cfgstr[0] - '0' > 9 || cfgstr[0] - '0' < 0) && cfgstr[0] != '-' && cfgstr[0] != '+')
-	{
-		return 0;
-	}
-	*res = atoi(cfgstr);
-	return 1;
-}
-
-// function for obtaining number of type long by identifier
-// char* cfgstr is the configuration string containing the needed data
-// int length is the length of the configuration string
-// char* identifier is the string preceding the needed data
-// long* res is the pointer to the variable the data should be written to
-char pony_extract_long(char* cfgstr, int length, char* identifier, long* res)
-{
-	cfgstr = pony_locatesubstrendn(cfgstr, length, identifier);
-	if (cfgstr == NULL)
-	{
-		return 0;
-	}
-	if ((cfgstr[0] - '0' > 9 || cfgstr[0] - '0' < 0) && cfgstr[0] != '-' && cfgstr[0] != '+')
-	{
-		return 0;
-	}
-	*res = atol(cfgstr);
-	return 1;
-}
-
-// function for obtaining number of type float by identifier
-// char* cfgstr is the configuration string containing the needed data
-// int length is the length of the configuration string
-// char* identifier is the string preceding the needed data
-// float* res is the pointer to the variable the data should be written to
-char pony_extract_float(char* cfgstr, int length, char* identifier, float* res)
-{
-	cfgstr = pony_locatesubstrendn(cfgstr, length, identifier);
-	if (cfgstr == NULL)
-	{
-		return 0;
-	}
-	if ((cfgstr[0] - '0' > 9 || cfgstr[0] - '0' < 0) && cfgstr[0] != '.' && cfgstr[0] != 'e' && cfgstr[0] != 'E' && cfgstr[0] != '-' && cfgstr[0] != '+')
-	{
-		return 0;
-	}
-	*res = (float)atof(cfgstr);
-	return 1;
-}
-
-// function for obtaining number of type double by identifier
-// char* cfgstr is the configuration string containing the needed data
-// int length is the length of the configuration string
-// char* identifier is the string preceding the needed data
-// double* res is the pointer to the variable the data should be written to
-char pony_extract_double(char* cfgstr, int length, char* identifier, double* res)
-{
-	cfgstr = pony_locatesubstrendn(cfgstr, length, identifier);
-	if (cfgstr == NULL)
-	{
-		return 0;
-	}
-	if ((cfgstr[0] - '0' > 9 || cfgstr[0] - '0' < 0) && cfgstr[0] != '.' && cfgstr[0] != 'e' && cfgstr[0] != 'E' && cfgstr[0] != '-' && cfgstr[0] != '+')
-	{
-		return 0;
-	}
-	*res = atof(cfgstr);
-	return 1;
-}
-
-// function for obtaining boolean by identifier (true - 1, false - 0)
-// char* cfgstr is the configuration string containing the needed data
-// int length is the length of the configuration string
-// char* identifier is the string preceding the needed data
-// char* res is the pointer to the variable the data should be written to
-char pony_extract_bool(char* cfgstr, int length, char* identifier, char* res)
-{
-	cfgstr = pony_locatesubstrendn(cfgstr, length, identifier);
-	if (cfgstr == NULL)
-	{
-		return 0;
-	}
-	if (pony_strncmpeff(cfgstr, "true", 4) || pony_strncmpeff(cfgstr, "TRUE", 4))
-	{
-		*res = 1;
-		return 1;
-	}
-	if (pony_strncmpeff(cfgstr, "false", 5) || pony_strncmpeff(cfgstr, "FALSE", 5))
-	{
-		*res = 0;
-		return 1;
-	}
-	return 0;
-}
+#endif
