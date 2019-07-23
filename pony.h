@@ -1,6 +1,7 @@
+// Jul-2019
+//
 // define to use linear algebra functions (see bottom of the file)
 #define PONY_LINAL
-
 
 // TIME EPOCH
 typedef struct 		// Julian-type time epoch
