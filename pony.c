@@ -100,7 +100,7 @@ char* pony_locatesubstreff(char* str, char* substr, int substrlen)
 
 	// locate parameter group within a configuration string
 	// input:
-	// char* groupname	-	group identifier (see documentation), may contain '?' as a wildcard for any character
+	// char* groupname	-	group identifier (see documentation)
 	//						or 
 	//						empty string to locate a substring that is outside of any group
 	// char* cfgstr	-	configuration string to parse
@@ -573,6 +573,11 @@ char pony_add_plugin(void(*newplugin)(void))
 // output: OK/not OK (1/0)
 char pony_init(char* cfg)
 {
+	const int max_gnss_count = 10;
+	
+	char multi_gnss_token[] = "gnss[0]:";
+	const int multi_gnss_index_position = 5;
+
 	int grouplen;
 	char* groupptr;
 
@@ -617,25 +622,34 @@ char pony_init(char* cfg)
 	// gnss init
 	pony.gnss = NULL;
 	pony.gnss_count = 0;
-	if (pony_locatecfggroup("gnss:", pony.cfg, pony.cfglength, &groupptr, &grouplen))
+		// multiple gnss mode support
+	for (i = 0; i < max_gnss_count; i++)
 	{
-		// try to allocate memory
-		pony.gnss = (pony_gnss*)calloc(sizeof(pony_gnss), 1);
-		if (pony.gnss == NULL) {
-			pony_free();
-			return 0;
-		}
-		pony.gnss_count++;
+		multi_gnss_token[multi_gnss_index_position] = '0'+i;
 
-		// set configuration pointer
-		pony.gnss->cfg = groupptr;
-		pony.gnss->cfglength = grouplen;
+		if ((i == 0 && pony_locatecfggroup("gnss:", pony.cfg, pony.cfglength, &groupptr, &grouplen)) ||
+			pony_locatecfggroup(multi_gnss_token, pony.cfg, pony.cfglength, &groupptr, &grouplen))
+			while (i >= pony.gnss_count) 
+			{
+				pony.gnss_count++;
+				// try to allocate/reallocate memory
+				pony.gnss = (pony_gnss*)realloc(pony.gnss, sizeof(pony_gnss)*pony.gnss_count);
+				if (pony.gnss == NULL) {
+					pony_free();
+					return 0;
+				}
+			
 
-		// try to init
-		if (!pony_init_gnss(pony.gnss)) {
-			pony_free();
-			return 0;
-		}
+				// set configuration pointer
+				pony.gnss[i].cfg = groupptr;
+				pony.gnss[i].cfglength = grouplen;
+
+				// try to init
+				if ( !pony_init_gnss( &(pony.gnss[i]) ) ) {
+					pony_free();
+					return 0;
+				}
+			}
 	}
 
 	// system time, operation mode and solution

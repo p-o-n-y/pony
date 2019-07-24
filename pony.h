@@ -176,7 +176,7 @@ typedef struct					// main core structure and instance
 	int cfglength;						// length of the part of configuration that is outside of any group
 } pony_core;
 
-#define pony_bus_version 0		// current bus version
+#define pony_bus_version 1		// current bus version
 typedef struct					// bus data to be used in host application
 {
 	int ver;							// bus version to be used at runtime	
