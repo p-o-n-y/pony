@@ -1,5 +1,8 @@
 // Jul-2019
 //
+
+// PONY core declarations
+
 // define to use linear algebra functions (see bottom of the file)
 #define PONY_LINAL
 
@@ -182,7 +185,7 @@ typedef struct					// bus data to be used in host application
 	int ver;							// bus version to be used at runtime	
 
 	// main functions to be used in host app
-	char(*add_plugin)(void(*)(void));	// add plugin to the plugin execution list,		input: pointer to plugin function,				output: OK/not OK (1/0)
+	char(*add_plugin)( void(*)(void) );	// add plugin to the plugin execution list,		input: pointer to plugin function,				output: OK/not OK (1/0)
 	char(*init)(char *);				// initialize the bus, except for core,			input: configuration string (see description),	output: OK/not OK (1/0)
 	char(*step)(void);					// step through the plugin execution list,														output: OK/not OK (1/0)
 	char(*terminate)(void);				// terminate operation,																			output: OK/not OK (1/0)
