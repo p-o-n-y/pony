@@ -1,4 +1,4 @@
-// Jul-2019
+// Aug-2019
 //
 
 // PONY core source code
@@ -295,14 +295,19 @@ void pony_init_gnss_gps_const(void)
 	int r;
 
 	for (r = 0; r < pony.gnss_count; r++) {
-	pony.gnss[r].gps_const.pi = 3.1415926535898;	// pi as in IS-GPS-200J (22 May 2018)
-	pony.gnss[r].gps_const.c = 299792458;			// speed of light as in IS-GPS-200J (22 May 2018), m/s
-	pony.gnss[r].gps_const.mu = 3.986005e14;		// Earth grav constant as in IS-GPS-200J (22 May 2018), m^3/s^2
-	pony.gnss[r].gps_const.u = 7.2921151467e-5;	// Earth rotation rate as in IS-GPS-200J (22 May 2018), rad/s
-	pony.gnss[r].gps_const.a = 6378137.0;			// Earth ellipsoid semi-major axis as in WGS-84(G1762) 2014-07-08, m
-	pony.gnss[r].gps_const.F = -4.442807633e-10;	// relativistic correction constant as in IS-GPS-200J (22 May 2018), s/sqrt(m)
-	pony.gnss[r].gps_const.sec_in_w = 604800;		// seconds in a week
-	pony.gnss[r].gps_const.sec_in_d =  86400;		// seconds in a day
+		pony.gnss[r].gps_const.pi = 3.1415926535898;	// pi as in IS-GPS-200J (22 May 2018)
+		pony.gnss[r].gps_const.c = 299792458;			// speed of light as in IS-GPS-200J (22 May 2018), m/s
+		pony.gnss[r].gps_const.mu = 3.986005e14;		// Earth gravity constant as in IS-GPS-200J (22 May 2018), m^3/s^2
+		pony.gnss[r].gps_const.u = 7.2921151467e-5;		// Earth rotation rate as in IS-GPS-200J (22 May 2018), rad/s
+		pony.gnss[r].gps_const.a = 6378137.0;			// Earth ellipsoid semi-major axis as in WGS-84(G1762) 2014-07-08, m
+		pony.gnss[r].gps_const.e2 = 6.694379990141e-3;	// Earth ellipsoid first eccentricity squared as in WGS-84(G1762) 2014-07-08
+		pony.gnss[r].gps_const.F = -4.442807633e-10;	// relativistic correction constant as in IS-GPS-200J (22 May 2018), s/sqrt(m)
+		pony.gnss[r].gps_const.sec_in_w = 604800;		// seconds in a week
+		pony.gnss[r].gps_const.sec_in_d =  86400;		// seconds in a day
+		pony.gnss[r].gps_const.F1 = 1575.42e6;			// nominal frequency for L1 signal
+		pony.gnss[r].gps_const.L1 = pony.gnss[r].gps_const.c/pony.gnss[r].gps_const.F1;		// nominal wavelength for L1 signal
+		pony.gnss[r].gps_const.F2 = 1227.60e6;			// nominal frequency for L2 signal
+		pony.gnss[r].gps_const.L2 = pony.gnss[r].gps_const.c/pony.gnss[r].gps_const.F2;		// nominal wavelength for L2 signal
 	}
 }
 

@@ -1,4 +1,4 @@
-// Jul-2019
+// Aug-2019
 //
 
 // PONY core declarations
@@ -95,9 +95,12 @@ typedef struct		// GPS system constants
 		mu,			// Earth grav constant as in GPS interface specs, m^3/s^2
 		u,			// Earth rotation rate as in GPS interface specs, rad/s
 		a,			// Earth ellipsoid semi-major axis, m
+		e2,			// Earth ellipsoid first eccentricity squared
 		F,			// relativistic correction constant
 		sec_in_w,	// seconds in a week
-		sec_in_d;	// seconds in a day
+		sec_in_d,	// seconds in a day
+		F1, L1,		// nominal frequency and wavelength for L1 signal
+		F2, L2;		// nominal frequency and wavelength for L2 signal
 } pony_gps_const;
 
 	// GPS
@@ -146,10 +149,10 @@ typedef struct // GNSS operation settings
 typedef struct						// global navigation satellite systems data
 {
 	char* cfg;						// GNSS configuration string pointer
-	int cfglength;					// configuration string length
+	int cfglength;					// full configuration string length
 
 	char* settings_cfg;				// pointer to a part of GNSS configuration common to all systems
-	int settings_length;			// full configuration string length
+	int settings_length;			// length of the part of GNSS configuration common to all systems
 
 	pony_gps_const gps_const;		// GPS constants
 	pony_gnss_settings settings;	// GNSS operation settings
