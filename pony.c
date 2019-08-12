@@ -378,8 +378,8 @@ void pony_free_gnss_gps(pony_gnss_gps *gps)
 			}
 	
 		free(gps->sat);
+		gps->sat = NULL;
 	}
-	gps->sat = NULL;
 
 	// gnss_gps structure
 	free(gps);
@@ -447,8 +447,8 @@ void pony_free_gnss_glo(pony_gnss_glo *glo)
 			}
 	
 		free(glo->sat);
+		glo->sat = NULL;
 	}
-	glo->sat = NULL;
 
 	// gnss_gps structure
 	free(glo);
