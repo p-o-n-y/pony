@@ -220,6 +220,8 @@ char pony_init_gnss_settings(pony_gnss *gnss)
 	pony_locatecfggroup( "", gnss->cfg, gnss->cfglength, &(gnss->cfg_settings), &(gnss->settings_length) );
 
 	gnss->settings.sinEl_mask = 0;
+	gnss->settings.code_sigma = 20;
+	gnss->settings.phase_sigma = 0.01;
 
 	return 1;
 }
@@ -736,6 +738,27 @@ void pony_linal_uT_mul_v(double *res, double *u, double *v, const int m) {
 	for (j = 1, k = m; j < m; j++)
 		for (i = j; i < m; i++, k++)
 			res[i] += u[k]*v[j];
+}
+
+	// Cholesky upper-triangular factorization P = S*S^T, where P is symmetric positive-definite matrix
+		// input:	P - upper-triangular part of symmetric m-by-m positive-definite R lined in a single-dimension array
+		// output:	S - upper-triangular part of a Cholesky factor S lined in a single-dimension array
+void pony_linal_chol(double *S, double *P, const int m)
+{
+	int i, j, k, k0, p, q, p0;
+	double s;
+
+	for (j = 0, k0 = (m+2)*(m-1)/2; j < m; k0 -= j+2, j++) {
+		p0 = k0+j;
+		for (p = k0+1, s = 0; p <= p0; p++)
+			s += S[p]*S[p];
+		S[k0] = sqrt(P[k0] - s);
+		for (i = j+1, k = k0-j-1; i < m; k -= i+1, i++) {
+			for (p = k0+1, q = k+1, s = 0; p <= p0; p++, q++)
+				s += S[p]*S[q];
+			S[k] = (P[k] - s)/S[k0];
+		}
+	}
 }
 
 	// square root Kalman filtering

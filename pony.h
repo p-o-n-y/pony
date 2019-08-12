@@ -139,6 +139,8 @@ typedef struct				// GLONASS constellation data (not supported yet)
 typedef struct // GNSS operation settings
 {
 	double sinEl_mask;			// elevation angle mask, sine of
+	double code_sigma;			// pseudorange measurement rmsdev (sigma), meters
+	double phase_sigma;			// carrier phase measurement rmsdev (sigma), cycles
 } pony_gnss_settings;
 
 	// GNSS
@@ -220,6 +222,8 @@ void pony_linal_u_k2ij(int *i, int *j, const int k, const int m);		// index conv
 
 void pony_linal_u_mul_v(double *res, double *u, double *v, const int m);	// matrix multiplication by vector: res = U*v
 void pony_linal_uT_mul_v(double *res, double *u, double *v, const int m);	// transposed matrix multiplication by vector: res = U^T*v
+
+void pony_linal_chol(double *S, double *P, const int m); // Cholesky upper-triangular factorization P = S*S^T, where P is symmetric positive-definite matrix
 
 	// square root Kalman filtering
 double pony_linal_kalman_update(double *x, double *S, double *K, double z, double *h, double sigma, const int m);
