@@ -1,6 +1,5 @@
 // Aug-2019
 //
-
 // PONY core declarations
 
 // define to use linear algebra functions (see bottom of the file)
@@ -148,11 +147,11 @@ typedef struct // GNSS operation settings
 	// GNSS
 typedef struct						// global navigation satellite systems data
 {
-	char* cfg;						// GNSS configuration string pointer
-	int cfglength;					// full configuration string length
+	char* cfg;						// full GNSS configuration string pointer
+	int cfglength;					// full GNSS configuration string length
 
-	char* settings_cfg;				// pointer to a part of GNSS configuration common to all systems
-	int settings_length;			// length of the part of GNSS configuration common to all systems
+	char* cfg_settings;				// pointer to a part of GNSS configuration string common to all systems
+	int settings_length;			// length of the part of GNSS configuration string common to all systems
 
 	pony_gps_const gps_const;		// GPS constants
 	pony_gnss_settings settings;	// GNSS operation settings
@@ -177,9 +176,6 @@ typedef struct					// main core structure and instance
 	void(**plugins)(void);				// plugin array pointer
 	int plugin_count;					// number of plugins
 	int exit_plugin_id;					// index of a plugin that initiated termination
-
-	char* cfg;							// part of configuration that is outside of any group
-	int cfglength;						// length of the part of configuration that is outside of any group
 } pony_core;
 
 #define pony_bus_version 1		// current bus version
@@ -196,6 +192,9 @@ typedef struct					// bus data to be used in host application
 
 	char* cfg;							// full configuration string
 	int cfglength;						// full configuration string length
+
+	char* cfg_settings;					// pointer to a part of the configuration string common to all subsystems
+	int settings_length;				// length of the part of the configuration string common to all subsystems
 
 	pony_imu* imu;						// inertial measurement unit data pointer
 

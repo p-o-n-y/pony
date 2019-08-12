@@ -1,6 +1,5 @@
 // Aug-2019
 //
-
 // PONY core source code
 
 #include <stdlib.h>
@@ -23,7 +22,7 @@ pony_bus pony = {
 	pony_init,					// init
 	pony_step,					// step
 	pony_terminate,				// terminate
-	{NULL, 0, -1, NULL, 0}};	// core.plugins, core.plugin_count, core.exit_plugin_id, core.cfg, core.cfglength
+	{NULL, 0, -1}};	// core.plugins, core.plugin_count, core.exit_plugin_id, core.cfg, core.cfglength
 
 
 
@@ -129,9 +128,12 @@ char pony_locatecfggroup(const char* groupname, char* cfgstr, const int cfglen, 
 	*groupptr = NULL;
 	*grouplen = 0;
 
+	if (cfgstr == NULL)
+		return 0;
+
 	// locate configuration substring that is outside of any group
 	if (groupname[0] == '\0') {
-		for (i = 0; cfgstr[i] && i < cfglen; i++) {
+		for (i = 0; i < cfglen && cfgstr[i]; i++) {
 			// skip all non-printable characters, blank spaces and commas between groups
 			for (; cfgstr[i] && (cfgstr[i] <= ' ' || cfgstr[i] == ',') && i < cfglen; i++); 
 			// if no group started at this point
@@ -151,7 +153,7 @@ char pony_locatecfggroup(const char* groupname, char* cfgstr, const int cfglen, 
 		}
 
 		// skip all non-printable characters, blank spaces and commas between groups
-		for (; cfgstr[i] && (cfgstr[i] <= ' ' || cfgstr[i] == ',') && i < cfglen; i++);
+		for (; i < cfglen && cfgstr[i] && (cfgstr[i] <= ' ' || cfgstr[i] == ','); i++);
 		// start from this point
 		*groupptr = cfgstr + i;
 
@@ -161,7 +163,7 @@ char pony_locatecfggroup(const char* groupname, char* cfgstr, const int cfglen, 
 
 	// locate configuration substring inside a requested group
 	else {
-		for (i = 0; cfgstr[i] && !group_found && i < cfglen; i++) {
+		for (i = 0; i < cfglen && cfgstr[i] && !group_found; i++) {
 			// skip all non-printable characters, blank spaces and commas between groups
 			for (; cfgstr[i] && (cfgstr[i] <= ' ' || cfgstr[i] == ',') && i < cfglen; i++); 
 			// if a group started
@@ -282,7 +284,7 @@ void pony_free_imu(void)
 	// initialize gnss settings
 char pony_init_gnss_settings(pony_gnss *gnss)
 {
-	pony_locatecfggroup( "", gnss->cfg, gnss->cfglength, &(gnss->settings_cfg), &(gnss->settings_length) );
+	pony_locatecfggroup( "", gnss->cfg, gnss->cfglength, &(gnss->cfg_settings), &(gnss->settings_length) );
 
 	gnss->settings.sinEl_mask = 0;
 
@@ -623,7 +625,9 @@ char pony_init(char* cfg)
 	pony.cfg[pony.cfglength] = '\0';
 
 	// fetch a part of configuration that is outside of any group
-	pony_locatecfggroup("", pony.cfg, pony.cfglength, &pony.core.cfg, &pony.core.cfglength);
+	pony.cfg_settings = NULL;
+	pony.settings_length = 0;
+	pony_locatecfggroup("", pony.cfg, pony.cfglength, &pony.cfg_settings, &pony.settings_length);
 	
 	// imu init
 	pony.imu = NULL;
@@ -656,28 +660,33 @@ char pony_init(char* cfg)
 		multi_gnss_token[multi_gnss_index_position] = '0' + (char)i;
 
 		if ( (i == 0 && pony_locatecfggroup("gnss:", pony.cfg, pony.cfglength, &groupptr, &grouplen) ) ||
-			pony_locatecfggroup(multi_gnss_token, pony.cfg, pony.cfglength, &groupptr, &grouplen) )
-			while (i >= pony.gnss_count) 
-			{
-				pony.gnss_count++;
+			pony_locatecfggroup(multi_gnss_token, pony.cfg, pony.cfglength, &groupptr, &grouplen) ) {
+			if (i >= pony.gnss_count) {
 				// try to allocate/reallocate memory
-				pony.gnss = (pony_gnss*)realloc(pony.gnss, sizeof(pony_gnss)*pony.gnss_count);
+				pony.gnss = (pony_gnss*)realloc(pony.gnss, sizeof(pony_gnss)*(i+1));
 				if (pony.gnss == NULL) {
 					pony_free();
 					return 0;
 				}
-			
-
-				// set configuration pointer
-				pony.gnss[i].cfg = groupptr;
-				pony.gnss[i].cfglength = grouplen;
-
-				// try to init
-				if ( !pony_init_gnss( &(pony.gnss[i]) ) ) {
-					pony_free();
-					return 0;
+				// try to init new instances, except the i-th one
+				for ( ; pony.gnss_count < i; pony.gnss_count++) {
+					pony.gnss[pony.gnss_count].cfg = NULL;
+					pony.gnss[pony.gnss_count].cfglength = 0;
+					pony_init_gnss( &(pony.gnss[pony.gnss_count]) );
 				}
+				pony.gnss_count = i+1;
 			}
+
+			// set configuration pointer
+			pony.gnss[i].cfg = groupptr;
+			pony.gnss[i].cfglength = grouplen;
+
+			// try to init
+			if ( !pony_init_gnss( &(pony.gnss[i]) ) ) {
+				pony_free();
+				return 0;
+			}
+		}
 	}
 
 	// system time, operation mode and solution
