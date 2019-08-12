@@ -3,6 +3,7 @@
 // PONY core source code
 
 #include <stdlib.h>
+#include <math.h>
 
 #include "pony.h"
 
@@ -31,74 +32,6 @@ pony_bus pony = {
 
 
 // service subroutines
-
-	// compare substrings of two strings up to a given length
-	//
-	// input: pointers to strings s1, s2, substring length
-	// 
-	// output: 0 - equal, 1 - difference detected
-char pony_strncmpeff(char* s1, char* s2, int substrlen)
-{
-	int i;
-	for (i = 0; i < substrlen; i++)
-		if (s1[i] != s2[i])
-			return 1;
-	return 0;
-}
-
-	// locate a substring within a string given theirs lengths
-	// 
-	// input: str - source string, len - source string length, susbtr - substring to locate, substrlen - susbtring length
-	// 
-	// output: pointer to the first occurence of substring within the source string
-char* pony_locatesubstrn(char* str, int len, char* substr, int substrlen)
-{
-	int n = 0;
-	while (n + substrlen <= len )
-	{
-		if (pony_strncmpeff(str + n, substr, substrlen) == 0)
-		{
-			return str + n;
-		}
-		n++;
-	}
-	return NULL;
-}
-
-
-	// locate a substring within a configuration group
-	// 
-	// input: str - pointer to a string containing the configuration group, substr - substring to locate, substrlen - substring length
-	// 
-	// output: pointer to the first occurence of substring within the configuration group
-char* pony_locatesubstreff(char* str, char* substr, int substrlen)  
-{
-	char* res = str;
-
-	int in = 0;
-
-	while ( (*res) != '\0' )
-	{
-		if (in == 0 && pony_strncmpeff(res, substr, substrlen) == 0)
-		{
-			return res;
-		}
-		if (res[0] == '{')
-		{
-			in++;
-		}
-		if (res[0] == '}')
-		{
-			in--;
-		}
-
-		res++;
-	}
-	return NULL;
-}
-
-
-
 
 	// locate parameter group within a configuration string
 	// input:
@@ -757,10 +690,7 @@ char pony_terminate()
 
 
 
-// if using linear algebra functions
-#ifdef PONY_LINAL
-#include <math.h>
-
+// linear algebra functions
 	// conventional operations
 		// dot product
 double pony_linal_dot(double *u, double *v, const int m) {
@@ -851,5 +781,3 @@ double pony_linal_kalman_update(double *x, double *S, double *K, double z, doubl
 
 	return z;
 }
-
-#endif
