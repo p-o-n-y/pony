@@ -1,7 +1,6 @@
-// Jul-2019
+// Aug-2019
 //
-// define to use linear algebra functions (see bottom of the file)
-#define PONY_LINAL
+// PONY core declarations
 
 // TIME EPOCH
 typedef struct 		// Julian-type time epoch
@@ -92,9 +91,12 @@ typedef struct		// GPS system constants
 		mu,			// Earth grav constant as in GPS interface specs, m^3/s^2
 		u,			// Earth rotation rate as in GPS interface specs, rad/s
 		a,			// Earth ellipsoid semi-major axis, m
+		e2,			// Earth ellipsoid first eccentricity squared
 		F,			// relativistic correction constant
 		sec_in_w,	// seconds in a week
-		sec_in_d;	// seconds in a day
+		sec_in_d,	// seconds in a day
+		F1, L1,		// nominal frequency and wavelength for L1 signal
+		F2, L2;		// nominal frequency and wavelength for L2 signal
 } pony_gps_const;
 
 	// GPS
@@ -137,16 +139,18 @@ typedef struct				// GLONASS constellation data (not supported yet)
 typedef struct // GNSS operation settings
 {
 	double sinEl_mask;			// elevation angle mask, sine of
+	double code_sigma;			// pseudorange measurement rmsdev (sigma), meters
+	double phase_sigma;			// carrier phase measurement rmsdev (sigma), cycles
 } pony_gnss_settings;
 
 	// GNSS
 typedef struct						// global navigation satellite systems data
 {
-	char* cfg;						// GNSS configuration string pointer
-	int cfglength;					// configuration string length
+	char* cfg;						// full GNSS configuration string pointer
+	int cfglength;					// full GNSS configuration string length
 
-	char* settings_cfg;				// pointer to a part of GNSS configuration common to all systems
-	int settings_length;			// full configuration string length
+	char* cfg_settings;				// pointer to a part of GNSS configuration string common to all systems
+	int settings_length;			// length of the part of GNSS configuration string common to all systems
 
 	pony_gps_const gps_const;		// GPS constants
 	pony_gnss_settings settings;	// GNSS operation settings
@@ -171,9 +175,6 @@ typedef struct					// main core structure and instance
 	void(**plugins)(void);				// plugin array pointer
 	int plugin_count;					// number of plugins
 	int exit_plugin_id;					// index of a plugin that initiated termination
-
-	char* cfg;							// part of configuration that is outside of any group
-	int cfglength;						// length of the part of configuration that is outside of any group
 } pony_core;
 
 #define pony_bus_version 1		// current bus version
@@ -182,7 +183,7 @@ typedef struct					// bus data to be used in host application
 	int ver;							// bus version to be used at runtime	
 
 	// main functions to be used in host app
-	char(*add_plugin)(void(*)(void));	// add plugin to the plugin execution list,		input: pointer to plugin function,				output: OK/not OK (1/0)
+	char(*add_plugin)( void(*)(void) );	// add plugin to the plugin execution list,		input: pointer to plugin function,				output: OK/not OK (1/0)
 	char(*init)(char *);				// initialize the bus, except for core,			input: configuration string (see description),	output: OK/not OK (1/0)
 	char(*step)(void);					// step through the plugin execution list,														output: OK/not OK (1/0)
 	char(*terminate)(void);				// terminate operation,																			output: OK/not OK (1/0)
@@ -190,6 +191,9 @@ typedef struct					// bus data to be used in host application
 
 	char* cfg;							// full configuration string
 	int cfglength;						// full configuration string length
+
+	char* cfg_settings;					// pointer to a part of the configuration string common to all subsystems
+	int settings_length;				// length of the part of the configuration string common to all subsystems
 
 	pony_imu* imu;						// inertial measurement unit data pointer
 
@@ -208,20 +212,18 @@ extern pony_bus pony;
 
 
 
-// if using linear algebra functions
-#ifdef PONY_LINAL
-
+// linear algebra functions
 	// conventional operations
-	double pony_linal_dot(double *u, double *v, const int m); // dot product
+double pony_linal_dot(double *u, double *v, const int m); // dot product
 
 	// routines for m x m upper-triangular matrices U lined up in a single-dimension array u
-	void pony_linal_u_ij2k(int *k, const int i, const int j, const int m);	// index conversion: (i,j) -> k
-	void pony_linal_u_k2ij(int *i, int *j, const int k, const int m);		// index conversion: k -> (i,j)
+void pony_linal_u_ij2k(int *k, const int i, const int j, const int m);	// index conversion: (i,j) -> k
+void pony_linal_u_k2ij(int *i, int *j, const int k, const int m);		// index conversion: k -> (i,j)
 
-	void pony_linal_u_mul_v(double *res, double *u, double *v, const int m);	// matrix multiplication by vector: res = U*v
-	void pony_linal_uT_mul_v(double *res, double *u, double *v, const int m);	// transposed matrix multiplication by vector: res = U^T*v
+void pony_linal_u_mul_v(double *res, double *u, double *v, const int m);	// matrix multiplication by vector: res = U*v
+void pony_linal_uT_mul_v(double *res, double *u, double *v, const int m);	// transposed matrix multiplication by vector: res = U^T*v
+
+void pony_linal_chol(double *S, double *P, const int m); // Cholesky upper-triangular factorization P = S*S^T, where P is symmetric positive-definite matrix
 
 	// square root Kalman filtering
-	double pony_linal_kalman_update(double *x, double *S, double *K, double z, double *h, double sigma, const int m);
-
-#endif
+double pony_linal_kalman_update(double *x, double *S, double *K, double z, double *h, double sigma, const int m);

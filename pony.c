@@ -1,12 +1,15 @@
-// Jul-2019
+// Aug-2019
 //
+// PONY core source code
+
 #include <stdlib.h>
+#include <math.h>
 
 #include "pony.h"
 
 
 // core functions to be used in host application
-char pony_add_plugin(void(*newplugin)(void));	// add plugin to the plugin execution list,		input: pointer to plugin function,				output: OK/not OK (1/0)
+char pony_add_plugin( void(*newplugin)(void) );	// add plugin to the plugin execution list,		input: pointer to plugin function,				output: OK/not OK (1/0)
 char pony_init(char*);							// initialize the bus, except for core,			input: configuration string (see description),	output: OK/not OK (1/0)
 char pony_step(void);							// step through the plugin execution list,														output: OK/not OK (1/0)
 char pony_terminate(void);						// terminate operation,																			output: OK/not OK (1/0)
@@ -20,7 +23,7 @@ pony_bus pony = {
 	pony_init,					// init
 	pony_step,					// step
 	pony_terminate,				// terminate
-	{NULL, 0, -1, NULL, 0}};	// core.plugins, core.plugin_count, core.exit_plugin_id, core.cfg, core.cfglength
+	{NULL, 0, -1}};	// core.plugins, core.plugin_count, core.exit_plugin_id, core.cfg, core.cfglength
 
 
 
@@ -29,74 +32,6 @@ pony_bus pony = {
 
 
 // service subroutines
-
-	// compare substrings of two strings up to a given length
-	//
-	// input: pointers to strings s1, s2, substring length
-	// 
-	// output: 0 - equal, 1 - difference detected
-char pony_strncmpeff(char* s1, char* s2, int substrlen)
-{
-	int i;
-	for (i = 0; i < substrlen; i++)
-		if (s1[i] != s2[i])
-			return 1;
-	return 0;
-}
-
-	// locate a substring within a string given theirs lengths
-	// 
-	// input: str - source string, len - source string length, susbtr - substring to locate, substrlen - susbtring length
-	// 
-	// output: pointer to the first occurence of substring within the source string
-char* pony_locatesubstrn(char* str, int len, char* substr, int substrlen)
-{
-	int n = 0;
-	while (n + substrlen <= len )
-	{
-		if (pony_strncmpeff(str + n, substr, substrlen) == 0)
-		{
-			return str + n;
-		}
-		n++;
-	}
-	return NULL;
-}
-
-
-	// locate a substring within a configuration group
-	// 
-	// input: str - pointer to a string containing the configuration group, substr - substring to locate, substrlen - substring length
-	// 
-	// output: pointer to the first occurence of substring within the configuration group
-char* pony_locatesubstreff(char* str, char* substr, int substrlen)  
-{
-	char* res = str;
-
-	int in = 0;
-
-	while ((*res) != '\0')
-	{
-		if (in == 0 && pony_strncmpeff(res, substr, substrlen) == 0)
-		{
-			return res;
-		}
-		if (res[0] == '{')
-		{
-			in++;
-		}
-		if (res[0] == '}')
-		{
-			in--;
-		}
-
-		res++;
-	}
-	return NULL;
-}
-
-
-
 
 	// locate parameter group within a configuration string
 	// input:
@@ -126,9 +61,12 @@ char pony_locatecfggroup(const char* groupname, char* cfgstr, const int cfglen, 
 	*groupptr = NULL;
 	*grouplen = 0;
 
+	if (cfgstr == NULL)
+		return 0;
+
 	// locate configuration substring that is outside of any group
 	if (groupname[0] == '\0') {
-		for (i = 0; cfgstr[i] && i < cfglen; i++) {
+		for (i = 0; i < cfglen && cfgstr[i]; i++) {
 			// skip all non-printable characters, blank spaces and commas between groups
 			for (; cfgstr[i] && (cfgstr[i] <= ' ' || cfgstr[i] == ',') && i < cfglen; i++); 
 			// if no group started at this point
@@ -148,7 +86,7 @@ char pony_locatecfggroup(const char* groupname, char* cfgstr, const int cfglen, 
 		}
 
 		// skip all non-printable characters, blank spaces and commas between groups
-		for (; cfgstr[i] && (cfgstr[i] <= ' ' || cfgstr[i] == ',') && i < cfglen; i++);
+		for (; i < cfglen && cfgstr[i] && (cfgstr[i] <= ' ' || cfgstr[i] == ','); i++);
 		// start from this point
 		*groupptr = cfgstr + i;
 
@@ -158,7 +96,7 @@ char pony_locatecfggroup(const char* groupname, char* cfgstr, const int cfglen, 
 
 	// locate configuration substring inside a requested group
 	else {
-		for (i = 0; cfgstr[i] && !group_found && i < cfglen; i++) {
+		for (i = 0; i < cfglen && cfgstr[i] && !group_found; i++) {
 			// skip all non-printable characters, blank spaces and commas between groups
 			for (; cfgstr[i] && (cfgstr[i] <= ' ' || cfgstr[i] == ',') && i < cfglen; i++); 
 			// if a group started
@@ -203,8 +141,22 @@ char pony_locatecfggroup(const char* groupname, char* cfgstr, const int cfglen, 
 
 
 
+// initialize epoch
+void pony_init_epoch(pony_time_epoch *epoch)
+{
+	epoch->Y = 0;
+	epoch->M = 0;
+	epoch->D = 0;
+	epoch->h = 0;
+	epoch->m = 0;
+	epoch->s = 0;
+}
+
+
+
+
 // initialize solution
-char pony_init_solution(pony_sol *sol)
+void pony_init_solution(pony_sol *sol)
 {
 	int i;
 
@@ -231,7 +183,6 @@ char pony_init_solution(pony_sol *sol)
 	sol->dt			= 0;
 	sol->dt_valid	= 0;
 
-	return 1;
 }
 
 
@@ -245,7 +196,7 @@ char pony_init_imu(void)
 	pony.imu->w_valid = 0;
 	pony.imu->f_valid = 0;
 	// drop the solution
-	pony_init_solution(&(pony.imu->sol));
+	pony_init_solution( &(pony.imu->sol) );
 
 	return 1;
 }
@@ -266,9 +217,11 @@ void pony_free_imu(void)
 	// initialize gnss settings
 char pony_init_gnss_settings(pony_gnss *gnss)
 {
-	pony_locatecfggroup("", gnss->cfg, gnss->cfglength, &(gnss->settings_cfg), &(gnss->settings_length));
+	pony_locatecfggroup( "", gnss->cfg, gnss->cfglength, &(gnss->cfg_settings), &(gnss->settings_length) );
 
 	gnss->settings.sinEl_mask = 0;
+	gnss->settings.code_sigma = 20;
+	gnss->settings.phase_sigma = 0.01;
 
 	return 1;
 }
@@ -276,14 +229,23 @@ char pony_init_gnss_settings(pony_gnss *gnss)
 	// initialize gnss gps constants
 void pony_init_gnss_gps_const(void)
 {
-	pony.gnss->gps_const.pi = 3.1415926535898;	// pi as in IS-GPS-200J (22 May 2018)
-	pony.gnss->gps_const.c = 299792458;			// speed of light as in IS-GPS-200J (22 May 2018), m/s
-	pony.gnss->gps_const.mu = 3.986005e14;		// Earth grav constant as in IS-GPS-200J (22 May 2018), m^3/s^2
-	pony.gnss->gps_const.u = 7.2921151467e-5;	// Earth rotation rate as in IS-GPS-200J (22 May 2018), rad/s
-	pony.gnss->gps_const.a = 6378137.0;			// Earth ellipsoid semi-major axis as in WGS-84(G1762) 2014-07-08, m
-	pony.gnss->gps_const.F = -4.442807633e-10;	// relativistic correction constant as in IS-GPS-200J (22 May 2018), s/sqrt(m)
-	pony.gnss->gps_const.sec_in_w = 604800;		// seconds in a week
-	pony.gnss->gps_const.sec_in_d =  86400;		// seconds in a day
+	int r;
+
+	for (r = 0; r < pony.gnss_count; r++) {
+		pony.gnss[r].gps_const.pi = 3.1415926535898;	// pi as in IS-GPS-200J (22 May 2018)
+		pony.gnss[r].gps_const.c = 299792458;			// speed of light as in IS-GPS-200J (22 May 2018), m/s
+		pony.gnss[r].gps_const.mu = 3.986005e14;		// Earth gravity constant as in IS-GPS-200J (22 May 2018), m^3/s^2
+		pony.gnss[r].gps_const.u = 7.2921151467e-5;		// Earth rotation rate as in IS-GPS-200J (22 May 2018), rad/s
+		pony.gnss[r].gps_const.a = 6378137.0;			// Earth ellipsoid semi-major axis as in WGS-84(G1762) 2014-07-08, m
+		pony.gnss[r].gps_const.e2 = 6.694379990141e-3;	// Earth ellipsoid first eccentricity squared as in WGS-84(G1762) 2014-07-08
+		pony.gnss[r].gps_const.F = -4.442807633e-10;	// relativistic correction constant as in IS-GPS-200J (22 May 2018), s/sqrt(m)
+		pony.gnss[r].gps_const.sec_in_w = 604800;		// seconds in a week
+		pony.gnss[r].gps_const.sec_in_d =  86400;		// seconds in a day
+		pony.gnss[r].gps_const.F1 = 1575.42e6;			// nominal frequency for L1 signal
+		pony.gnss[r].gps_const.L1 = pony.gnss[r].gps_const.c/pony.gnss[r].gps_const.F1;		// nominal wavelength for L1 signal
+		pony.gnss[r].gps_const.F2 = 1227.60e6;			// nominal frequency for L2 signal
+		pony.gnss[r].gps_const.L2 = pony.gnss[r].gps_const.c/pony.gnss[r].gps_const.F2;		// nominal wavelength for L2 signal
+	}
 }
 
 	// initialize gnss gps structure
@@ -296,7 +258,7 @@ char pony_init_gnss_gps(pony_gnss_gps *gps, const int max_sat_count, const int m
 	gps->max_eph_count = 0;
 
 	// try to allocate memory for satellite data
-	gps->sat = (pony_gnss_sat*)calloc(sizeof(pony_gnss_sat), max_sat_count);
+	gps->sat = (pony_gnss_sat*)calloc( max_sat_count, sizeof(pony_gnss_sat) );
 	if (gps->sat == NULL)
 		return 0;
 	gps->max_sat_count = max_sat_count;
@@ -315,7 +277,7 @@ char pony_init_gnss_gps(pony_gnss_gps *gps, const int max_sat_count, const int m
 
 	// try to allocate memory for each satellite ephemeris
 	for (i = 0; i < gps->max_sat_count; i++) {
-		gps->sat[i].eph = (double *)calloc(sizeof(double),max_eph_count);
+		gps->sat[i].eph = (double *)calloc( max_eph_count, sizeof(double) );
 		if (gps->sat[i].eph == NULL)
 			return 0;
 	}
@@ -351,8 +313,8 @@ void pony_free_gnss_gps(pony_gnss_gps *gps)
 			}
 	
 		free(gps->sat);
+		gps->sat = NULL;
 	}
-	gps->sat = NULL;
 
 	// gnss_gps structure
 	free(gps);
@@ -369,7 +331,7 @@ char pony_init_gnss_glo(pony_gnss_glo *glo, const int max_sat_count, const int m
 	glo->max_eph_count = 0;
 
 	// try to allocate memory for satellite data
-	glo->sat = (pony_gnss_sat*)calloc(sizeof(pony_gnss_sat), max_sat_count);
+	glo->sat = (pony_gnss_sat*)calloc( max_sat_count, sizeof(pony_gnss_sat) );
 	if (glo->sat == NULL)
 		return 0;
 	glo->max_sat_count = max_sat_count;
@@ -388,7 +350,7 @@ char pony_init_gnss_glo(pony_gnss_glo *glo, const int max_sat_count, const int m
 
 	// try to allocate memory for each satellite ephemeris
 	for (i = 0; i < glo->max_sat_count; i++) {
-		glo->sat[i].eph = (double *)calloc(sizeof(double),max_eph_count);
+		glo->sat[i].eph = (double *)calloc( max_eph_count, sizeof(double) );
 		if (glo->sat[i].eph == NULL)
 			return 0;
 	}
@@ -420,8 +382,8 @@ void pony_free_gnss_glo(pony_gnss_glo *glo)
 			}
 	
 		free(glo->sat);
+		glo->sat = NULL;
 	}
-	glo->sat = NULL;
 
 	// gnss_gps structure
 	free(glo);
@@ -444,29 +406,29 @@ char pony_init_gnss(pony_gnss *gnss)
 	// gps
 	pony_init_gnss_gps_const();
 	gnss->gps = NULL;
-	if (pony_locatecfggroup("gps:", gnss->cfg, gnss->cfglength, &groupptr, &grouplen))
+	if ( pony_locatecfggroup("gps:", gnss->cfg, gnss->cfglength, &groupptr, &grouplen) )
 	{
-		gnss->gps = (pony_gnss_gps*)calloc(sizeof(pony_gnss_gps), 1);
+		gnss->gps = (pony_gnss_gps*)calloc( 1, sizeof(pony_gnss_gps) );
 		if (gnss->gps == NULL)
 			return 0;
 		gnss->gps->cfg = groupptr;
 		gnss->gps->cfglength = grouplen;
 
-		if (!pony_init_gnss_gps(gnss->gps, max_sat_count, max_gps_eph_count))
+		if ( !pony_init_gnss_gps(gnss->gps, max_sat_count, max_gps_eph_count) )
 			return 0;
 	}
 
 	// glonass
 	gnss->glo = NULL;
-	if (pony_locatecfggroup("glo:", gnss->cfg, gnss->cfglength, &groupptr, &grouplen))
+	if (pony_locatecfggroup( "glo:", gnss->cfg, gnss->cfglength, &groupptr, &grouplen) )
 	{
-		gnss->glo = (pony_gnss_glo*)calloc(sizeof(pony_gnss_glo), 1);
+		gnss->glo = (pony_gnss_glo*)calloc( 1, sizeof(pony_gnss_glo) );
 		if (gnss->glo == NULL)
 			return 0;
 		gnss->glo->cfg = groupptr;
 		gnss->glo->cfglength = grouplen;
 
-		if (!pony_init_gnss_glo(gnss->glo, max_sat_count, max_glo_eph_count))
+		if ( !pony_init_gnss_glo(gnss->glo, max_sat_count, max_glo_eph_count) )
 			return 0;
 	}
 
@@ -474,7 +436,10 @@ char pony_init_gnss(pony_gnss *gnss)
 	pony_init_gnss_settings(gnss);
 
 	// gnss solution
-	pony_init_solution(&(gnss->sol));
+	pony_init_solution( &(gnss->sol) );
+
+	// gnss epoch
+	pony_init_epoch( &(gnss->epoch) );
 
 	return 1;
 }
@@ -520,7 +485,7 @@ void pony_free()
 	if (pony.gnss != NULL)
 	{
 		for (i = 0; i < pony.gnss_count; i++)
-			pony_free_gnss(&(pony.gnss[i]));
+			pony_free_gnss( &(pony.gnss[i]) );
 		free(pony.gnss);
 		pony.gnss = NULL;
 	}
@@ -549,9 +514,9 @@ void pony_free()
 // input: pointer to plugin function
 //
 // output: OK/not OK (1/0)
-char pony_add_plugin(void(*newplugin)(void))
+char pony_add_plugin( void(*newplugin)(void) )
 {
-	pony.core.plugins = (void(**)(void))realloc(pony.core.plugins, (pony.core.plugin_count + 1) * sizeof(void(*)(void)));
+	pony.core.plugins = ( void(**)(void) )realloc( pony.core.plugins, (pony.core.plugin_count + 1) * sizeof( void(*)(void) ) );
 
 	if (pony.core.plugins == NULL)	// failed to allocate/realocate memory
 	{
@@ -587,7 +552,7 @@ char pony_init(char* cfg)
 	for (pony.cfglength = 0; cfg[pony.cfglength]; pony.cfglength++);
 
 	// assign configuration string
-	pony.cfg = (char *)malloc(sizeof(char) * (pony.cfglength + 1));
+	pony.cfg = (char *)malloc( sizeof(char) * (pony.cfglength + 1) );
 	if (pony.cfg == NULL)
 		return 0;
 	for (i = 0; i < pony.cfglength; i++)
@@ -595,14 +560,16 @@ char pony_init(char* cfg)
 	pony.cfg[pony.cfglength] = '\0';
 
 	// fetch a part of configuration that is outside of any group
-	pony_locatecfggroup("", pony.cfg, pony.cfglength, &pony.core.cfg, &pony.core.cfglength);
+	pony.cfg_settings = NULL;
+	pony.settings_length = 0;
+	pony_locatecfggroup("", pony.cfg, pony.cfglength, &pony.cfg_settings, &pony.settings_length);
 	
 	// imu init
 	pony.imu = NULL;
-	if (pony_locatecfggroup("imu:", pony.cfg, pony.cfglength, &groupptr, &grouplen)) // if the group found in configuration
+	if ( pony_locatecfggroup("imu:", pony.cfg, pony.cfglength, &groupptr, &grouplen) ) // if the group found in configuration
 	{
 		// try to allocate memory
-		pony.imu = (pony_imu*)calloc(sizeof(pony_imu), 1);
+		pony.imu = (pony_imu*)calloc( 1, sizeof(pony_imu) );
 		if (pony.imu == NULL) {
 			pony_free();
 			return 0;
@@ -613,7 +580,7 @@ char pony_init(char* cfg)
 		pony.imu->cfglength = grouplen;
 
 		// try to init
-		if (!pony_init_imu()) {
+		if ( !pony_init_imu() ) {
 			pony_free();
 			return 0;
 		}
@@ -625,37 +592,42 @@ char pony_init(char* cfg)
 		// multiple gnss mode support
 	for (i = 0; i < max_gnss_count; i++)
 	{
-		multi_gnss_token[multi_gnss_index_position] = '0'+i;
+		multi_gnss_token[multi_gnss_index_position] = '0' + (char)i;
 
-		if ((i == 0 && pony_locatecfggroup("gnss:", pony.cfg, pony.cfglength, &groupptr, &grouplen)) ||
-			pony_locatecfggroup(multi_gnss_token, pony.cfg, pony.cfglength, &groupptr, &grouplen))
-			while (i >= pony.gnss_count) 
-			{
-				pony.gnss_count++;
+		if ( (i == 0 && pony_locatecfggroup("gnss:", pony.cfg, pony.cfglength, &groupptr, &grouplen) ) ||
+			pony_locatecfggroup(multi_gnss_token, pony.cfg, pony.cfglength, &groupptr, &grouplen) ) {
+			if (i >= pony.gnss_count) {
 				// try to allocate/reallocate memory
-				pony.gnss = (pony_gnss*)realloc(pony.gnss, sizeof(pony_gnss)*pony.gnss_count);
+				pony.gnss = (pony_gnss*)realloc(pony.gnss, sizeof(pony_gnss)*(i+1));
 				if (pony.gnss == NULL) {
 					pony_free();
 					return 0;
 				}
-			
-
-				// set configuration pointer
-				pony.gnss[i].cfg = groupptr;
-				pony.gnss[i].cfglength = grouplen;
-
-				// try to init
-				if ( !pony_init_gnss( &(pony.gnss[i]) ) ) {
-					pony_free();
-					return 0;
+				// try to init new instances, except the i-th one
+				for ( ; pony.gnss_count < i; pony.gnss_count++) {
+					pony.gnss[pony.gnss_count].cfg = NULL;
+					pony.gnss[pony.gnss_count].cfglength = 0;
+					pony_init_gnss( &(pony.gnss[pony.gnss_count]) );
 				}
+				pony.gnss_count = i+1;
 			}
+
+			// set configuration pointer
+			pony.gnss[i].cfg = groupptr;
+			pony.gnss[i].cfglength = grouplen;
+
+			// try to init
+			if ( !pony_init_gnss( &(pony.gnss[i]) ) ) {
+				pony_free();
+				return 0;
+			}
+		}
 	}
 
 	// system time, operation mode and solution
 	pony.t = 0;
 	pony.mode = 0;
-	pony_init_solution(&(pony.sol));
+	pony_init_solution( &(pony.sol) );
 	
 	return 1;
 }
@@ -678,7 +650,7 @@ char pony_step(void)
 		if (pony.core.exit_plugin_id == i)	// if termination was initiated by the current plugin on the previous loop
 		{
 			pony.core.exit_plugin_id = -1;		// set to default
-			pony_init_solution(&(pony.sol));	// drop the solution
+			pony_init_solution( &(pony.sol) );	// drop the solution
 			pony_free();						// free memory
 			break;
 		}
@@ -704,7 +676,7 @@ char pony_terminate()
 	for (i = 0; i < pony.core.plugin_count; i++)
 		pony.core.plugins[i]();
 
-	pony_init_solution(&(pony.sol));	// drop the solution
+	pony_init_solution( &(pony.sol) );	// drop the solution
 	pony_free();						// free memory
 
 	return 1; // always succeed in termination
@@ -720,10 +692,7 @@ char pony_terminate()
 
 
 
-// if using linear algebra functions
-#ifdef PONY_LINAL
-#include <math.h>
-
+// linear algebra functions
 	// conventional operations
 		// dot product
 double pony_linal_dot(double *u, double *v, const int m) {
@@ -739,14 +708,14 @@ double pony_linal_dot(double *u, double *v, const int m) {
 	// routines for m x m upper-triangular matrices lined up in a single-dimension array
 		// index conversion: (i,j) -> k
 void pony_linal_u_ij2k(int *k, const int i, const int j, const int m) {
-	*k = (i*(2*m - 1 - i))/2 + j;
+	*k = ( i*(2*m - 1 - i) )/2 + j;
 }
 
 		// index conversion: k -> (i,j)
 void pony_linal_u_k2ij(int *i, int *j, const int k, const int m) {
 	double onehalf_plus_m = 0.5+m;
-	*i = (int)(floor(onehalf_plus_m - sqrt(onehalf_plus_m*onehalf_plus_m - 2.0*k)) + 0.5);
-	*j = k - ((2*m - 1 - (*i))*(*i))/2;
+	*i = (int)(floor( onehalf_plus_m - sqrt(onehalf_plus_m*onehalf_plus_m - 2.0*k) ) + 0.5);
+	*j = k - ( ( 2*m - 1 - (*i) )*(*i) )/2;
 }
 
 		// matrix multiplication by vector: res = U*v
@@ -769,6 +738,28 @@ void pony_linal_uT_mul_v(double *res, double *u, double *v, const int m) {
 	for (j = 1, k = m; j < m; j++)
 		for (i = j; i < m; i++, k++)
 			res[i] += u[k]*v[j];
+}
+
+	// Cholesky upper-triangular factorization P = S*S^T, where P is symmetric positive-definite matrix
+		// input:	P - upper-triangular part of symmetric m-by-m positive-definite R lined in a single-dimension array
+		// output:	S - upper-triangular part of a Cholesky factor S lined in a single-dimension array
+		// 
+void pony_linal_chol(double *S, double *P, const int m)
+{
+	int i, j, k, k0, p, q, p0;
+	double s;
+
+	for (j = 0, k0 = (m+2)*(m-1)/2; j < m; k0 -= j+2, j++) {
+		p0 = k0+j;
+		for (p = k0+1, s = 0; p <= p0; p++)
+			s += S[p]*S[p];
+		S[k0] = sqrt(P[k0] - s);
+		for (i = j+1, k = k0-j-1; i < m; k -= i+1, i++) {
+			for (p = k0+1, q = k+1, s = 0; p <= p0; p++, q++)
+				s += S[p]*S[q];
+			S[k] = (S[k0] == 0)? 0 : (P[k] - s)/S[k0];
+		}
+	}
 }
 
 	// square root Kalman filtering
@@ -814,5 +805,3 @@ double pony_linal_kalman_update(double *x, double *S, double *K, double z, doubl
 
 	return z;
 }
-
-#endif
