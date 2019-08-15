@@ -224,6 +224,7 @@ void pony_linal_u_mul_v(double *res, double *u, double *v, const int m);	// matr
 void pony_linal_uT_mul_v(double *res, double *u, double *v, const int m);	// transposed matrix multiplication by vector: res = U^T*v
 
 void pony_linal_chol(double *S, double *P, const int m); // Cholesky upper-triangular factorization P = S*S^T, where P is symmetric positive-definite matrix
+void pony_linal_u_inv(double *res, double *u, const int m); // inversion of upper-triangular matrix lined up in a single-dimension array: res = U^-1
 
 	// square root Kalman filtering
 double pony_linal_kalman_update(double *x, double *S, double *K, double z, double *h, double sigma, const int m);

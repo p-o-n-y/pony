@@ -706,19 +706,19 @@ double pony_linal_dot(double *u, double *v, const int m) {
 }
 
 	// routines for m x m upper-triangular matrices lined up in a single-dimension array
-		// index conversion: (i,j) -> k
+		// index conversion for upper-triangular matrix lined up in a single-dimension array: (i,j) -> k
 void pony_linal_u_ij2k(int *k, const int i, const int j, const int m) {
 	*k = ( i*(2*m - 1 - i) )/2 + j;
 }
 
-		// index conversion: k -> (i,j)
+		// index conversion for upper-triangular matrix lined up in a single-dimension array: k -> (i,j)
 void pony_linal_u_k2ij(int *i, int *j, const int k, const int m) {
 	double onehalf_plus_m = 0.5+m;
 	*i = (int)(floor( onehalf_plus_m - sqrt(onehalf_plus_m*onehalf_plus_m - 2.0*k) ) + 0.5);
 	*j = k - ( ( 2*m - 1 - (*i) )*(*i) )/2;
 }
 
-		// matrix multiplication by vector: res = U*v
+		// upper-triangular matrix lined up in a single-dimension array multiplication by vector: res = U*v
 void pony_linal_u_mul_v(double *res, double *u, double *v, const int m) {
 	int i, j, k;
 
@@ -729,7 +729,7 @@ void pony_linal_u_mul_v(double *res, double *u, double *v, const int m) {
 	}
 }
 
-		// transposed matrix multiplication by vector: res = U^T*v
+		// upper-triangular matrix lined up in a single-dimension array transposed multiplication by vector: res = U^T*v
 void pony_linal_uT_mul_v(double *res, double *u, double *v, const int m) {
 	int i, j, k;
 
@@ -740,12 +740,30 @@ void pony_linal_uT_mul_v(double *res, double *u, double *v, const int m) {
 			res[i] += u[k]*v[j];
 }
 
+		// inversion of upper-triangular matrix lined up in a single-dimension array: res = U^-1
+void pony_linal_u_inv(double *res, double *u, const int m) {
+
+	int i, j, k, k0, p, q, p0, r;
+	double s;
+
+	for (j = 0, k0 = (m+2)*(m-1)/2; j < m; k0 -= j+2, j++) {
+		res[k0] = 1/u[k0];
+		for (i = j+1, k = k0-j-1; i < m; k -= i+1, i++) {
+			p0 = k-(i-j);
+			for (p = k, q = k0, r = 0, s = 0; q > k; p--, q -= j+r+1, r++)
+				s += u[p]*res[q];
+			res[k] = -s/u[p0];
+		}
+	}
+
+}
+
 	// Cholesky upper-triangular factorization P = S*S^T, where P is symmetric positive-definite matrix
 		// input:	P - upper-triangular part of symmetric m-by-m positive-definite R lined in a single-dimension array
 		// output:	S - upper-triangular part of a Cholesky factor S lined in a single-dimension array
-		// 
-void pony_linal_chol(double *S, double *P, const int m)
-{
+		// overwriting input (double *P == double *S) allowed
+void pony_linal_chol(double *S, double *P, const int m) {
+
 	int i, j, k, k0, p, q, p0;
 	double s;
 
@@ -760,6 +778,7 @@ void pony_linal_chol(double *S, double *P, const int m)
 			S[k] = (S[k0] == 0)? 0 : (P[k] - s)/S[k0];
 		}
 	}
+
 }
 
 	// square root Kalman filtering
