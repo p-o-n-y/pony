@@ -718,15 +718,18 @@ void pony_linal_u_k2ij(int *i, int *j, const int k, const int m) {
 	*j = k - ( ( 2*m - 1 - (*i) )*(*i) )/2;
 }
 
-		// upper-triangular matrix lined up in a single-dimension array multiplication by vector: res = U*v
-void pony_linal_u_mul_v(double *res, double *u, double *v, const int m) {
-	int i, j, k;
+		// upper-triangular matrix lined up in a single-dimension array multiplication: res = U*v
+			// overwriting input (double *res = double *v) allowed
+void pony_linal_u_mul(double *res, double *u, double *v, const int n, const int m) {
+	int i, j, k, p, p0, mn;
 
-	for (i = 0, k = 0; i < m; i++) {
-		res[i] = u[k]*v[i];
-		for (j = i+1, k++; j < m; j++, k++)
-			res[i] += u[k]*v[j];
-	}
+	mn = m*n;
+	for (j = 0; j < m; j++)
+		for (i = 0, k = 0, p0 = j; i < n; i++, p0 += m) {
+			res[p0] = u[k]*v[p0];
+			for (p = p0+m, k++; p < mn; p += m, k++)
+				res[p0] += u[k]*v[p];
+		}
 }
 
 		// upper-triangular matrix lined up in a single-dimension array transposed multiplication by vector: res = U^T*v
@@ -741,6 +744,7 @@ void pony_linal_uT_mul_v(double *res, double *u, double *v, const int m) {
 }
 
 		// inversion of upper-triangular matrix lined up in a single-dimension array: res = U^-1
+			// overwriting input (double *res = double *u) allowed
 void pony_linal_u_inv(double *res, double *u, const int m) {
 
 	int i, j, k, k0, p, q, p0, r;
