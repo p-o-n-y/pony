@@ -696,13 +696,28 @@ char pony_terminate()
 	// conventional operations
 		// dot product
 double pony_linal_dot(double *u, double *v, const int m) {
-	double res = 0;
+	double res;
 	int i;
 
-	for (i = 0; i < m; i++)
+	res = u[0]*v[0];
+	for (i = 1; i < m; i++)
 		res += u[i]*v[i];
 
 	return res;
+}
+
+		// matrix multiplication res = a*b, a is n x n1, b is n1 x m, res is n x m
+void pony_linal_mmul(double *res,  double *a, double *b, const int n, const int n1, const int m) {
+	int i, j, k, k0, ka, kb, p;
+
+	for (i = 0, k = 0, k0 = 0; i < n; i++, k0 += n1)
+		for (j = 0; j < m; j++, k++) {
+			ka = k0;
+			kb = j;
+			res[k] = a[ka]*b[kb];
+			for (ka++, kb += m, p = 1; p < n1; ka++, kb += m, p++)
+				res[k] += a[ka]*b[kb];
+		}
 }
 
 	// routines for m x m upper-triangular matrices lined up in a single-dimension array
@@ -759,6 +774,22 @@ void pony_linal_u_inv(double *res, double *u, const int m) {
 			res[k] = -s/u[p0];
 		}
 	}
+
+}
+
+		// square (with transposition) of upper-triangular matrix lined up in a single-dimension array: res = U U^T
+			// overwriting input (double *res = double *u) allowed
+void pony_linal_uuT(double *res, double *u, const int m) {
+
+	int i, j, k, p, q, r;
+
+	for (i = 0, k = 0; i < m; i++)
+		for (j = i; j < m; j++, k++) {
+			pony_linal_u_ij2k(&p, j,j, m);
+			res[k] = u[k]*u[p];
+			for (q = k+1, p++, r = j+1; r < m; q++, p++, r++)
+				res[k] += u[q]*u[p];
+		}
 
 }
 

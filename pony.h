@@ -215,17 +215,19 @@ extern pony_bus pony;
 // linear algebra functions
 	// conventional operations
 double pony_linal_dot(double *u, double *v, const int m); // dot product
+void pony_linal_mmul(double *res,  double *a, double *b, const int n, const int n1, const int m); // matrix multiplication res = a*b, a is n x n1, b is n1 x m, res is n x m
 
 	// routines for m x m upper-triangular matrices U lined up in a single-dimension array u
-void pony_linal_u_ij2k(int *k, const int i, const int j, const int m);	// upper-triangular matrix lined up in a single-dimension array index conversion: (i,j) -> k
-void pony_linal_u_k2ij(int *i, int *j, const int k, const int m);		// upper-triangular matrix lined up in a single-dimension array index conversion: k -> (i,j)
+void pony_linal_u_ij2k(int *k,  const int i, const int j, const int m);	// upper-triangular matrix lined up in a single-dimension array index conversion: (i,j) -> k
+void pony_linal_u_k2ij(int *i,  int *j, const int k, const int m);		// upper-triangular matrix lined up in a single-dimension array index conversion: k -> (i,j)
 
-void pony_linal_u_mul(double *res, double *u, double *v, const int n, const int m);	// upper-triangular matrix lined up in a single-dimension array multiplication: res = U*v
-void pony_linal_uT_mul_v(double *res, double *u, double *v, const int m);	// upper-triangular matrix lined up in a single-dimension array transposed multiplication by vector: res = U^T*v
-void pony_linal_u_inv(double *res, double *u, const int m); // inversion of upper-triangular matrix lined up in a single-dimension array: res = U^-1
+void pony_linal_u_mul(double *res,  double *u, double *v, const int n, const int m);	// upper-triangular matrix lined up in a single-dimension array multiplication: res = U*v
+void pony_linal_uT_mul_v(double *res,  double *u, double *v, const int m);	// upper-triangular matrix lined up in a single-dimension array transposed multiplication by vector: res = U^T*v
+void pony_linal_u_inv(double *res,  double *u, const int m); // inversion of upper-triangular matrix lined up in a single-dimension array: res = U^-1
+void pony_linal_uuT(double *res,  double *u, const int m); // square (with transposition) of upper-triangular matrix lined up in a single-dimension array: res = U U^T
 
-void pony_linal_chol(double *S, double *P, const int m); // Cholesky upper-triangular factorization P = S*S^T, where P is symmetric positive-definite matrix
+void pony_linal_chol(double *S,  double *P, const int m); // Cholesky upper-triangular factorization P = S*S^T, where P is symmetric positive-definite matrix
 
 	// square root Kalman filtering
-double pony_linal_kalman_update(double *x, double *S, double *K, double z, double *h, double sigma, const int m);
+double pony_linal_kalman_update(double *x, double *S, double *K,  double z, double *h, double sigma, const int m);
 
