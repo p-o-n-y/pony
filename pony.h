@@ -116,7 +116,7 @@ typedef struct				// GPS constellation data
 	double iono_b[4];		
 	char iono_valid;		// validity (0/1)
 
-	double clock_corr[3];	// clock correction parameters from GPS almanac
+	double clock_corr[4];	// clock correction parameters from GPS almanac: a0, a1, gps_second, gps_week for GPS to UTC, optional
 	char clock_corr_valid;	// validity (0/1)
 } pony_gnss_gps;
 
@@ -130,9 +130,12 @@ typedef struct				// GLONASS constellation data (not supported yet)
 	int max_eph_count;		// maximum supported number of ephemeris
 
 	pony_gnss_sat *sat;		// GLONASS satellites
+	int *freq_slot;			// frequency numbers
 	char **obs_types;		// observation types according to RINEX: C1C, etc.; an array of 3-character null-terminated strings in the same order as satellites
 	int obs_count;			// number of observation types
 
+	double clock_corr[4];	// clock correction parameters from GLONASS almanac: -tauC, zero, Na_day_number, N4_four_year_interval for GLONASS to UTC, optional
+	char clock_corr_valid;	// validity (0/1)
 } pony_gnss_glo;
 
 	// SETTINGS

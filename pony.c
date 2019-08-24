@@ -327,13 +327,15 @@ char pony_init_gnss_glo(pony_gnss_glo *glo, const int max_sat_count, const int m
 	int i;
 
 	glo->sat = NULL;
+	glo->freq_slot = NULL;
 	glo->max_sat_count = 0;
 	glo->max_eph_count = 0;
 
 	// try to allocate memory for satellite data
-	glo->sat = (pony_gnss_sat*)calloc( max_sat_count, sizeof(pony_gnss_sat) );
+	glo->sat = (pony_gnss_sat *)calloc( max_sat_count, sizeof(pony_gnss_sat) );
 	if (glo->sat == NULL)
 		return 0;
+	glo->freq_slot = (int *)calloc( max_sat_count, sizeof(int) );
 	glo->max_sat_count = max_sat_count;
 
 	// initialize satellite data
@@ -383,6 +385,10 @@ void pony_free_gnss_glo(pony_gnss_glo *glo)
 	
 		free(glo->sat);
 		glo->sat = NULL;
+	}
+	if (glo->freq_slot != NULL) {
+		free(glo->freq_slot);
+		glo->freq_slot = NULL;
 	}
 
 	// gnss_gps structure
