@@ -1,6 +1,7 @@
 // Aug-2019
 //
 // PONY core declarations
+#define pony_bus_version 2		// current bus version
 
 // TIME EPOCH
 typedef struct 		// Julian-type time epoch
@@ -180,7 +181,6 @@ typedef struct					// main core structure and instance
 	int exit_plugin_id;					// index of a plugin that initiated termination
 } pony_core;
 
-#define pony_bus_version 1		// current bus version
 typedef struct					// bus data to be used in host application
 {
 	int ver;							// bus version to be used at runtime	
