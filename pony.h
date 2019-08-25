@@ -64,7 +64,7 @@ typedef struct			// inertial measurement unit
 	// SAT
 typedef struct 				// GNSS satellite data
 {
-	double *eph;			// array of satellite ephemeris as defined by RINEX format
+	double *eph;			// array of satellite ephemeris as defined by RINEX format (starting with toc: year, month, day, hour, min, sec, clock bias, etc., system-dependent)
 	char eph_valid;			// validity (0/1)
 
 	double Deltatsv;		// SV PRN code phase time offset (seconds), SV slock correction term as in Section 20.3.3.3.3.1 of IS-GPS-200J (22 May 2018) p. 96
