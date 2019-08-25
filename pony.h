@@ -120,9 +120,6 @@ typedef struct				// GPS constellation data
 	double clock_corr[4];	// clock correction parameters from GPS almanac: e.g. a0, a1, gps_second, gps_week for GPS to UTC, optional
 	char clock_corr_to[2];	// time system, which the correction results into: GP - GPS, UT - UTC, GA - Galileo, etc.
 	char clock_corr_valid;	// validity (0/1)
-
-	int leap_sec;			// current number of leap seconds
-	char leap_sec_valid;	// validity (0/1)
 } pony_gnss_gps;
 
 	// GLONASS
@@ -142,9 +139,6 @@ typedef struct				// GLONASS constellation data (not supported yet)
 	double clock_corr[4];	// clock correction parameters from GLONASS almanac: e.g. -tauC, zero, Na_day_number, N4_four_year_interval for GLONASS to UTC, optional
 	char clock_corr_to[2];	// time system, which the correction results into: GP - GPS, UT - UTC, GA - Galileo, etc.
 	char clock_corr_valid;	// validity (0/1)
-
-	int leap_sec;			// current number of leap seconds
-	char leap_sec_valid;	// validity (0/1)
 } pony_gnss_glo;
 
 	// SETTINGS
@@ -171,6 +165,8 @@ typedef struct						// global navigation satellite systems data
 	pony_gnss_glo* glo;				// GLONASS constellation data pointer
 
 	pony_time_epoch epoch;			// current GNSS time epoch
+	int leap_sec;					// current number of leap seconds (for UTC by default, but may also be used for BDS leap second for BDS-only processing)
+	char leap_sec_valid;			// validity (0/1)
 
 	pony_sol sol;					// current GNSS solution
 	int obs_count;					// total observations used in solution
