@@ -227,25 +227,21 @@ char pony_init_gnss_settings(pony_gnss *gnss)
 }
 
 	// initialize gnss gps constants
-void pony_init_gnss_gps_const(void)
+void pony_init_gnss_gps_const(pony_gnss *gnss)
 {
-	int r;
-
-	for (r = 0; r < pony.gnss_count; r++) {
-		pony.gnss[r].gps_const.pi = 3.1415926535898;	// pi as in IS-GPS-200J (22 May 2018)
-		pony.gnss[r].gps_const.c = 299792458;			// speed of light as in IS-GPS-200J (22 May 2018), m/s
-		pony.gnss[r].gps_const.mu = 3.986005e14;		// Earth gravity constant as in IS-GPS-200J (22 May 2018), m^3/s^2
-		pony.gnss[r].gps_const.u = 7.2921151467e-5;		// Earth rotation rate as in IS-GPS-200J (22 May 2018), rad/s
-		pony.gnss[r].gps_const.a = 6378137.0;			// Earth ellipsoid semi-major axis as in WGS-84(G1762) 2014-07-08, m
-		pony.gnss[r].gps_const.e2 = 6.694379990141e-3;	// Earth ellipsoid first eccentricity squared as in WGS-84(G1762) 2014-07-08
-		pony.gnss[r].gps_const.F = -4.442807633e-10;	// relativistic correction constant as in IS-GPS-200J (22 May 2018), s/sqrt(m)
-		pony.gnss[r].gps_const.sec_in_w = 604800;		// seconds in a week
-		pony.gnss[r].gps_const.sec_in_d =  86400;		// seconds in a day
-		pony.gnss[r].gps_const.F1 = 1575.42e6;			// nominal frequency for L1 signal
-		pony.gnss[r].gps_const.L1 = pony.gnss[r].gps_const.c/pony.gnss[r].gps_const.F1;		// nominal wavelength for L1 signal
-		pony.gnss[r].gps_const.F2 = 1227.60e6;			// nominal frequency for L2 signal
-		pony.gnss[r].gps_const.L2 = pony.gnss[r].gps_const.c/pony.gnss[r].gps_const.F2;		// nominal wavelength for L2 signal
-	}
+	gnss->gps_const.pi			=  3.1415926535898;		// pi as in IS-GPS-200J (22 May 2018)
+	gnss->gps_const.c			=  299792458;			// speed of light as in IS-GPS-200J (22 May 2018), m/s
+	gnss->gps_const.mu			=  3.986005e14;			// Earth gravity constant as in IS-GPS-200J (22 May 2018), m^3/s^2
+	gnss->gps_const.u			=  7.2921151467e-5;		// Earth rotation rate as in IS-GPS-200J (22 May 2018), rad/s
+	gnss->gps_const.a			=  6378137.0;			// Earth ellipsoid semi-major axis as in WGS-84(G1762) 2014-07-08, m
+	gnss->gps_const.e2			=  6.694379990141e-3;	// Earth ellipsoid first eccentricity squared as in WGS-84(G1762) 2014-07-08
+	gnss->gps_const.F			= -4.442807633e-10;		// relativistic correction constant as in IS-GPS-200J (22 May 2018), s/sqrt(m)
+	gnss->gps_const.sec_in_w	= 604800;				// seconds in a week
+	gnss->gps_const.sec_in_d	=  86400;				// seconds in a day
+	gnss->gps_const.F1			=  1575.42e6;			// nominal frequency for L1 signal
+	gnss->gps_const.L1			= gnss->gps_const.c/gnss->gps_const.F1;		// nominal wavelength for L1 signal
+	gnss->gps_const.F2			=  1227.60e6;			// nominal frequency for L2 signal
+	gnss->gps_const.L2			= gnss->gps_const.c/gnss->gps_const.F2;		// nominal wavelength for L2 signal
 }
 
 	// initialize gnss gps structure
@@ -320,6 +316,21 @@ void pony_free_gnss_gps(pony_gnss_gps *gps)
 	free(gps);
 }
 
+	// initialize gnss glonass constants
+void pony_init_gnss_glo_const(pony_gnss *gnss)
+{
+	gnss->glo_const.c			= 299792458;		// speed of light as in ICD GLONASS Edition 5.1 2008, m/s
+	gnss->glo_const.mu			= 398600.4418e9;	// Earth gravity constant as in PZ-90.02, m^3/s^2
+	gnss->glo_const.J02			= 1082625.75e-9;	// second zonal harmonic of geopotential as in PZ-90.02
+	gnss->glo_const.u			= 7.292115e-5;		// Earth rotation rate as in PZ-90.02, rad/s
+	gnss->glo_const.a			= 6378136.0;		// Earth ellipsoid semi-major axis as in PZ-90.02, m
+	gnss->glo_const.e2			= 0.0066943662;		// Earth ellipsoid first eccentricity squared as in PZ-90.02
+	gnss->glo_const.sec_in_d	=  86400;			// seconds in a day
+	gnss->glo_const.F01			= 1602e6;			// nominal centre frequency for L1 signal as in ICD GLONASS Edition 5.1 2008, Hz
+	gnss->glo_const.dF1			= 562.5e3;			// nominal channel separation for L1 signal as in ICD GLONASS Edition 5.1 2008, Hz
+	gnss->glo_const.F02			= 1246e6;			// nominal centre frequency for L2 signal as in ICD GLONASS Edition 5.1 2008, Hz
+	gnss->glo_const.dF2			= 437.5e3;			// nominal channel separation for L2 signal as in ICD GLONASS Edition 5.1 2008, Hz
+}
 
 	// initialize gnss glo structure
 char pony_init_gnss_glo(pony_gnss_glo *glo, const int max_sat_count, const int max_eph_count)
@@ -410,7 +421,7 @@ char pony_init_gnss(pony_gnss *gnss)
 		return 0;
 
 	// gps
-	pony_init_gnss_gps_const();
+	pony_init_gnss_gps_const(gnss);
 	gnss->gps = NULL;
 	if ( pony_locatecfggroup("gps:", gnss->cfg, gnss->cfglength, &groupptr, &grouplen) )
 	{
@@ -425,6 +436,7 @@ char pony_init_gnss(pony_gnss *gnss)
 	}
 
 	// glonass
+	pony_init_gnss_glo_const(gnss);
 	gnss->glo = NULL;
 	if (pony_locatecfggroup( "glo:", gnss->cfg, gnss->cfglength, &groupptr, &grouplen) )
 	{

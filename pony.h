@@ -93,12 +93,27 @@ typedef struct		// GPS system constants
 		u,			// Earth rotation rate as in GPS interface specs, rad/s
 		a,			// Earth ellipsoid semi-major axis, m
 		e2,			// Earth ellipsoid first eccentricity squared
-		F,			// relativistic correction constant
+		F,			// relativistic correction constant as in GPS interface specs, sec/sqrt(m)
 		sec_in_w,	// seconds in a week
 		sec_in_d,	// seconds in a day
-		F1, L1,		// nominal frequency and wavelength for L1 signal
-		F2, L2;		// nominal frequency and wavelength for L2 signal
+		F1, L1,		// nominal frequency and wavelength for L1 signal as in GPS interface specs, Hz and m
+		F2, L2;		// nominal frequency and wavelength for L2 signal as in GPS interface specs, Hz and m
 } pony_gps_const;
+
+	// GLONASS const
+typedef struct		// GLONASS system constants
+{
+	double 
+		c,			// speed of light, m/s, 
+		mu,			// Earth grav constant as in GLONASS ICD, m^3/s^2
+		J02,		// second zonal harmonic of geopotential
+		u,			// Earth rotation rate as in GLONASS ICD, rad/s
+		a,			// Earth ellipsoid semi-major axis, m
+		e2,			// Earth ellipsoid first eccentricity squared as in GLONASS ICD
+		sec_in_d,	// seconds in a day
+		F01, dF1,	// nominal centre frequency and channel separation for L1 signal as in GLONASS ICD, Hz
+		F02, dF2;	// nominal centre frequency and channel wavelength for L2 signal as in GLONASS ICD, Hz
+} pony_glo_const;
 
 	// GPS
 typedef struct				// GPS constellation data
@@ -159,6 +174,7 @@ typedef struct						// global navigation satellite systems data
 	int settings_length;			// length of the part of GNSS configuration string common to all systems
 
 	pony_gps_const gps_const;		// GPS constants
+	pony_glo_const glo_const;		// GLONASS constants
 	pony_gnss_settings settings;	// GNSS operation settings
 
 	pony_gnss_gps* gps;				// GPS constellation data pointer
