@@ -67,7 +67,9 @@ typedef struct 				// GNSS satellite data
 	double *eph;			// array of satellite ephemeris as defined by RINEX format (starting with toc: year, month, day, hour, min, sec, clock bias, etc., system-dependent)
 	char eph_valid;			// validity (0/1)
 
-	double Deltatsv;		// SV PRN code phase time offset (seconds), SV slock correction term as in Section 20.3.3.3.3.1 of IS-GPS-200J (22 May 2018) p. 96
+	double Deltatsv;		// SV PRN code phase time offset (seconds), SV slock correction term to be subtracted: 
+								// GPS as in Section 20.3.3.3.3.1 of IS-GPS-200J (22 May 2018) p. 96
+								// GLONASS as in Section 3.3.3 of ICD GLONASS Edition 5.1 2008, minus sign, tau_c if present in pony_gnss_glo.clock_corr[0]
 
 	double t_em;			// time of signal emission
 	char t_em_valid;		// validity (0/1)
