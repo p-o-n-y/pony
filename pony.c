@@ -459,6 +459,9 @@ char pony_init_gnss(pony_gnss *gnss)
 	// gnss epoch
 	pony_init_epoch( &(gnss->epoch) );
 
+	gnss->leap_sec = 0;
+	gnss->leap_sec_valid = 0;
+
 	return 1;
 }
 
