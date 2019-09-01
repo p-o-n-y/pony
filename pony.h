@@ -1,4 +1,4 @@
-// Aug-2019
+// Sep-2019
 //
 // PONY core declarations
 #define pony_bus_version 2		// current bus version
@@ -18,25 +18,25 @@ typedef struct 		// Julian-type time epoch
 typedef struct			// navigation solution structure
 {
 	double x[3];		// cartesian coordinates, meters
-	char x_valid;		// validity (0/1)
+	char x_valid;		// validity flag (0/1)
 	
 	double llh[3];		// geodetic coordinates: longitude (rad), latitude (rad), height (meters)
-	char llh_valid;		// validity (0/1)
+	char llh_valid;		// validity flag (0/1)
 
 	double v[3];		// relative-to-Earth velocity vector coordinates in local-level geodetic or cartesian frame, meters per second
-	char v_valid;		// validity (0/1)
+	char v_valid;		// validity flag (0/1)
 
 	double q[4];		// attitude quaternion, relative to local-level or cartesian frame
-	char q_valid;		// validity (0/1)
+	char q_valid;		// validity flag (0/1)
 
 	double L[9];		// attitude matrix for the transition from local-level or cartesian frame, row-wise: L[0] = L_11, L[1] = L_12, ..., L[8] = L[33]
-	char L_valid;		// validity (0/1)
+	char L_valid;		// validity flag (0/1)
 
 	double rpy[3];		// attitude angles relative to local-level frame: roll (rad), pitch (rad), yaw = true heading (rad)
-	char rpy_valid;		// validity (0/1)
+	char rpy_valid;		// validity flag (0/1)
 
 	double dt;			// system clock error
-	double dt_valid;	// validity (0/1)
+	double dt_valid;	// validity flag (0/1)
 } pony_sol;
 
 
@@ -49,10 +49,10 @@ typedef struct			// inertial measurement unit
 	int cfglength;		// IMU configuration string length
 
 	double w[3];		// up to 3 gyroscope measurements
-	char w_valid;		// validity (0/1)
+	char w_valid;		// validity flag (0/1)
 
 	double f[3];		// up to accelerometer measurements
-	char f_valid;		// validity (0/1)
+	char f_valid;		// validity flag (0/1)
 
 	pony_sol sol;		// inertial solution
 } pony_imu;
@@ -65,24 +65,24 @@ typedef struct			// inertial measurement unit
 typedef struct 				// GNSS satellite data
 {
 	double *eph;			// array of satellite ephemeris as defined by RINEX format (starting with toc: year, month, day, hour, min, sec, clock bias, etc., system-dependent)
-	char eph_valid;			// validity (0/1)
+	char eph_valid;			// validity flag (0/1)
 
 	double Deltatsv;		// SV PRN code phase time offset (seconds), SV slock correction term to be subtracted: 
 								// GPS as in Section 20.3.3.3.3.1 of IS-GPS-200J (22 May 2018) p. 96
 								// GLONASS as in Section 3.3.3 of ICD GLONASS Edition 5.1 2008, minus sign, tau_c if present in pony_gnss_glo.clock_corr[0]
 
 	double t_em;			// time of signal emission
-	char t_em_valid;		// validity (0/1)
+	char t_em_valid;		// validity flag (0/1)
 	double x[3];			// satellite coordinates
-	char x_valid;			// validity (0/1)
+	char x_valid;			// validity flag (0/1)
 	double v[3];			// satellite velocity vector
-	char v_valid;			// validity (0/1)
+	char v_valid;			// validity flag (0/1)
 	
 	double sinEl;			// sine of satellite elevation angle
-	char sinEl_valid;		// validity (0/1)
+	char sinEl_valid;		// validity flag (0/1)
 
 	double *obs;			// satellite observables array, defined at runtime
-	char *obs_valid;		// satellite observables validity array (0/1)
+	char *obs_valid;		// satellite observables validity flag array (0/1)
 } pony_gnss_sat;
 
 	// GPS const
@@ -132,11 +132,11 @@ typedef struct				// GPS constellation data
 
 	double iono_a[4];		// ionospheric model parameters from GPS almanac
 	double iono_b[4];		
-	char iono_valid;		// validity (0/1)
+	char iono_valid;		// validity flag (0/1)
 
 	double clock_corr[4];	// clock correction parameters from GPS almanac: e.g. a0, a1, gps_second, gps_week for GPS to UTC, optional
 	char clock_corr_to[2];	// time system, which the correction results into: GP - GPS, UT - UTC, GA - Galileo, etc.
-	char clock_corr_valid;	// validity (0/1)
+	char clock_corr_valid;	// validity flag (0/1)
 } pony_gnss_gps;
 
 	// GLONASS
@@ -155,15 +155,18 @@ typedef struct				// GLONASS constellation data (not supported yet)
 
 	double clock_corr[4];	// clock correction parameters from GLONASS almanac: e.g. -tauC, zero, Na_day_number, N4_four_year_interval for GLONASS to UTC, optional
 	char clock_corr_to[2];	// time system, which the correction results into: GP - GPS, UT - UTC, GA - Galileo, etc.
-	char clock_corr_valid;	// validity (0/1)
+	char clock_corr_valid;	// validity flag (0/1)
 } pony_gnss_glo;
 
 	// SETTINGS
 typedef struct // GNSS operation settings
 {
 	double sinEl_mask;			// elevation angle mask, sine of
+
 	double code_sigma;			// pseudorange measurement rmsdev (sigma), meters
 	double phase_sigma;			// carrier phase measurement rmsdev (sigma), cycles
+
+	double ant_pos[3];			// antenna coordinates in the instrumental frame
 } pony_gnss_settings;
 
 	// GNSS
@@ -184,7 +187,7 @@ typedef struct						// global navigation satellite systems data
 
 	pony_time_epoch epoch;			// current GNSS time epoch
 	int leap_sec;					// current number of leap seconds (for UTC by default, but may also be used for BDS leap second for BDS-only processing)
-	char leap_sec_valid;			// validity (0/1)
+	char leap_sec_valid;			// validity flag (0/1)
 
 	pony_sol sol;					// current GNSS solution
 	int obs_count;					// total observations used in solution
@@ -240,7 +243,8 @@ extern pony_bus pony;
 // linear algebra functions
 	// conventional operations
 double pony_linal_dot(double *u, double *v, const int m); // dot product
-void pony_linal_mmul(double *res,  double *a, double *b, const int n, const int n1, const int m); // matrix multiplication res = a*b, a is n x n1, b is n1 x m, res is n x m
+void pony_linal_mmul  (double *res,  double *a, double *b, const int n, const int n1, const int m); // matrix multiplication res = a*b, a is n x n1, b is n1 x m, res is n x m
+void pony_linal_mmul2T(double *res,  double *a, double *b, const int n, const int m, const int n1); // matrix multiplication with the second argument transposed res = a*b^T, a is n x m, b is n1 x m, res is n x n1
 
 	// routines for m x m upper-triangular matrices U lined up in a single-dimension array u
 void pony_linal_u_ij2k(int *k,  const int i, const int j, const int m);	// upper-triangular matrix lined up in a single-dimension array index conversion: (i,j) -> k

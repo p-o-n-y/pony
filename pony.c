@@ -1,4 +1,4 @@
-// Aug-2019
+// Sep-2019
 //
 // PONY core source code
 
@@ -217,11 +217,15 @@ void pony_free_imu(void)
 	// initialize gnss settings
 char pony_init_gnss_settings(pony_gnss *gnss)
 {
+	int i;
+
 	pony_locatecfggroup( "", gnss->cfg, gnss->cfglength, &(gnss->cfg_settings), &(gnss->settings_length) );
 
 	gnss->settings.sinEl_mask = 0;
 	gnss->settings.code_sigma = 20;
 	gnss->settings.phase_sigma = 0.01;
+	for (i = 0; i < 3; i++)
+		gnss->settings.ant_pos[i] = 0;
 
 	return 1;
 }
@@ -737,6 +741,20 @@ void pony_linal_mmul(double *res,  double *a, double *b, const int n, const int 
 			kb = j;
 			res[k] = a[ka]*b[kb];
 			for (ka++, kb += m, p = 1; p < n1; ka++, kb += m, p++)
+				res[k] += a[ka]*b[kb];
+		}
+}
+
+		// matrix multiplication with the second argument transposed res = a*b^T, a is n x m, b is n1 x m, res is n x n1
+void pony_linal_mmul2T(double *res,  double *a, double *b, const int n, const int m, const int n1) {
+	int i, j, k, k0, ka, kb, p;
+
+	for (i = 0, k = 0, k0 = 0; i < n; i++, k0 += m)
+		for (j = 0; j < n1; j++, k++) {
+			ka = k0;
+			kb = j*m;
+			res[k] = a[ka]*b[kb];
+			for (ka++, kb++, p = 1; p < m; ka++, kb++, p++)
 				res[k] += a[ka]*b[kb];
 		}
 }
