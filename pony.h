@@ -36,7 +36,7 @@ typedef struct			// navigation solution structure
 	char rpy_valid;		// validity flag (0/1)
 
 	double dt;			// system clock error
-	double dt_valid;	// validity flag (0/1)
+	char dt_valid;		// validity flag (0/1)
 } pony_sol;
 
 
