@@ -207,6 +207,7 @@ typedef struct					// main core structure and instance
 	void(**plugins)(void);				// plugin array pointer
 	int plugin_count;					// number of plugins
 	int exit_plugin_id;					// index of a plugin that initiated termination
+	char host_termination;				// identifier of termination being called by host
 } pony_core;
 
 typedef struct					// bus data to be used in host application

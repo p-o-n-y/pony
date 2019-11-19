@@ -23,7 +23,7 @@ pony_bus pony = {
 	pony_init,					// init
 	pony_step,					// step
 	pony_terminate,				// terminate
-	{NULL, 0, -1}};	// core.plugins, core.plugin_count, core.exit_plugin_id, core.cfg, core.cfglength
+	{ NULL, 0, -1, 0 } };		// core.plugins, core.plugin_count, core.exit_plugin_id, core.host_termination
 
 
 
@@ -677,36 +677,43 @@ char pony_step(void)
 		if (pony.core.exit_plugin_id == i)	// if termination was initiated by the current plugin on the previous loop
 		{
 			pony.core.exit_plugin_id = -1;		// set to default
-			pony_init_solution( &(pony.sol) );	// drop the solution
+			pony.core.host_termination = 0;		// set to default
+			pony_init_solution(&(pony.sol));	// drop the solution
 			pony_free();						// free memory
 			break;
 		}
 
-		if (pony.mode < 0 && pony.core.exit_plugin_id == -1)	// if termination was initiated by the current plugin on the current loop
-			pony.core.exit_plugin_id = i;							// set the index to use in the next loop
+		if ((pony.mode < 0 || pony.core.host_termination == 1) && pony.core.exit_plugin_id == -1)	// if termination was initiated by the current plugin on the current loop
+		{
+			if (pony.mode > 0)
+				pony.mode = -1;					// set mode to -1 for external termination cases
+
+			if (pony.mode != 0)
+				pony.core.exit_plugin_id = i;	// set the index to use in the next loop
+
+		}
 	}
 
 	if (pony.mode == 0)		// if initialization ended
-		pony.mode = 1;			// set operation mode to regular
+		pony.mode = 1;		// set operation mode to regular
 
-	// success if either staying in regular operation mode, or a termination by a plugin properly detected
+							// success if either staying in regular operation mode, or a termination properly detected
 	return (pony.mode >= 0) || (pony.core.exit_plugin_id >= 0);
 }
 
 // terminate operation
+//
+// output: OK/not OK (1/0)
 char pony_terminate()
 {
-	int i;
+	if (pony.mode >= 0 && pony.core.host_termination != 1)
+	{
+		pony.core.host_termination = 1;
 
-	// step through plugin execution list with mode switched to termination
-	pony.mode = -1;
-	for (i = 0; i < pony.core.plugin_count; i++)
-		pony.core.plugins[i]();
+		return 1; // termination started
+	}
 
-	pony_init_solution( &(pony.sol) );	// drop the solution
-	pony_free();						// free memory
-
-	return 1; // always succeed in termination
+	return 0; // had been already terminated by host or by plugin 
 }
 
 
