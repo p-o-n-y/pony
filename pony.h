@@ -166,7 +166,10 @@ typedef struct // GNSS operation settings
 	double code_sigma;			// pseudorange measurement rmsdev (sigma), meters
 	double phase_sigma;			// carrier phase measurement rmsdev (sigma), cycles
 
-	double ant_pos[3];			// antenna coordinates in the instrumental frame
+	double ant_pos[3];				// antenna coordinates in the instrumental frame
+	double ant_pos_tol;			// antenna position tolerance (-1 if undefined)
+
+	double leap_sec_def;		// default value of leap seconds ( <= 0 if undefined)
 } pony_gnss_settings;
 
 	// GNSS

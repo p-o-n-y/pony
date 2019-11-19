@@ -226,6 +226,8 @@ char pony_init_gnss_settings(pony_gnss *gnss)
 	gnss->settings.phase_sigma = 0.01;
 	for (i = 0; i < 3; i++)
 		gnss->settings.ant_pos[i] = 0;
+	gnss->settings.ant_pos_tol = -1;
+	gnss->settings.leap_sec_def = 0;
 
 	return 1;
 }
