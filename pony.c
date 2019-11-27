@@ -543,13 +543,17 @@ void pony_free()
 // output: OK/not OK (1/0)
 char pony_add_plugin( void(*newplugin)(void) )
 {
-	pony.core.plugins = ( void(**)(void) )realloc( pony.core.plugins, (pony.core.plugin_count + 1) * sizeof( void(*)(void) ) );
+	void(**reallocated_pointer)(void);
 
-	if (pony.core.plugins == NULL)	// failed to allocate/realocate memory
+	reallocated_pointer = ( void(**)(void) )realloc( pony.core.plugins, (pony.core.plugin_count + 1) * sizeof( void(*)(void) ) );
+
+	if (reallocated_pointer == NULL)	// failed to allocate/realocate memory
 	{
 		pony_free();
 		return 0;
 	}
+	else
+		pony.core.plugins = reallocated_pointer;
 
 	pony.core.plugins[pony.core.plugin_count] = newplugin;
 	pony.core.plugin_count++;
@@ -572,6 +576,8 @@ char pony_init(char* cfg)
 
 	int grouplen;
 	char* groupptr;
+
+	pony_gnss *reallocated_pointer;
 
 	int i;
 
@@ -625,11 +631,13 @@ char pony_init(char* cfg)
 			pony_locatecfggroup(multi_gnss_token, pony.cfg, pony.cfglength, &groupptr, &grouplen) ) {
 			if (i >= pony.gnss_count) {
 				// try to allocate/reallocate memory
-				pony.gnss = (pony_gnss*)realloc(pony.gnss, sizeof(pony_gnss)*(i+1));
-				if (pony.gnss == NULL) {
+				reallocated_pointer = (pony_gnss*)realloc(pony.gnss, sizeof(pony_gnss)*(i+1));
+				if (reallocated_pointer == NULL) {
 					pony_free();
 					return 0;
 				}
+				else
+					pony.gnss = reallocated_pointer;
 				// try to init new instances, except the i-th one
 				for ( ; pony.gnss_count < i; pony.gnss_count++) {
 					pony.gnss[pony.gnss_count].cfg = NULL;
