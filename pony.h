@@ -117,6 +117,25 @@ typedef struct		// GLONASS system constants
 		F02, dF2;	// nominal centre frequency and channel wavelength for L2 signal as in GLONASS ICD, Hz
 } pony_glo_const;
 
+	// GALILEO const
+typedef struct		// Galileo system constants
+{
+	double 
+		pi,			// pi as in Galileo interface specs
+		c,			// speed of light, m/s, 
+		mu,			// Earth grav constant as in Galileo interface specs, m^3/s^2
+		u,			// Earth rotation rate as in Galileo interface specs, rad/s
+		a,			// Earth ellipsoid semi-major axis, m
+		e2,			// Earth ellipsoid first eccentricity squared
+		F,			// relativistic correction constant as in Galileo interface specs, sec/sqrt(m)
+		sec_in_w,	// seconds in a week
+		sec_in_d,	// seconds in a day
+		F1, L1,		// nominal frequency and wavelength for E1 signal as in Galileo interface specs, Hz and m
+		F5a, L5a,	// nominal frequency and wavelength for E5a signal as in Galileo interface specs, Hz and m
+		F5b, L5b,	// nominal frequency and wavelength for E5b signal as in Galileo interface specs, Hz and m
+		F6, L6;		// nominal frequency and wavelength for E6 signal as in Galileo interface specs, Hz and m
+} pony_gal_const;
+
 	// GPS
 typedef struct				// GPS constellation data
 {
@@ -158,6 +177,27 @@ typedef struct				// GLONASS constellation data (not supported yet)
 	char clock_corr_valid;	// validity flag (0/1)
 } pony_gnss_glo;
 
+	// GALILEO
+typedef struct				// Galileo constellation data
+{
+	char* cfg;				// Galileo configuration string
+	int cfglength;			// configuration string length
+
+	int max_sat_count;		// maximum supported number of satellites
+	int max_eph_count;		// maximum supported number of ephemeris
+
+	pony_gnss_sat *sat;		// Galileo satellites
+	char **obs_types;		// observation types according to RINEX: C1C, etc.; an array of 3-character null-terminated strings in the same order as in satellites
+	int obs_count;			// number of observation types
+
+	double iono[3];			// ionospheric model parameters from Galileo almanac
+	char iono_valid;		// validity flag (0/1)
+
+	double clock_corr[4];	// clock correction parameters from Galileo almanac: e.g. a0, a1, gal_second, gal_week for GAL to UTC, optional
+	char clock_corr_to[2];	// time system, which the correction results into: GP - GPS, UT - UTC, GA - Galileo, etc.
+	char clock_corr_valid;	// validity flag (0/1)
+} pony_gnss_gal;
+
 	// SETTINGS
 typedef struct // GNSS operation settings
 {
@@ -183,10 +223,12 @@ typedef struct						// global navigation satellite systems data
 
 	pony_gps_const gps_const;		// GPS constants
 	pony_glo_const glo_const;		// GLONASS constants
+	pony_gal_const gal_const;		// GLONASS constants
 	pony_gnss_settings settings;	// GNSS operation settings
 
 	pony_gnss_gps* gps;				// GPS constellation data pointer
 	pony_gnss_glo* glo;				// GLONASS constellation data pointer
+	pony_gnss_gal* gal;				// Galileo constellation data pointer
 
 	pony_time_epoch epoch;			// current GNSS time epoch
 	int leap_sec;					// current number of leap seconds (for UTC by default, but may also be used for BDS leap second for BDS-only processing)

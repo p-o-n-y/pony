@@ -308,6 +308,7 @@ void pony_free_gnss_gps(pony_gnss_gps *gps)
 	if (gps->sat != NULL) 
 	{
 		for (i = 0; i < gps->max_sat_count; i++) 
+			// ephemeris
 			if (gps->sat[i].eph != NULL)
 			{
 				free(gps->sat[i].eph);
@@ -338,7 +339,7 @@ void pony_init_gnss_glo_const(pony_gnss *gnss)
 	gnss->glo_const.dF2			= 437.5e3;			// nominal channel separation for L2 signal as in ICD GLONASS Edition 5.1 2008, Hz
 }
 
-	// initialize gnss glo structure
+	// initialize gnss glonass structure
 char pony_init_gnss_glo(pony_gnss_glo *glo, const int max_sat_count, const int max_eph_count)
 {
 	int i;
@@ -394,6 +395,7 @@ void pony_free_gnss_glo(pony_gnss_glo *glo)
 	if (glo->sat != NULL) 
 	{
 		for (i = 0; i < glo->max_sat_count; i++) 
+			// ephemeris
 			if (glo->sat[i].eph != NULL)
 			{
 				free(glo->sat[i].eph);
@@ -408,8 +410,104 @@ void pony_free_gnss_glo(pony_gnss_glo *glo)
 		glo->freq_slot = NULL;
 	}
 
-	// gnss_gps structure
+	// gnss glonass structure
 	free(glo);
+}
+
+	// initialize gnss galileo constants
+void pony_init_gnss_gal_const(pony_gnss *gnss)
+{
+	gnss->gal_const.pi			=  3.1415926535898;		// pi as in Galileo OS SIS ICD Issue 1.2 (November 2015)
+	gnss->gal_const.c			=  299792458;			// speed of light as in Galileo OS SIS ICD Issue 1.2 (November 2015), m/s
+	gnss->gal_const.mu			=  3.986004418e14;		// Earth gravity constant as in Galileo OS SIS ICD Issue 1.2 (November 2015), m^3/s^2
+	gnss->gal_const.u			=  7.2921151467e-5;		// Earth rotation rate as in Galileo OS SIS ICD Issue 1.2 (November 2015), rad/s
+	gnss->gal_const.a			=  6378137.0;			// Earth ellipsoid semi-major axis as in GRS-80 // JoG March 2000 vol. 74 issue 1, m
+	gnss->gal_const.e2			=  6.69438002290e-3;	// Earth ellipsoid first eccentricity squared as in GRS-80 // JoG March 2000 vol. 74 issue 1
+	gnss->gal_const.F			= -4.442807309e-10;		// relativistic correction constant as in Galileo OS SIS ICD Issue 1.2 (November 2015), s/sqrt(m)
+	gnss->gal_const.sec_in_w	= 604800;				// seconds in a week
+	gnss->gal_const.sec_in_d	=  86400;				// seconds in a day
+	gnss->gal_const.F1			=  1575.42e6;			// nominal frequency for E1 signal
+	gnss->gal_const.L1			= gnss->gal_const.c/gnss->gal_const.F1;		// nominal wavelength for E1 signal
+	gnss->gal_const.F5a			=  1176.45e6;			// nominal frequency for E5a signal
+	gnss->gal_const.L5a			= gnss->gal_const.c/gnss->gal_const.F5a;	// nominal wavelength for E5a signal
+	gnss->gal_const.F5b			=  1207.14e6;			// nominal frequency for E5b signal
+	gnss->gal_const.L5b			= gnss->gal_const.c/gnss->gal_const.F5b;	// nominal wavelength for E5b signal
+	gnss->gal_const.F6			=  1278.75e6;			// nominal frequency for E6 signal
+	gnss->gal_const.L6			= gnss->gal_const.c/gnss->gal_const.F6;		// nominal wavelength for E6 signal
+	
+}
+
+	// initialize gnss galileo structure
+char pony_init_gnss_gal(pony_gnss_gal *gal, const int max_sat_count, const int max_eph_count)
+{
+	int i;
+
+	gal->sat = NULL;
+	gal->max_sat_count = 0;
+	gal->max_eph_count = 0;
+
+	// try to allocate memory for satellite data
+	gal->sat = (pony_gnss_sat*)calloc( max_sat_count, sizeof(pony_gnss_sat) );
+	if (gal->sat == NULL)
+		return 0;
+	gal->max_sat_count = max_sat_count;
+
+	// initialize satellite data
+	for (i = 0; i < gal->max_sat_count; i++) {
+		gal->sat[i].eph			= NULL;
+		gal->sat[i].eph_valid	= 0;
+		gal->sat[i].obs			= NULL;
+		gal->sat[i].obs_valid	= NULL;
+		gal->sat[i].x_valid		= 0;
+		gal->sat[i].v_valid		= 0;
+		gal->sat[i].t_em_valid	= 0;
+		gal->sat[i].sinEl_valid	= 0;
+	}
+
+	// try to allocate memory for each satellite ephemeris
+	for (i = 0; i < gal->max_sat_count; i++) {
+		gal->sat[i].eph = (double *)calloc( max_eph_count, sizeof(double) );
+		if (gal->sat[i].eph == NULL)
+			return 0;
+	}
+	gal->max_eph_count = max_eph_count;
+
+	// observation types
+	gal->obs_types = NULL;
+	gal->obs_count = 0;
+
+	// validity flags
+	gal->iono_valid = 0;
+	gal->clock_corr_valid = 0;
+
+	return 1;
+}
+
+	// free gnss galileo memory
+void pony_free_gnss_gal(pony_gnss_gal *gal)
+{
+	int i;
+
+	if (gal == NULL)
+		return;
+
+	// satellites
+	if (gal->sat != NULL) 
+	{
+		for (i = 0; i < gal->max_sat_count; i++)
+			//ephemeris
+			if (gal->sat[i].eph != NULL)
+			{
+				free(gal->sat[i].eph);
+				gal->sat[i].eph = NULL;
+			}
+	
+		free(gal->sat);
+		gal->sat = NULL;
+	}
+
+	// gnss galileo structure
+	free(gal);
 }
 
 	// initialize gnss structure
@@ -419,6 +517,7 @@ char pony_init_gnss(pony_gnss *gnss)
 	const int max_sat_count = 36;
 	const int max_gps_eph_count = 36;
 	const int max_glo_eph_count = 24;
+	const int max_gal_eph_count = 36;
 
 	int grouplen;
 	char* groupptr;
@@ -456,6 +555,21 @@ char pony_init_gnss(pony_gnss *gnss)
 			return 0;
 	}
 
+	// galileo
+	pony_init_gnss_gal_const(gnss);
+	gnss->gal = NULL;
+	if ( pony_locatecfggroup("gal:", gnss->cfg, gnss->cfglength, &groupptr, &grouplen) )
+	{
+		gnss->gal = (pony_gnss_gal*)calloc( 1, sizeof(pony_gnss_gal) );
+		if (gnss->gal == NULL)
+			return 0;
+		gnss->gal->cfg = groupptr;
+		gnss->gal->cfglength = grouplen;
+
+		if ( !pony_init_gnss_gal(gnss->gal, max_sat_count, max_gal_eph_count) )
+			return 0;
+	}
+
 	// gnss settings
 	pony_init_gnss_settings(gnss);
 
@@ -479,6 +593,9 @@ void pony_free_gnss(pony_gnss *gnss)
 
 	pony_free_gnss_gps(gnss->gps);
 	gnss->gps = NULL;
+
+	pony_free_gnss_glo(gnss->glo);
+	gnss->glo = NULL;
 
 	pony_free_gnss_glo(gnss->glo);
 	gnss->glo = NULL;
