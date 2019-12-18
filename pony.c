@@ -521,7 +521,7 @@ void pony_init_gnss_bds_const(pony_gnss *gnss)
 	gnss->bds_const.F			= -4.442807309043977e-10;	// relativistic correction constant derived from Earth gravity as in BeiDou SIS ICD OSS Version 2.1 (November 2016), s/sqrt(m)
 	gnss->bds_const.sec_in_w	= 604800;					// seconds in a week
 	gnss->bds_const.sec_in_d	=  86400;					// seconds in a day
-	gnss->bds_const.leap_sec	=  16;						// leap seconds between BeiDou time and UTC as of 01-Jan-2006
+	gnss->bds_const.leap_sec	=  14;						// leap seconds between BeiDou time and GPS time as of 01-Jan-2006
 	gnss->bds_const.B1			=  1561.098e6;				// nominal frequency for B1 signal as in BeiDou SIS ICD OSS Version 2.1 (November 2016)
 	gnss->bds_const.L1			= gnss->bds_const.c/gnss->bds_const.B1;		// nominal wavelength for B1 signal
 	gnss->bds_const.B2			=  1207.140e6;				// nominal frequency for B2 signal as in BeiDou SIS ICD OSS Version 2.1 (November 2016)

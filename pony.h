@@ -149,7 +149,7 @@ typedef struct		// BeiDou system constants
 		F,			// relativistic correction constant as in BeiDou interface specs, sec/sqrt(m)
 		sec_in_w,	// seconds in a week
 		sec_in_d,	// seconds in a day
-		leap_sec,	// leap seconds between BeiDou time and UTC as of 01-Jan-2006
+		leap_sec,	// leap seconds between BeiDou time and GPS time as of 01-Jan-2006
 		B1, L1,		// nominal frequency and wavelength for B1 signal as in BeiDou interface specs, Hz and m
 		B2, L2;		// nominal frequency and wavelength for B2 signal as in BeiDou interface specs, Hz and m
 } pony_bds_const;
