@@ -244,9 +244,9 @@ void pony_init_gnss_gps_const(pony_gnss *gnss)
 	gnss->gps_const.F			= -4.442807633e-10;		// relativistic correction constant as in IS-GPS-200J (22 May 2018), s/sqrt(m)
 	gnss->gps_const.sec_in_w	= 604800;				// seconds in a week
 	gnss->gps_const.sec_in_d	=  86400;				// seconds in a day
-	gnss->gps_const.F1			=  1575.42e6;			// nominal frequency for L1 signal
+	gnss->gps_const.F1			=  1575.42e6;			// nominal frequency for L1 signal as in IS-GPS-200J (22 May 2018)
 	gnss->gps_const.L1			= gnss->gps_const.c/gnss->gps_const.F1;		// nominal wavelength for L1 signal
-	gnss->gps_const.F2			=  1227.60e6;			// nominal frequency for L2 signal
+	gnss->gps_const.F2			=  1227.60e6;			// nominal frequency for L2 signal as in IS-GPS-200J (22 May 2018)
 	gnss->gps_const.L2			= gnss->gps_const.c/gnss->gps_const.F2;		// nominal wavelength for L2 signal
 }
 
@@ -327,11 +327,11 @@ void pony_free_gnss_gps(pony_gnss_gps *gps)
 void pony_init_gnss_glo_const(pony_gnss *gnss)
 {
 	gnss->glo_const.c			= 299792458;		// speed of light as in ICD GLONASS Edition 5.1 2008, m/s
-	gnss->glo_const.mu			= 398600.4418e9;	// Earth gravity constant as in PZ-90.02, m^3/s^2
-	gnss->glo_const.J02			= 1082625.75e-9;	// second zonal harmonic of geopotential as in PZ-90.02
-	gnss->glo_const.u			= 7.292115e-5;		// Earth rotation rate as in PZ-90.02, rad/s
-	gnss->glo_const.a			= 6378136.0;		// Earth ellipsoid semi-major axis as in PZ-90.02, m
-	gnss->glo_const.e2			= 0.0066943662;		// Earth ellipsoid first eccentricity squared as in PZ-90.02
+	gnss->glo_const.mu			= 398600.4418e9;	// Earth gravity constant as in PZ-90.11 (2014), m^3/s^2
+	gnss->glo_const.J02			= 1082.62575e-6;	// second degree zonal harmonic coefficient of normal potential as in PZ-90.11 (2014)
+	gnss->glo_const.u			= 7.292115e-5;		// Earth rotation rate as in PZ-90.11 (2014), rad/s
+	gnss->glo_const.a			= 6378136.0;		// Earth ellipsoid semi-major axis as in PZ-90.11 (2014), m
+	gnss->glo_const.e2			= 0.0066943662;		// Earth ellipsoid first eccentricity squared as in PZ-90.11 (2014)
 	gnss->glo_const.sec_in_d	=  86400;			// seconds in a day
 	gnss->glo_const.F01			= 1602e6;			// nominal centre frequency for L1 signal as in ICD GLONASS Edition 5.1 2008, Hz
 	gnss->glo_const.dF1			= 562.5e3;			// nominal channel separation for L1 signal as in ICD GLONASS Edition 5.1 2008, Hz
@@ -426,15 +426,14 @@ void pony_init_gnss_gal_const(pony_gnss *gnss)
 	gnss->gal_const.F			= -4.442807309e-10;		// relativistic correction constant as in Galileo OS SIS ICD Issue 1.2 (November 2015), s/sqrt(m)
 	gnss->gal_const.sec_in_w	= 604800;				// seconds in a week
 	gnss->gal_const.sec_in_d	=  86400;				// seconds in a day
-	gnss->gal_const.F1			=  1575.42e6;			// nominal frequency for E1 signal
+	gnss->gal_const.F1			=  1575.42e6;			// nominal frequency for E1 signal as in Galileo OS SIS ICD Issue 1.2 (November 2015)
 	gnss->gal_const.L1			= gnss->gal_const.c/gnss->gal_const.F1;		// nominal wavelength for E1 signal
-	gnss->gal_const.F5a			=  1176.45e6;			// nominal frequency for E5a signal
+	gnss->gal_const.F5a			=  1176.45e6;			// nominal frequency for E5a signal as in Galileo OS SIS ICD Issue 1.2 (November 2015)
 	gnss->gal_const.L5a			= gnss->gal_const.c/gnss->gal_const.F5a;	// nominal wavelength for E5a signal
-	gnss->gal_const.F5b			=  1207.14e6;			// nominal frequency for E5b signal
+	gnss->gal_const.F5b			=  1207.14e6;			// nominal frequency for E5b signal as in Galileo OS SIS ICD Issue 1.2 (November 2015)
 	gnss->gal_const.L5b			= gnss->gal_const.c/gnss->gal_const.F5b;	// nominal wavelength for E5b signal
-	gnss->gal_const.F6			=  1278.75e6;			// nominal frequency for E6 signal
+	gnss->gal_const.F6			=  1278.75e6;			// nominal frequency for E6 signal as in Galileo OS SIS ICD Issue 1.2 (November 2015)
 	gnss->gal_const.L6			= gnss->gal_const.c/gnss->gal_const.F6;		// nominal wavelength for E6 signal
-	
 }
 
 	// initialize gnss galileo structure
@@ -510,14 +509,108 @@ void pony_free_gnss_gal(pony_gnss_gal *gal)
 	free(gal);
 }
 
+	// initialize gnss beidou constants
+void pony_init_gnss_bds_const(pony_gnss *gnss)
+{
+	gnss->bds_const.pi			=  3.1415926535898;			// pi as in BeiDou SIS ICD OSS Version 2.1 (November 2016)
+	gnss->bds_const.c			=  299792458;				// speed of light as in BeiDou SIS ICD OSS Version 2.1 (November 2016), m/s
+	gnss->bds_const.mu			=  3.986004418e14;			// Earth gravity constant as in BeiDou SIS ICD OSS Version 2.1 (November 2016), m^3/s^2
+	gnss->bds_const.u			=  7.292115e-5;				// Earth rotation rate as in BeiDou SIS ICD OSS Version 2.1 (November 2016), rad/s
+	gnss->bds_const.a			=  6378137.0;				// Earth ellipsoid semi-major axis as in BeiDou SIS ICD OSS Version 2.1 (November 2016), m
+	gnss->bds_const.e2			=  6.6943800229008e-3;		// Earth ellipsoid first eccentricity squared derived from flattening as in BeiDou SIS ICD OSS Version 2.1 (November 2016)
+	gnss->bds_const.F			= -4.442807309043977e-10;	// relativistic correction constant derived from Earth gravity as in BeiDou SIS ICD OSS Version 2.1 (November 2016), s/sqrt(m)
+	gnss->bds_const.sec_in_w	= 604800;					// seconds in a week
+	gnss->bds_const.sec_in_d	=  86400;					// seconds in a day
+	gnss->bds_const.leap_sec	=  16;						// leap seconds between BeiDou time and UTC as of 01-Jan-2006
+	gnss->bds_const.B1			=  1561.098e6;				// nominal frequency for B1 signal as in BeiDou SIS ICD OSS Version 2.1 (November 2016)
+	gnss->bds_const.L1			= gnss->bds_const.c/gnss->bds_const.B1;		// nominal wavelength for B1 signal
+	gnss->bds_const.B2			=  1207.140e6;				// nominal frequency for B2 signal as in BeiDou SIS ICD OSS Version 2.1 (November 2016)
+	gnss->bds_const.L2			= gnss->bds_const.c/gnss->bds_const.B2;		// nominal wavelength for B2 signal
+}
+
+	// initialize gnss beidou structure
+char pony_init_gnss_bds(pony_gnss_bds *bds, const int max_sat_count, const int max_eph_count)
+{
+	int i;
+
+	bds->sat = NULL;
+	bds->max_sat_count = 0;
+	bds->max_eph_count = 0;
+
+	// try to allocate memory for satellite data
+	bds->sat = (pony_gnss_sat*)calloc( max_sat_count, sizeof(pony_gnss_sat) );
+	if (bds->sat == NULL)
+		return 0;
+	bds->max_sat_count = max_sat_count;
+
+	// initialize satellite data
+	for (i = 0; i < bds->max_sat_count; i++) {
+		bds->sat[i].eph			= NULL;
+		bds->sat[i].eph_valid	= 0;
+		bds->sat[i].obs			= NULL;
+		bds->sat[i].obs_valid	= NULL;
+		bds->sat[i].x_valid		= 0;
+		bds->sat[i].v_valid		= 0;
+		bds->sat[i].t_em_valid	= 0;
+		bds->sat[i].sinEl_valid	= 0;
+	}
+
+	// try to allocate memory for each satellite ephemeris
+	for (i = 0; i < bds->max_sat_count; i++) {
+		bds->sat[i].eph = (double *)calloc( max_eph_count, sizeof(double) );
+		if (bds->sat[i].eph == NULL)
+			return 0;
+	}
+	bds->max_eph_count = max_eph_count;
+
+	// observation types
+	bds->obs_types = NULL;
+	bds->obs_count = 0;
+
+	// validity flags
+	bds->iono_valid = 0;
+	bds->clock_corr_valid = 0;
+
+	return 1;
+}
+
+	// free gnss beidou memory
+void pony_free_gnss_bds(pony_gnss_bds *bds)
+{
+	int i;
+
+	if (bds == NULL)
+		return;
+
+	// satellites
+	if (bds->sat != NULL) 
+	{
+		for (i = 0; i < bds->max_sat_count; i++)
+			//ephemeris
+			if (bds->sat[i].eph != NULL)
+			{
+				free(bds->sat[i].eph);
+				bds->sat[i].eph = NULL;
+			}
+	
+		free(bds->sat);
+		bds->sat = NULL;
+	}
+
+	// gnss beidou structure
+	free(bds);
+}
+
 	// initialize gnss structure
 char pony_init_gnss(pony_gnss *gnss)
 {
 	// memory allocation limitations
-	const int max_sat_count = 36;
-	const int max_gps_eph_count = 36;
-	const int max_glo_eph_count = 24;
-	const int max_gal_eph_count = 36;
+	const int 
+		max_sat_count = 36,
+		max_gps_eph_count = 36,
+		max_glo_eph_count = 24,
+		max_gal_eph_count = 36,
+		max_bds_eph_count = 36;
 
 	int grouplen;
 	char* groupptr;
@@ -567,6 +660,21 @@ char pony_init_gnss(pony_gnss *gnss)
 		gnss->gal->cfglength = grouplen;
 
 		if ( !pony_init_gnss_gal(gnss->gal, max_sat_count, max_gal_eph_count) )
+			return 0;
+	}
+
+	// beidou
+	pony_init_gnss_bds_const(gnss);
+	gnss->bds = NULL;
+	if ( pony_locatecfggroup("bds:", gnss->cfg, gnss->cfglength, &groupptr, &grouplen) )
+	{
+		gnss->bds = (pony_gnss_bds*)calloc( 1, sizeof(pony_gnss_bds) );
+		if (gnss->bds == NULL)
+			return 0;
+		gnss->bds->cfg = groupptr;
+		gnss->bds->cfglength = grouplen;
+
+		if ( !pony_init_gnss_bds(gnss->bds, max_sat_count, max_bds_eph_count) )
 			return 0;
 	}
 
