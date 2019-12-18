@@ -263,7 +263,7 @@ typedef struct						// global navigation satellite systems data
 	pony_gps_const gps_const;		// GPS constants
 	pony_glo_const glo_const;		// GLONASS constants
 	pony_gal_const gal_const;		// Galileo constants
-	pony_bds_const gal_const;		// BeiDou constants
+	pony_bds_const bds_const;		// BeiDou constants
 	pony_gnss_settings settings;	// GNSS operation settings
 
 	pony_gnss_gps* gps;				// GPS constellation data pointer
