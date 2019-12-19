@@ -605,12 +605,9 @@ void pony_free_gnss_bds(pony_gnss_bds *bds)
 char pony_init_gnss(pony_gnss *gnss)
 {
 	// memory allocation limitations
-	const int 
-		max_sat_count = 36,
-		max_gps_eph_count = 36,
-		max_glo_eph_count = 24,
-		max_gal_eph_count = 36,
-		max_bds_eph_count = 36;
+	enum		system_id				{gps,	glo,	gal,	bds	};
+	const int	max_sat_count[] =		{36,	36,		36,		64	},
+				max_eph_count[] =		{36,	24,		36,		36	};
 
 	int grouplen;
 	char* groupptr;
@@ -629,7 +626,7 @@ char pony_init_gnss(pony_gnss *gnss)
 		gnss->gps->cfg = groupptr;
 		gnss->gps->cfglength = grouplen;
 
-		if ( !pony_init_gnss_gps(gnss->gps, max_sat_count, max_gps_eph_count) )
+		if ( !pony_init_gnss_gps(gnss->gps, max_sat_count[gps], max_eph_count[gps]) )
 			return 0;
 	}
 
@@ -644,7 +641,7 @@ char pony_init_gnss(pony_gnss *gnss)
 		gnss->glo->cfg = groupptr;
 		gnss->glo->cfglength = grouplen;
 
-		if ( !pony_init_gnss_glo(gnss->glo, max_sat_count, max_glo_eph_count) )
+		if ( !pony_init_gnss_glo(gnss->glo, max_sat_count[glo], max_eph_count[glo]) )
 			return 0;
 	}
 
@@ -659,7 +656,7 @@ char pony_init_gnss(pony_gnss *gnss)
 		gnss->gal->cfg = groupptr;
 		gnss->gal->cfglength = grouplen;
 
-		if ( !pony_init_gnss_gal(gnss->gal, max_sat_count, max_gal_eph_count) )
+		if ( !pony_init_gnss_gal(gnss->gal, max_sat_count[gal], max_eph_count[gal]) )
 			return 0;
 	}
 
@@ -674,7 +671,7 @@ char pony_init_gnss(pony_gnss *gnss)
 		gnss->bds->cfg = groupptr;
 		gnss->bds->cfglength = grouplen;
 
-		if ( !pony_init_gnss_bds(gnss->bds, max_sat_count, max_bds_eph_count) )
+		if ( !pony_init_gnss_bds(gnss->bds, max_sat_count[bds], max_eph_count[bds]) )
 			return 0;
 	}
 
