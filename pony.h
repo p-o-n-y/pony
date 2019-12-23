@@ -255,7 +255,7 @@ typedef struct // GNSS operation settings
 	// GNSS
 typedef struct						// global navigation satellite systems data
 {
-	char* cfg;						// full GNSS configuration string pointer
+	char* cfg;						// full GNSS configuration string pointer, NULL if gnss is not used
 	int cfglength;					// full GNSS configuration string length
 
 	char* cfg_settings;				// pointer to a part of GNSS configuration string common to all systems
