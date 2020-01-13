@@ -1,6 +1,5 @@
 // Jan-2020
 //
-// Dec-2019
 // PONY core source code
 
 #include <stdlib.h>
