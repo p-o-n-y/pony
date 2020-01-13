@@ -1,5 +1,6 @@
-// Dec-2019
+// Jan-2020
 //
+// Dec-2019
 // PONY core source code
 
 #include <stdlib.h>
@@ -23,7 +24,7 @@ pony_bus pony = {
 	pony_init,					// init
 	pony_step,					// step
 	pony_terminate,				// terminate
-	{ NULL, 0, -1, 0 } };		// core.plugins, core.plugin_count, core.exit_plugin_id, core.host_termination
+	{ NULL, 0, 0, -1, 0 } };		// core.plugins, core.plugin_count, core.exit_plugin_id, core.host_termination
 
 
 
@@ -900,8 +901,9 @@ char pony_step(void)
 	int i;
 
 	// loop through plugin execution list
-	for (i = 0; i < pony.core.plugin_count; i++)
+	for (pony.core.current_plugin_id = 0; pony.core.current_plugin_id < pony.core.plugin_count; pony.core.current_plugin_id++)
 	{
+		i = pony.core.current_plugin_id;
 		pony.core.plugins[i](); // execute the current plugin
 
 		if (pony.core.exit_plugin_id == i)	// if termination was initiated by the current plugin on the previous loop

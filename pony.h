@@ -1,5 +1,6 @@
-// Dec-2019
+// Jan-2020
 //
+// Dec-2019
 // PONY core declarations
 #define pony_bus_version 2		// current bus version
 
@@ -290,6 +291,7 @@ typedef struct					// main core structure and instance
 {
 	void(**plugins)(void);				// plugin array pointer
 	int plugin_count;					// number of plugins
+	int current_plugin_id;				// current plugin in plugin execution list
 	int exit_plugin_id;					// index of a plugin that initiated termination
 	char host_termination;				// identifier of termination being called by host
 } pony_core;
