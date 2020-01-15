@@ -759,10 +759,11 @@ void pony_free()
 
 
 // add plugin to the plugin execution list
-//
-// input: pointer to plugin function
-//
-// output: OK/not OK (1/0)
+//	input: 
+//		newplugin - pointer to plugin function (no arguments, no return value)
+//	output: 
+//		1 - OK
+//		0 - not OK (failed to allocate/realocate memory)
 char pony_add_plugin( void(*newplugin)(void) )
 {
 	void(**reallocated_pointer)(void);
@@ -785,10 +786,11 @@ char pony_add_plugin( void(*newplugin)(void) )
 
 
 // initialize the bus, except for core
-// 
-// input: configuration string (see description)
-//
-// output: OK/not OK (1/0)
+//	input: 
+//		cfg - configuration string (see pony description)
+//	output: 
+//		1 - OK
+//		0 - not OK
 char pony_init(char* cfg)
 {
 	const int max_gnss_count = 10;
@@ -893,8 +895,9 @@ char pony_init(char* cfg)
 
 
 // step through the plugin execution list, to be called by host application in a main loop
-//
-// output: OK/not OK (1/0)
+//	output: 
+//		1 - OK (either staying in regular operation mode, or a termination properly detected)
+//		0 - not OK (otherwise)
 char pony_step(void)
 {
 	int i;
@@ -933,18 +936,76 @@ char pony_step(void)
 }
 
 // terminate operation
-//
-// output: OK/not OK (1/0)
-char pony_terminate()
+//	output: 
+//		1 - OK (termination is due in the next step)
+//		0 - not OK (had been already terminated by host or by plugin)
+char pony_terminate(void)
 {
 	if (pony.mode >= 0 && pony.core.host_termination != 1)
 	{
 		pony.core.host_termination = 1;
 
-		return 1; // termination started
+		return 1; // termination is due in the next step
 	}
 
 	return 0; // had been already terminated by host or by plugin 
+}
+
+
+
+
+
+
+
+
+
+
+
+// basic parsing
+	//	locate a token in a configuration string
+	//	skips groups enclosed in braces {...} and strings within quotes ("...")
+	//	input:
+	//		token - token to be found and located, only non-blank characters
+	//		src - source string to search and locate in
+	//		len - maximum length to search and locate within
+	//		delim - mandatory delimiter to look for after the token found (if any), ignored if zero character
+	//	output:
+	//		NULL - if the token or delimiter (if delim != 0) not found, or token is invalid
+	//		pointer to the next character after the token or delimiter (if delim != 0)
+char * pony_locate_token(const char *token, char *src, const int len, const char delim) {
+
+	const char quote = '"', brace_open = '{', brace_close = '}';
+
+	int i, j, k, n, len1;
+
+	for (n = 0; token[n]; n++); // determine token length
+	if (n == 0) // invalid token
+		return NULL; 
+	len1 = len - n;
+
+	// look for the token
+	for (i = 0, j = 0, k = 0; i < len1 && src[i]; i++) // go throughout the string
+		if (src[i] == quote) // skip quoted values
+			for (i++; src[i] && i < len1 && src[i] != quote; i++);
+		else if (src[i] == brace_open) // skip groups
+			for (i++; src[i] && i < len1 && src[i] != brace_close; i++);
+		else {
+			for (j = 0, k = i; j < n && src[k] == token[j]; j++, k++); 
+			if (j == n) // token found
+				break;
+		}
+	if (j < n) // token not found
+		return NULL;
+
+	if (!delim)
+		return (src + k + 1);
+
+	// check for delimiter
+	for (i = k+1; i < len && src[i] && src[i] <= ' '; i++); // skip all non-printables		
+	if (i >= len || src[i] != delim) // no delimiter found
+		return NULL;
+	else
+		return (src + i + 1);
 }
 
 

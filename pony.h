@@ -1,7 +1,7 @@
 // Jan-2020
 //
 // PONY core declarations
-#define pony_bus_version 2		// current bus version
+#define pony_bus_version 3		// current bus version
 
 // TIME EPOCH
 typedef struct 		// Julian-type time epoch
@@ -323,6 +323,16 @@ typedef struct					// bus data to be used in host application
 } pony_bus;
 
 extern pony_bus pony;
+
+
+
+
+
+
+
+// basic parsing
+char * pony_locate_token(const char *token, char *src, const int len, const char delim); // locate a token (and delimiter, when given) within a configuration string
+
 
 
 
