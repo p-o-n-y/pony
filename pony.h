@@ -35,7 +35,7 @@ typedef struct			// navigation solution structure
 	double rpy[3];		// attitude angles relative to local-level frame: roll (rad), pitch (rad), yaw = true heading (rad)
 	char rpy_valid;		// validity flag (0/1)
 
-	double dt;			// system clock error
+	double dt;			// clock bias
 	char dt_valid;		// validity flag (0/1)
 } pony_sol;
 
