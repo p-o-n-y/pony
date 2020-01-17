@@ -43,18 +43,33 @@ typedef struct			// navigation solution structure
 
 
 // IMU
-typedef struct			// inertial measurement unit
+	// IMU const
+typedef struct		// inertial navigation constants
 {
-	char* cfg;			// pointer to IMU configuration string
-	int cfglength;		// IMU configuration string length
+	double 
+		pi,			// pi
+		// Earth parameters as in GRS-80 by H. Moritz // Journal of Geodesy (2000) 74 (1): pp. 128–162
+		u,			// Earth rotation rate, rad/s
+		a,			// Earth ellipsoid semi-major axis, m
+		e2,			// Earth ellipsoid first eccentricity squared
+		ge,			// Earth normal gravity at the equator, m/s^2
+		fg,			// Earth normal gravity flattening
+		fg4;		// Earth normal gravity second-order term flattening
+} pony_imu_const;
 
-	double w[3];		// up to 3 gyroscope measurements
-	char w_valid;		// validity flag (0/1)
+	// IMU
+typedef struct					// inertial measurement unit
+{
+	char* cfg;					// pointer to IMU configuration string
+	int cfglength;				// IMU configuration string length
 
-	double f[3];		// up to accelerometer measurements
-	char f_valid;		// validity flag (0/1)
+	double w[3];				// up to 3 gyroscope measurements
+	char w_valid;				// validity flag (0/1)
 
-	pony_sol sol;		// inertial solution
+	double f[3];				// up to accelerometer measurements
+	char f_valid;				// validity flag (0/1)
+
+	pony_sol sol;				// inertial solution
 } pony_imu;
 
 
@@ -312,6 +327,7 @@ typedef struct					// bus data to be used in host application
 	char* cfg_settings;					// pointer to a part of the configuration string common to all subsystems
 	int settings_length;				// length of the part of the configuration string common to all subsystems
 
+	pony_imu_const imu_const;			// inertial navigation constants
 	pony_imu* imu;						// inertial measurement unit data pointer
 
 	pony_gnss* gnss;					// global navigation satellite system data pointer

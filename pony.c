@@ -189,14 +189,33 @@ void pony_init_solution(pony_sol *sol)
 
 
 // imu data handling subroutines
-	// initialize imu structure
-char pony_init_imu(void)
+	// initialize inertial navigation constants
+void pony_init_imu_const()
 {
+	pony.imu_const.pi	= 3.141592653589793;	// pi with maximum double-precision floating point digits as in IEEE 754-2008 (binary64)
+	// Earth parameters as in Section 4 of GRS-80 by H. Moritz // Journal of Geodesy (2000) 74 (1): pp. 128–162
+	pony.imu_const.u	= 7.292115e-5;			// Earth rotation rate, rad/s
+	pony.imu_const.a	= 6378137.0;			// Earth ellipsoid semi-major axis, m
+	pony.imu_const.e2	= 6.6943800229e-3;		// Earth ellipsoid first eccentricity squared
+	pony.imu_const.ge	= 9.7803267715;			// Earth normal gravity at the equator, m/s^2
+	pony.imu_const.fg	= 5.302440112e-3;		// Earth normal gravity flattening
+	pony.imu_const.fg4	= 5.8e-6;				// Earth normal gravity second-order term flattening
+}
+
+	// initialize imu structure
+char pony_init_imu(pony_imu *imu)
+{
+	int i;
+
 	// validity flags
-	pony.imu->w_valid = 0;
-	pony.imu->f_valid = 0;
+	imu->w_valid = 0;
+	imu->f_valid = 0;
+	for (i = 0; i < 3; i++) {
+		imu->w[i]	= 0;
+		imu->f[i]	= 0;
+	}
 	// drop the solution
-	pony_init_solution( &(pony.imu->sol) );
+	pony_init_solution( &(imu->sol) );
 
 	return 1;
 }
@@ -822,6 +841,7 @@ char pony_init(char* cfg)
 	pony_locatecfggroup("", pony.cfg, pony.cfglength, &pony.cfg_settings, &pony.settings_length);
 	
 	// imu init
+	pony_init_imu_const();
 	pony.imu = NULL;
 	if ( pony_locatecfggroup("imu:", pony.cfg, pony.cfglength, &groupptr, &grouplen) ) // if the group found in configuration
 	{
@@ -837,7 +857,7 @@ char pony_init(char* cfg)
 		pony.imu->cfglength = grouplen;
 
 		// try to init
-		if ( !pony_init_imu() ) {
+		if ( !pony_init_imu(pony.imu) ) {
 			pony_free();
 			return 0;
 		}
