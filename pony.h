@@ -104,15 +104,11 @@ typedef struct 				// GNSS satellite data
 typedef struct		// GPS system constants
 {
 	double 
-		pi,			// pi as in GPS interface specs
-		c,			// speed of light, m/s, 
 		mu,			// Earth grav constant as in GPS interface specs, m^3/s^2
 		u,			// Earth rotation rate as in GPS interface specs, rad/s
 		a,			// Earth ellipsoid semi-major axis, m
 		e2,			// Earth ellipsoid first eccentricity squared
 		F,			// relativistic correction constant as in GPS interface specs, sec/sqrt(m)
-		sec_in_w,	// seconds in a week
-		sec_in_d,	// seconds in a day
 		F1, L1,		// nominal frequency and wavelength for L1 signal as in GPS interface specs, Hz and m
 		F2, L2;		// nominal frequency and wavelength for L2 signal as in GPS interface specs, Hz and m
 } pony_gps_const;
@@ -121,13 +117,11 @@ typedef struct		// GPS system constants
 typedef struct		// GLONASS system constants
 {
 	double 
-		c,			// speed of light, m/s, 
 		mu,			// Earth grav constant as in GLONASS ICD, m^3/s^2
 		J02,		// second zonal harmonic of geopotential
 		u,			// Earth rotation rate as in GLONASS ICD, rad/s
 		a,			// Earth ellipsoid semi-major axis, m
 		e2,			// Earth ellipsoid first eccentricity squared as in GLONASS ICD
-		sec_in_d,	// seconds in a day
 		F01, dF1,	// nominal centre frequency and channel separation for L1 signal as in GLONASS ICD, Hz
 		F02, dF2;	// nominal centre frequency and channel wavelength for L2 signal as in GLONASS ICD, Hz
 } pony_glo_const;
@@ -136,15 +130,11 @@ typedef struct		// GLONASS system constants
 typedef struct		// Galileo system constants
 {
 	double 
-		pi,			// pi as in Galileo interface specs
-		c,			// speed of light, m/s, 
 		mu,			// Earth grav constant as in Galileo interface specs, m^3/s^2
 		u,			// Earth rotation rate as in Galileo interface specs, rad/s
 		a,			// Earth ellipsoid semi-major axis, m
 		e2,			// Earth ellipsoid first eccentricity squared
 		F,			// relativistic correction constant as in Galileo interface specs, sec/sqrt(m)
-		sec_in_w,	// seconds in a week
-		sec_in_d,	// seconds in a day
 		F1, L1,		// nominal frequency and wavelength for E1 signal as in Galileo interface specs, Hz and m
 		F5a, L5a,	// nominal frequency and wavelength for E5a signal as in Galileo interface specs, Hz and m
 		F5b, L5b,	// nominal frequency and wavelength for E5b signal as in Galileo interface specs, Hz and m
@@ -155,19 +145,29 @@ typedef struct		// Galileo system constants
 typedef struct		// BeiDou system constants
 {
 	double 
-		pi,			// pi as in BeiDou interface specs
-		c,			// speed of light, m/s, 
 		mu,			// Earth grav constant as in BeiDou interface specs, m^3/s^2
 		u,			// Earth rotation rate as in BeiDou interface specs, rad/s
 		a,			// Earth ellipsoid semi-major axis as in CGCS2000, m
 		e2,			// Earth ellipsoid first eccentricity squared, as in CGCS2000
 		F,			// relativistic correction constant as in BeiDou interface specs, sec/sqrt(m)
-		sec_in_w,	// seconds in a week
-		sec_in_d,	// seconds in a day
 		leap_sec,	// leap seconds between BeiDou time and GPS time as of 01-Jan-2006
 		B1, L1,		// nominal frequency and wavelength for B1 signal as in BeiDou interface specs, Hz and m
 		B2, L2;		// nominal frequency and wavelength for B2 signal as in BeiDou interface specs, Hz and m
 } pony_bds_const;
+
+typedef struct		// GNSS constants
+{
+	double 
+		pi,			// pi as in BeiDou interface specs
+		c,			// speed of light, m/s
+		sec_in_w,	// seconds in a week
+		sec_in_d;	// seconds in a day
+	// constellation-specific constants
+	pony_gps_const gps;		// GPS constants
+	pony_glo_const glo;		// GLONASS constants
+	pony_gal_const gal;		// Galileo constants
+	pony_bds_const bds;		// BeiDou constants
+} pony_gnss_const;
 
 	// GPS
 typedef struct				// GPS constellation data
@@ -276,10 +276,6 @@ typedef struct						// global navigation satellite systems data
 	char* cfg_settings;				// pointer to a part of GNSS configuration string common to all systems
 	int settings_length;			// length of the part of GNSS configuration string common to all systems
 
-	pony_gps_const gps_const;		// GPS constants
-	pony_glo_const glo_const;		// GLONASS constants
-	pony_gal_const gal_const;		// Galileo constants
-	pony_bds_const bds_const;		// BeiDou constants
 	pony_gnss_settings settings;	// GNSS operation settings
 
 	pony_gnss_gps* gps;				// GPS constellation data pointer
@@ -327,9 +323,10 @@ typedef struct					// bus data to be used in host application
 	char* cfg_settings;					// pointer to a part of the configuration string common to all subsystems
 	int settings_length;				// length of the part of the configuration string common to all subsystems
 
-	pony_imu_const imu_const;			// inertial navigation constants
+	pony_imu_const imu_const;			// inertial navigation constants, initialized independent of imu structure
 	pony_imu* imu;						// inertial measurement unit data pointer
 
+	pony_gnss_const gnss_const;			// global navigation satellite system constants, initialized independent of gnss structure
 	pony_gnss* gnss;					// global navigation satellite system data pointer
 	int gnss_count;						// number of gnss instances
 
@@ -348,6 +345,15 @@ extern pony_bus pony;
 
 // basic parsing
 char * pony_locate_token(const char *token, char *src, const int len, const char delim); // locate a token (and delimiter, when given) within a configuration string
+
+
+
+
+
+
+
+// time routines
+int pony_time_days_between_dates(pony_time_epoch epoch_from, pony_time_epoch epoch_to);	// days elapsed from one date to another, based on Rata Die serial date from day one on 0001/01/01
 
 
 
