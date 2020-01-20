@@ -1039,7 +1039,7 @@ char * pony_locate_token(const char *token, char *src, const int len, const char
 	//		epoch_from	- starting epoch, only Y, M and D are used
 	//		epoch_to	- ending epoch, only Y, M and D are used
 	// output:
-	//		number of days elapsed from starting epoch to the ending one
+	//		number of days elapsed from starting epoch to the ending one 
 int pony_time_days_between_dates(pony_time_epoch epoch_from, pony_time_epoch epoch_to) {
 
 	if (epoch_to.M		< 3) 

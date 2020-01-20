@@ -353,7 +353,7 @@ char * pony_locate_token(const char *token, char *src, const int len, const char
 
 
 // time routines
-int pony_time_days_between_dates(pony_time_epoch epoch_from, pony_time_epoch epoch_to);	// days elapsed from one date to another, based on Rata Die serial date from day one on 0001/01/01
+int pony_time_days_between_dates(pony_time_epoch epoch_from, pony_time_epoch epoch_to);	// days elapsed from one date to another, based on Rata Die serial date from day one on 0001/01/01 
 
 
 
