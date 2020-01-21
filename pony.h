@@ -316,31 +316,36 @@ typedef struct	// core structure
 
 typedef struct					// bus data to be used in host application
 {
-	int ver;							// bus version to be used at runtime	
+	int ver;								// bus version to be used at runtime	
 
 	// main functions to be used in host app
-	char(*add_plugin)( void(*)(void) );	// add plugin to the plugin execution list,		input: pointer to plugin function,				output: OK/not OK (1/0)
-	char(*init)(char *);				// initialize the bus, except for core,			input: configuration string (see description),	output: OK/not OK (1/0)
-	char(*step)(void);					// step through the plugin execution list,														output: OK/not OK (1/0)
-	char(*terminate)(void);				// terminate operation,																			output: OK/not OK (1/0)
-	pony_core core;						// core instances
+		// basic
+	char(*add_plugin)		(void(*func)(void)	);	// add plugin to the plugin execution list,	input: pointer to plugin function,				output: OK/not OK (1/0)
+	char(*init)				(char *cfg			);	// initialize the bus, except for core,		input: configuration string (see description),	output: OK/not OK (1/0)
+	char(*step)				(void				);	// step through the plugin execution list,													output: OK/not OK (1/0)
+	char(*terminate)		(void				);	// terminate operation,																		output: OK/not OK (1/0)
+		// advance
+	char(*remove_plugin)	(void(*func)(void)							);	// remove all instances of a plugin from the plugin execution list,	input: pointer to plugin function to be removed,	output: OK/not OK (1/0)
+	char(*replace_plugin)	(void(*oldfunc)(void), void(*newfunc)(void)	);	// replace all instances of the plugin by another one,				input: pointers to old and new plugin functions,	output: OK/not OK (1/0)
+	char(*schedule_plugin)	(void(*func)(void), int cycle, int shift	);	// add scheduled plugin to the plugin execution list,				input: pointer to plugin function, cycle, shift,	output: OK/not OK (1/0)
+	pony_core core;								// core instances
 
-	char* cfg;							// full configuration string
-	int cfglength;						// full configuration string length
+	char* cfg;									// full configuration string
+	int cfglength;								// full configuration string length
 
-	char* cfg_settings;					// pointer to a part of the configuration string common to all subsystems
-	int settings_length;				// length of the part of the configuration string common to all subsystems
+	char* cfg_settings;							// pointer to a part of the configuration string common to all subsystems
+	int settings_length;						// length of the part of the configuration string common to all subsystems
 
-	pony_imu_const imu_const;			// inertial navigation constants, initialized independent of imu structure
-	pony_imu* imu;						// inertial measurement unit data pointer
+	pony_imu_const imu_const;					// inertial navigation constants, initialized independent of imu structure
+	pony_imu* imu;								// inertial measurement unit data pointer
 
-	pony_gnss_const gnss_const;			// global navigation satellite system constants, initialized independent of gnss structure
-	pony_gnss* gnss;					// global navigation satellite system data pointer
-	int gnss_count;						// number of gnss instances
+	pony_gnss_const gnss_const;					// global navigation satellite system constants, initialized independent of gnss structure
+	pony_gnss* gnss;							// global navigation satellite system data pointer
+	int gnss_count;								// number of gnss instances
 
-	double t;							// system time
-	int mode;							// operation mode: 0 - init, <0 termination, >0 normal operation
-	pony_sol sol;						// navigation solution
+	double t;									// system time
+	int mode;									// operation mode: 0 - init, <0 termination, >0 normal operation
+	pony_sol sol;								// navigation solution
 } pony_bus;
 
 extern pony_bus pony;

@@ -9,12 +9,15 @@
 
 
 // core functions to be used in host application
-char pony_add_plugin( void(*newplugin)(void) );	// add plugin to the plugin execution list,		input: pointer to plugin function,				output: OK/not OK (1/0)
-char pony_init(char*);							// initialize the bus, except for core,			input: configuration string (see description),	output: OK/not OK (1/0)
-char pony_step(void);							// step through the plugin execution list,														output: OK/not OK (1/0)
-char pony_terminate(void);						// terminate operation,																			output: OK/not OK (1/0)
-
-
+	// basic
+char pony_add_plugin(void(*newplugin)(void)	);	// add plugin to the plugin execution list,		input: pointer to plugin function,				output: OK/not OK (1/0)
+char pony_init      (char*					);	// initialize the bus, except for core,			input: configuration string (see description),	output: OK/not OK (1/0)
+char pony_step      (void					);	// step through the plugin execution list,														output: OK/not OK (1/0)
+char pony_terminate (void					);	// terminate operation,																			output: OK/not OK (1/0)
+	// advanced
+char pony_remove_plugin		(void(*   plugin)(void)							);	// remove all instances of the plugin from the plugin execution list,	input: pointer to plugin function,					output: OK/not OK (1/0)
+char pony_replace_plugin	(void(*oldplugin)(void), void(*newplugin)(void)	);	// replace all instances of the plugin by another one,					input: pointers to old and new plugin functions,	output: OK/not OK (1/0)
+char pony_schedule_plugin	(void(*newplugin)(void), int cycle, int shift	);	// add scheduled plugin to the plugin execution list,					input: pointer to plugin function, cycle, shift,	output: OK/not OK (1/0)
 
 // bus instance
 pony_bus pony = {
@@ -23,6 +26,9 @@ pony_bus pony = {
 	pony_init,					// init
 	pony_step,					// step
 	pony_terminate,				// terminate
+	pony_remove_plugin,			// remove_plugin
+	pony_replace_plugin,		// replace_plugin
+	pony_schedule_plugin,		// schedule_plugin
 	{ NULL, 0, 0, -1, 0 } };		// core.plugins, core.plugin_count, core.exit_plugin_id, core.host_termination
 
 
@@ -775,17 +781,19 @@ void pony_free()
 
 
 
-// add plugin to the plugin execution list
-//	input: 
-//		newplugin - pointer to plugin function (no arguments, no return value)
-//	output: 
-//		1 - OK
-//		0 - not OK (failed to allocate/realocate memory)
+	// basic functions
+
+		// add plugin to the plugin execution list
+		//	input: 
+		//		newplugin - pointer to plugin function (no arguments, no return value)
+		//	output: 
+		//		1 - OK
+		//		0 - not OK (failed to allocate/realocate memory)
 char pony_add_plugin( void(*newplugin)(void) )
 {
 	pony_plugin *reallocated_pointer;
 
-	reallocated_pointer = (pony_plugin *)realloc( pony.core.plugins, (pony.core.plugin_count + 1) * sizeof(pony_plugin) );
+	reallocated_pointer = (pony_plugin *)realloc( (void *)(pony.core.plugins), (pony.core.plugin_count + 1) * sizeof(pony_plugin) );
 
 	if (reallocated_pointer == NULL)	// failed to allocate/realocate memory
 	{
@@ -805,12 +813,12 @@ char pony_add_plugin( void(*newplugin)(void) )
 }
 
 
-// initialize the bus, except for core
-//	input: 
-//		cfg - configuration string (see pony description)
-//	output: 
-//		1 - OK
-//		0 - not OK
+		// initialize the bus, except for core
+		//	input: 
+		//		cfg - configuration string (see pony description)
+		//	output: 
+		//		1 - OK
+		//		0 - not OK (memory allocation or partial init failed)
 char pony_init(char* cfg)
 {
 	const int max_gnss_count = 10;
@@ -915,11 +923,10 @@ char pony_init(char* cfg)
 
 
 
-
-// step through the plugin execution list, to be called by host application in a main loop
-//	output: 
-//		1 - OK (either staying in regular operation mode, or a termination properly detected)
-//		0 - not OK (otherwise)
+		// step through the plugin execution list, to be called by host application in a main loop
+		//	output: 
+		//		1 - OK (either staying in regular operation mode, or a termination is properly detected)
+		//		0 - not OK (otherwise)
 char pony_step(void)
 {
 	int i;
@@ -964,10 +971,11 @@ char pony_step(void)
 	return (pony.mode >= 0) || (pony.core.exit_plugin_id >= 0);
 }
 
-// terminate operation
-//	output: 
-//		1 - OK (termination is due in the next step)
-//		0 - not OK (had been already terminated by host or by plugin)
+
+		// terminate operation
+		//	output: 
+		//		1 - OK (termination is due in the next step)
+		//		0 - not OK (had been already terminated by host or by plugin)
 char pony_terminate(void)
 {
 	if (pony.mode >= 0 && pony.core.host_termination != 1)
@@ -978,6 +986,105 @@ char pony_terminate(void)
 	}
 
 	return 0; // had been already terminated by host or by plugin 
+}
+
+
+	// advanced functions
+
+		// remove all instances of a given plugin from the plugin execution list,	
+		//	input: 
+		//		plugin - pointer to plugin function to remove from execution list
+		//	output: 
+		//		>0 - number of plugin instances found, limited to 255
+		//		 0 - no instances found, or memory reallocation somehow failed
+char pony_remove_plugin(void(*plugin)(void))
+{
+	int i, j;
+	char flag = 0;
+
+	for (i = 0; i < pony.core.plugin_count; i++) { // go through the execution list
+		if (pony.core.plugins[i].func != plugin) // if not the requested plugin, do nothing
+			continue;
+		// otherwise, remove the current plugin from the execution list
+		for (j = i+1; j < pony.core.plugin_count; j++) // move all succeeding plugins one position lower
+			pony.core.plugins[j-1] = pony.core.plugins[j];
+		// reset the last one
+		j--;
+		pony.core.plugins[j].func = NULL;
+		pony.core.plugins[j].cycle = 0;
+		pony.core.plugins[j].shift = 0;
+		pony.core.plugins[j].tick  = 0;
+		pony.core.plugin_count--;
+		if (flag < 0xff)
+			flag++;
+	}
+
+	// reallocate memory
+	pony.core.plugins = (pony_plugin *)realloc( (void *)(pony.core.plugins), pony.core.plugin_count*sizeof(pony_plugin) );
+	if (pony.core.plugin_count > 0 &&  pony.core.plugins == NULL) { // memory reallocation somehow failed
+		pony_free();
+		return 0;
+	}
+
+	return flag;
+}
+
+
+		// replace all instances of the given plugin to another one in the plugin execution list,
+		//	input: 
+		//		oldplugin - pointer to plugin function to be replaced
+		//		newplugin - pointer to plugin function to replace with
+		//	output: 
+		//		number of plugin instances found, limited to 255
+char pony_replace_plugin(void(*oldplugin)(void), void(*newplugin)(void)) {
+
+	int i;
+	char flag = 0;
+
+	for (i = 0; i < pony.core.plugin_count; i++) {
+		if (pony.core.plugins[i].func != oldplugin)
+			continue;
+		pony.core.plugins[i].func = newplugin;
+		if (flag < 0xff)
+			flag++;
+	}
+
+	return flag;
+}
+
+
+		// add scheduled plugin to the plugin execution list
+		//	input: 
+		//		newplugin	- pointer to plugin function
+		//		cycle		- repeating cycle (in ticks of main cycle), 
+		//					  negative for suspended plugin, 
+		//					  zero for the plugin to be turned off (for further rescheduling)
+		//		shift		- shift from the beginning of the cycle, automatically shrunk to [0..cycle-1]
+		//	output: 
+		//		1 - OK
+		//		0 - not OK (failed to allocate/realocate memory)
+char pony_schedule_plugin	(void(*newplugin)(void), int cycle, int shift	)
+{
+	int abs_cycle;
+
+	if (!pony_add_plugin(newplugin))
+		return 0;
+
+	abs_cycle = abs(cycle);
+	if (abs_cycle) {
+		while (shift >= abs_cycle)
+			shift -= abs_cycle;
+		while (shift < 0)
+			shift += abs_cycle;
+	}
+	else
+		shift = 0;
+
+	pony.core.plugins[pony.core.plugin_count-1].cycle = cycle;
+	pony.core.plugins[pony.core.plugin_count-1].shift = shift;
+	pony.core.plugins[pony.core.plugin_count-1].tick  = 0;
+
+	return 1;
 }
 
 
