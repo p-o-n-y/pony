@@ -189,14 +189,33 @@ void pony_init_solution(pony_sol *sol)
 
 
 // imu data handling subroutines
-	// initialize imu structure
-char pony_init_imu(void)
+	// initialize inertial navigation constants
+void pony_init_imu_const()
 {
+	pony.imu_const.pi	= 3.141592653589793;	// pi with maximum double-precision floating point digits as in IEEE 754-2008 (binary64)
+	// Earth parameters as in Section 4 of GRS-80 by H. Moritz // Journal of Geodesy (2000) 74 (1): pp. 128–162
+	pony.imu_const.u	= 7.292115e-5;			// Earth rotation rate, rad/s
+	pony.imu_const.a	= 6378137.0;			// Earth ellipsoid semi-major axis, m
+	pony.imu_const.e2	= 6.6943800229e-3;		// Earth ellipsoid first eccentricity squared
+	pony.imu_const.ge	= 9.7803267715;			// Earth normal gravity at the equator, m/s^2
+	pony.imu_const.fg	= 5.302440112e-3;		// Earth normal gravity flattening
+	pony.imu_const.fg4	= 5.8e-6;				// Earth normal gravity second-order term flattening
+}
+
+	// initialize imu structure
+char pony_init_imu(pony_imu *imu)
+{
+	int i;
+
 	// validity flags
-	pony.imu->w_valid = 0;
-	pony.imu->f_valid = 0;
+	imu->w_valid = 0;
+	imu->f_valid = 0;
+	for (i = 0; i < 3; i++) {
+		imu->w[i]	= 0;
+		imu->f[i]	= 0;
+	}
 	// drop the solution
-	pony_init_solution( &(pony.imu->sol) );
+	pony_init_solution( &(imu->sol) );
 
 	return 1;
 }
@@ -233,21 +252,17 @@ char pony_init_gnss_settings(pony_gnss *gnss)
 }
 
 	// initialize gnss gps constants
-void pony_init_gnss_gps_const(pony_gnss *gnss)
+void pony_init_gnss_gps_const(pony_gps_const *gps_const)
 {
-	gnss->gps_const.pi			=  3.1415926535898;		// pi as in IS-GPS-200J (22 May 2018)
-	gnss->gps_const.c			=  299792458;			// speed of light as in IS-GPS-200J (22 May 2018), m/s
-	gnss->gps_const.mu			=  3.986005e14;			// Earth gravity constant as in IS-GPS-200J (22 May 2018), m^3/s^2
-	gnss->gps_const.u			=  7.2921151467e-5;		// Earth rotation rate as in IS-GPS-200J (22 May 2018), rad/s
-	gnss->gps_const.a			=  6378137.0;			// Earth ellipsoid semi-major axis as in WGS-84(G1762) 2014-07-08, m
-	gnss->gps_const.e2			=  6.694379990141e-3;	// Earth ellipsoid first eccentricity squared as in WGS-84(G1762) 2014-07-08
-	gnss->gps_const.F			= -4.442807633e-10;		// relativistic correction constant as in IS-GPS-200J (22 May 2018), s/sqrt(m)
-	gnss->gps_const.sec_in_w	= 604800;				// seconds in a week
-	gnss->gps_const.sec_in_d	=  86400;				// seconds in a day
-	gnss->gps_const.F1			=  1575.42e6;			// nominal frequency for L1 signal as in IS-GPS-200J (22 May 2018)
-	gnss->gps_const.L1			= gnss->gps_const.c/gnss->gps_const.F1;		// nominal wavelength for L1 signal
-	gnss->gps_const.F2			=  1227.60e6;			// nominal frequency for L2 signal as in IS-GPS-200J (22 May 2018)
-	gnss->gps_const.L2			= gnss->gps_const.c/gnss->gps_const.F2;		// nominal wavelength for L2 signal
+	gps_const->mu	=  3.986005e14;			// Earth gravity constant as in IS-GPS-200J (22 May 2018), m^3/s^2
+	gps_const->u	=  7.2921151467e-5;		// Earth rotation rate as in IS-GPS-200J (22 May 2018), rad/s
+	gps_const->a	=  6378137.0;			// Earth ellipsoid semi-major axis as in WGS-84(G1762) 2014-07-08, m
+	gps_const->e2	=  6.694379990141e-3;	// Earth ellipsoid first eccentricity squared as in WGS-84(G1762) 2014-07-08
+	gps_const->F	= -4.442807633e-10;		// relativistic correction constant as in IS-GPS-200J (22 May 2018), s/sqrt(m)
+	gps_const->F1	=  1575.42e6;			// nominal frequency for L1 signal as in IS-GPS-200J (22 May 2018)
+	gps_const->L1	= pony.gnss_const.c/gps_const->F1;		// nominal wavelength for L1 signal
+	gps_const->F2	=  1227.60e6;			// nominal frequency for L2 signal as in IS-GPS-200J (22 May 2018)
+	gps_const->L2	= pony.gnss_const.c/gps_const->F2;		// nominal wavelength for L2 signal
 }
 
 	// initialize gnss gps structure
@@ -324,19 +339,17 @@ void pony_free_gnss_gps(pony_gnss_gps *gps)
 }
 
 	// initialize gnss glonass constants
-void pony_init_gnss_glo_const(pony_gnss *gnss)
+void pony_init_gnss_glo_const(pony_glo_const *glo_const)
 {
-	gnss->glo_const.c			= 299792458;		// speed of light as in ICD GLONASS Edition 5.1 2008, m/s
-	gnss->glo_const.mu			= 398600.4418e9;	// Earth gravity constant as in PZ-90.11 (2014), m^3/s^2
-	gnss->glo_const.J02			= 1082.62575e-6;	// second degree zonal harmonic coefficient of normal potential as in PZ-90.11 (2014)
-	gnss->glo_const.u			= 7.292115e-5;		// Earth rotation rate as in PZ-90.11 (2014), rad/s
-	gnss->glo_const.a			= 6378136.0;		// Earth ellipsoid semi-major axis as in PZ-90.11 (2014), m
-	gnss->glo_const.e2			= 0.0066943662;		// Earth ellipsoid first eccentricity squared as in PZ-90.11 (2014)
-	gnss->glo_const.sec_in_d	=  86400;			// seconds in a day
-	gnss->glo_const.F01			= 1602e6;			// nominal centre frequency for L1 signal as in ICD GLONASS Edition 5.1 2008, Hz
-	gnss->glo_const.dF1			= 562.5e3;			// nominal channel separation for L1 signal as in ICD GLONASS Edition 5.1 2008, Hz
-	gnss->glo_const.F02			= 1246e6;			// nominal centre frequency for L2 signal as in ICD GLONASS Edition 5.1 2008, Hz
-	gnss->glo_const.dF2			= 437.5e3;			// nominal channel separation for L2 signal as in ICD GLONASS Edition 5.1 2008, Hz
+	glo_const->mu	= 398600.4418e9;	// Earth gravity constant as in PZ-90.11 (2014), m^3/s^2
+	glo_const->J02	= 1082.62575e-6;	// second degree zonal harmonic coefficient of normal potential as in PZ-90.11 (2014)
+	glo_const->u	= 7.292115e-5;		// Earth rotation rate as in PZ-90.11 (2014), rad/s
+	glo_const->a	= 6378136.0;		// Earth ellipsoid semi-major axis as in PZ-90.11 (2014), m
+	glo_const->e2	= 0.0066943662;		// Earth ellipsoid first eccentricity squared as in PZ-90.11 (2014)
+	glo_const->F01	= 1602e6;			// nominal centre frequency for L1 signal as in ICD GLONASS Edition 5.1 2008, Hz
+	glo_const->dF1	= 562.5e3;			// nominal channel separation for L1 signal as in ICD GLONASS Edition 5.1 2008, Hz
+	glo_const->F02	= 1246e6;			// nominal centre frequency for L2 signal as in ICD GLONASS Edition 5.1 2008, Hz
+	glo_const->dF2	= 437.5e3;			// nominal channel separation for L2 signal as in ICD GLONASS Edition 5.1 2008, Hz
 }
 
 	// initialize gnss glonass structure
@@ -415,25 +428,21 @@ void pony_free_gnss_glo(pony_gnss_glo *glo)
 }
 
 	// initialize gnss galileo constants
-void pony_init_gnss_gal_const(pony_gnss *gnss)
+void pony_init_gnss_gal_const(pony_gal_const *gal_const)
 {
-	gnss->gal_const.pi			=  3.1415926535898;		// pi as in Galileo OS SIS ICD Issue 1.2 (November 2015)
-	gnss->gal_const.c			=  299792458;			// speed of light as in Galileo OS SIS ICD Issue 1.2 (November 2015), m/s
-	gnss->gal_const.mu			=  3.986004418e14;		// Earth gravity constant as in Galileo OS SIS ICD Issue 1.2 (November 2015), m^3/s^2
-	gnss->gal_const.u			=  7.2921151467e-5;		// Earth rotation rate as in Galileo OS SIS ICD Issue 1.2 (November 2015), rad/s
-	gnss->gal_const.a			=  6378137.0;			// Earth ellipsoid semi-major axis as in GRS-80 // JoG March 2000 vol. 74 issue 1, m
-	gnss->gal_const.e2			=  6.69438002290e-3;	// Earth ellipsoid first eccentricity squared as in GRS-80 // JoG March 2000 vol. 74 issue 1
-	gnss->gal_const.F			= -4.442807309e-10;		// relativistic correction constant as in Galileo OS SIS ICD Issue 1.2 (November 2015), s/sqrt(m)
-	gnss->gal_const.sec_in_w	= 604800;				// seconds in a week
-	gnss->gal_const.sec_in_d	=  86400;				// seconds in a day
-	gnss->gal_const.F1			=  1575.42e6;			// nominal frequency for E1 signal as in Galileo OS SIS ICD Issue 1.2 (November 2015)
-	gnss->gal_const.L1			= gnss->gal_const.c/gnss->gal_const.F1;		// nominal wavelength for E1 signal
-	gnss->gal_const.F5a			=  1176.45e6;			// nominal frequency for E5a signal as in Galileo OS SIS ICD Issue 1.2 (November 2015)
-	gnss->gal_const.L5a			= gnss->gal_const.c/gnss->gal_const.F5a;	// nominal wavelength for E5a signal
-	gnss->gal_const.F5b			=  1207.14e6;			// nominal frequency for E5b signal as in Galileo OS SIS ICD Issue 1.2 (November 2015)
-	gnss->gal_const.L5b			= gnss->gal_const.c/gnss->gal_const.F5b;	// nominal wavelength for E5b signal
-	gnss->gal_const.F6			=  1278.75e6;			// nominal frequency for E6 signal as in Galileo OS SIS ICD Issue 1.2 (November 2015)
-	gnss->gal_const.L6			= gnss->gal_const.c/gnss->gal_const.F6;		// nominal wavelength for E6 signal
+	gal_const->mu	=  3.986004418e14;		// Earth gravity constant as in Galileo OS SIS ICD Issue 1.2 (November 2015), m^3/s^2
+	gal_const->u	=  7.2921151467e-5;		// Earth rotation rate as in Galileo OS SIS ICD Issue 1.2 (November 2015), rad/s
+	gal_const->a	=  6378137.0;			// Earth ellipsoid semi-major axis as in GRS-80 // JoG March 2000 vol. 74 issue 1, m
+	gal_const->e2	=  6.69438002290e-3;	// Earth ellipsoid first eccentricity squared as in GRS-80 // JoG March 2000 vol. 74 issue 1
+	gal_const->F	= -4.442807309e-10;		// relativistic correction constant as in Galileo OS SIS ICD Issue 1.2 (November 2015), s/sqrt(m)
+	gal_const->F1	=  1575.42e6;			// nominal frequency for E1 signal as in Galileo OS SIS ICD Issue 1.2 (November 2015)
+	gal_const->L1	= pony.gnss_const.c/gal_const->F1;		// nominal wavelength for E1 signal
+	gal_const->F5a	=  1176.45e6;			// nominal frequency for E5a signal as in Galileo OS SIS ICD Issue 1.2 (November 2015)
+	gal_const->L5a	= pony.gnss_const.c/gal_const->F5a;	// nominal wavelength for E5a signal
+	gal_const->F5b	=  1207.14e6;			// nominal frequency for E5b signal as in Galileo OS SIS ICD Issue 1.2 (November 2015)
+	gal_const->L5b	= pony.gnss_const.c/gal_const->F5b;	// nominal wavelength for E5b signal
+	gal_const->F6	=  1278.75e6;			// nominal frequency for E6 signal as in Galileo OS SIS ICD Issue 1.2 (November 2015)
+	gal_const->L6	= pony.gnss_const.c/gal_const->F6;		// nominal wavelength for E6 signal
 }
 
 	// initialize gnss galileo structure
@@ -510,22 +519,18 @@ void pony_free_gnss_gal(pony_gnss_gal *gal)
 }
 
 	// initialize gnss beidou constants
-void pony_init_gnss_bds_const(pony_gnss *gnss)
+void pony_init_gnss_bds_const(pony_bds_const *bds_const)
 {
-	gnss->bds_const.pi			=  3.1415926535898;			// pi as in BeiDou SIS ICD OSS Version 2.1 (November 2016)
-	gnss->bds_const.c			=  299792458;				// speed of light as in BeiDou SIS ICD OSS Version 2.1 (November 2016), m/s
-	gnss->bds_const.mu			=  3.986004418e14;			// Earth gravity constant as in BeiDou SIS ICD OSS Version 2.1 (November 2016), m^3/s^2
-	gnss->bds_const.u			=  7.292115e-5;				// Earth rotation rate as in BeiDou SIS ICD OSS Version 2.1 (November 2016), rad/s
-	gnss->bds_const.a			=  6378137.0;				// Earth ellipsoid semi-major axis as in BeiDou SIS ICD OSS Version 2.1 (November 2016), m
-	gnss->bds_const.e2			=  6.6943800229008e-3;		// Earth ellipsoid first eccentricity squared derived from flattening as in BeiDou SIS ICD OSS Version 2.1 (November 2016)
-	gnss->bds_const.F			= -4.442807309043977e-10;	// relativistic correction constant derived from Earth gravity as in BeiDou SIS ICD OSS Version 2.1 (November 2016), s/sqrt(m)
-	gnss->bds_const.sec_in_w	= 604800;					// seconds in a week
-	gnss->bds_const.sec_in_d	=  86400;					// seconds in a day
-	gnss->bds_const.leap_sec	=  14;						// leap seconds between BeiDou time and GPS time as of 01-Jan-2006
-	gnss->bds_const.B1			=  1561.098e6;				// nominal frequency for B1 signal as in BeiDou SIS ICD OSS Version 2.1 (November 2016)
-	gnss->bds_const.L1			= gnss->bds_const.c/gnss->bds_const.B1;		// nominal wavelength for B1 signal
-	gnss->bds_const.B2			=  1207.140e6;				// nominal frequency for B2 signal as in BeiDou SIS ICD OSS Version 2.1 (November 2016)
-	gnss->bds_const.L2			= gnss->bds_const.c/gnss->bds_const.B2;		// nominal wavelength for B2 signal
+	bds_const->mu			=  3.986004418e14;			// Earth gravity constant as in BeiDou SIS ICD OSS Version 2.1 (November 2016), m^3/s^2
+	bds_const->u			=  7.292115e-5;				// Earth rotation rate as in BeiDou SIS ICD OSS Version 2.1 (November 2016), rad/s
+	bds_const->a			=  6378137.0;				// Earth ellipsoid semi-major axis as in BeiDou SIS ICD OSS Version 2.1 (November 2016), m
+	bds_const->e2			=  6.6943800229008e-3;		// Earth ellipsoid first eccentricity squared derived from flattening as in BeiDou SIS ICD OSS Version 2.1 (November 2016)
+	bds_const->F			= -4.442807309043977e-10;	// relativistic correction constant derived from Earth gravity as in BeiDou SIS ICD OSS Version 2.1 (November 2016), s/sqrt(m)
+	bds_const->leap_sec		=  14;						// leap seconds between BeiDou time and GPS time as of 01-Jan-2006
+	bds_const->B1			=  1561.098e6;				// nominal frequency for B1 signal as in BeiDou SIS ICD OSS Version 2.1 (November 2016)
+	bds_const->L1			= pony.gnss_const.c/bds_const->B1;		// nominal wavelength for B1 signal
+	bds_const->B2			=  1207.140e6;				// nominal frequency for B2 signal as in BeiDou SIS ICD OSS Version 2.1 (November 2016)
+	bds_const->L2			= pony.gnss_const.c/bds_const->B2;		// nominal wavelength for B2 signal
 }
 
 	// initialize gnss beidou structure
@@ -601,6 +606,22 @@ void pony_free_gnss_bds(pony_gnss_bds *bds)
 	free(bds);
 }
 
+	// initialize gnss constants
+void pony_init_gnss_const()
+{
+	pony.gnss_const.pi			= 3.1415926535898;		// pi, circumference to diameter ratio, as in as in IS-GPS-200J, Galileo OS SIS ICD Issue 1.2 (November 2015), BeiDou SIS ICD OSS Version 2.1 (November 2016)
+	pony.gnss_const.c			= 299792458;			// speed of light as in IS-GPS-200J (22 May 2018), ICD GLONASS Edition 5.1 2008, Galileo OS SIS ICD Issue 1.2 (November 2015), BeiDou SIS ICD OSS Version 2.1 (November 2016), m/s
+	pony.gnss_const.sec_in_w	= 604800;				// seconds in a week
+	pony.gnss_const.sec_in_d	= 86400;				// seconds in a day
+
+	// constellation-specific constants
+	pony_init_gnss_gps_const(&(pony.gnss_const.gps));
+	pony_init_gnss_glo_const(&(pony.gnss_const.glo));
+	pony_init_gnss_gal_const(&(pony.gnss_const.gal));
+	pony_init_gnss_bds_const(&(pony.gnss_const.bds));
+
+}
+
 	// initialize gnss structure
 char pony_init_gnss(pony_gnss *gnss)
 {
@@ -616,7 +637,6 @@ char pony_init_gnss(pony_gnss *gnss)
 		return 0;
 
 	// gps
-	pony_init_gnss_gps_const(gnss);
 	gnss->gps = NULL;
 	if ( pony_locatecfggroup("gps:", gnss->cfg, gnss->cfglength, &groupptr, &grouplen) )
 	{
@@ -631,7 +651,6 @@ char pony_init_gnss(pony_gnss *gnss)
 	}
 
 	// glonass
-	pony_init_gnss_glo_const(gnss);
 	gnss->glo = NULL;
 	if (pony_locatecfggroup( "glo:", gnss->cfg, gnss->cfglength, &groupptr, &grouplen) )
 	{
@@ -646,7 +665,6 @@ char pony_init_gnss(pony_gnss *gnss)
 	}
 
 	// galileo
-	pony_init_gnss_gal_const(gnss);
 	gnss->gal = NULL;
 	if ( pony_locatecfggroup("gal:", gnss->cfg, gnss->cfglength, &groupptr, &grouplen) )
 	{
@@ -661,7 +679,6 @@ char pony_init_gnss(pony_gnss *gnss)
 	}
 
 	// beidou
-	pony_init_gnss_bds_const(gnss);
 	gnss->bds = NULL;
 	if ( pony_locatecfggroup("bds:", gnss->cfg, gnss->cfglength, &groupptr, &grouplen) )
 	{
@@ -822,6 +839,7 @@ char pony_init(char* cfg)
 	pony_locatecfggroup("", pony.cfg, pony.cfglength, &pony.cfg_settings, &pony.settings_length);
 	
 	// imu init
+	pony_init_imu_const();
 	pony.imu = NULL;
 	if ( pony_locatecfggroup("imu:", pony.cfg, pony.cfglength, &groupptr, &grouplen) ) // if the group found in configuration
 	{
@@ -837,13 +855,14 @@ char pony_init(char* cfg)
 		pony.imu->cfglength = grouplen;
 
 		// try to init
-		if ( !pony_init_imu() ) {
+		if ( !pony_init_imu(pony.imu) ) {
 			pony_free();
 			return 0;
 		}
 	}
 
 	// gnss init
+	pony_init_gnss_const();
 	pony.gnss = NULL;
 	pony.gnss_count = 0;
 		// multiple gnss mode support
@@ -1006,6 +1025,31 @@ char * pony_locate_token(const char *token, char *src, const int len, const char
 		return NULL;
 	else
 		return (src + i + 1);
+}
+
+
+
+
+
+
+
+// time routines
+	// days elapsed from one date to another, based on Rata Die serial date from day one on 0001/01/01
+	// input:
+	//		epoch_from	- starting epoch, only Y, M and D are used
+	//		epoch_to	- ending epoch, only Y, M and D are used
+	// output:
+	//		number of days elapsed from starting epoch to the ending one 
+int pony_time_days_between_dates(pony_time_epoch epoch_from, pony_time_epoch epoch_to) {
+
+	if (epoch_to.M		< 3) 
+		epoch_to.Y--,	epoch_to.M		+= 12;
+	if (epoch_from.M	< 3) 
+		epoch_from.Y--,	epoch_from.M	+= 12;
+    return 
+		(365*epoch_to.Y		+ epoch_to.Y/4		- epoch_to.Y/100	+ epoch_to.Y/400	+ (153*epoch_to.M	- 457)/5	+ epoch_to.D	- 306) - 
+		(365*epoch_from.Y	+ epoch_from.Y/4	- epoch_from.Y/100	+ epoch_from.Y/400	+ (153*epoch_from.M	- 457)/5	+ epoch_from.D	- 306);
+
 }
 
 
