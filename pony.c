@@ -783,9 +783,9 @@ void pony_free()
 //		0 - not OK (failed to allocate/realocate memory)
 char pony_add_plugin( void(*newplugin)(void) )
 {
-	void(**reallocated_pointer)(void);
+	pony_plugin *reallocated_pointer;
 
-	reallocated_pointer = ( void(**)(void) )realloc( pony.core.plugins, (pony.core.plugin_count + 1) * sizeof( void(*)(void) ) );
+	reallocated_pointer = (pony_plugin *)realloc( pony.core.plugins, (pony.core.plugin_count + 1) * sizeof(pony_plugin) );
 
 	if (reallocated_pointer == NULL)	// failed to allocate/realocate memory
 	{
@@ -795,7 +795,9 @@ char pony_add_plugin( void(*newplugin)(void) )
 	else
 		pony.core.plugins = reallocated_pointer;
 
-	pony.core.plugins[pony.core.plugin_count] = newplugin;
+	pony.core.plugins[pony.core.plugin_count].func  = newplugin;
+	pony.core.plugins[pony.core.plugin_count].tick  = 0;
+	pony.core.plugins[pony.core.plugin_count].ticks = 0;
 	pony.core.plugin_count++;
 
 	return 1;
@@ -925,7 +927,7 @@ char pony_step(void)
 	for (pony.core.current_plugin_id = 0; pony.core.current_plugin_id < pony.core.plugin_count; pony.core.current_plugin_id++)
 	{
 		i = pony.core.current_plugin_id;
-		pony.core.plugins[i](); // execute the current plugin
+		pony.core.plugins[i].func(); // execute the current plugin
 
 		if (pony.core.exit_plugin_id == i)	// if termination was initiated by the current plugin on the previous loop
 		{

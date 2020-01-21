@@ -296,14 +296,21 @@ typedef struct						// global navigation satellite systems data
 
 
 // BUS
-	// CORE
-typedef struct					// main core structure and instance
+	// PLUGIN
+typedef struct	// scheduled plugin structure
 {
-	void(**plugins)(void);				// plugin array pointer
-	int plugin_count;					// number of plugins
-	int current_plugin_id;				// current plugin in plugin execution list
-	int exit_plugin_id;					// index of a plugin that initiated termination
-	char host_termination;				// identifier of termination being called by host
+	void(*func)(void);	// pointer to plugin function to execute
+	int tick;			// tick number to execute plugin at (shift)
+	int ticks;			// tick cycle (period) to execute
+} pony_plugin;
+	// CORE
+typedef struct	// core structure
+{
+	pony_plugin *plugins;	// plugin array pointer
+	int plugin_count;		// number of plugins
+	int current_plugin_id;	// current plugin in plugin execution list
+	int exit_plugin_id;		// index of a plugin that initiated termination
+	char host_termination;	// identifier of termination being called by host
 } pony_core;
 
 typedef struct					// bus data to be used in host application
