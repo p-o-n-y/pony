@@ -796,8 +796,9 @@ char pony_add_plugin( void(*newplugin)(void) )
 		pony.core.plugins = reallocated_pointer;
 
 	pony.core.plugins[pony.core.plugin_count].func  = newplugin;
+	pony.core.plugins[pony.core.plugin_count].cycle = 1;
+	pony.core.plugins[pony.core.plugin_count].shift = 0;
 	pony.core.plugins[pony.core.plugin_count].tick  = 0;
-	pony.core.plugins[pony.core.plugin_count].ticks = 0;
 	pony.core.plugin_count++;
 
 	return 1;
@@ -927,7 +928,14 @@ char pony_step(void)
 	for (pony.core.current_plugin_id = 0; pony.core.current_plugin_id < pony.core.plugin_count; pony.core.current_plugin_id++)
 	{
 		i = pony.core.current_plugin_id;
-		pony.core.plugins[i].func(); // execute the current plugin
+		
+		if (pony.core.plugins[i].cycle > 0 && pony.core.plugins[i].tick == pony.core.plugins[i].shift)	// check if the scheduled tick has come
+			pony.core.plugins[i].func();																// execute the current plugin
+
+		pony.core.plugins[i].tick++;									// current tick increment
+		if (pony.core.plugins[i].tick >= pony.core.plugins[i].cycle)	// check to stay within the cycle
+			pony.core.plugins[i].tick = 0;								// reset tick
+
 
 		if (pony.core.exit_plugin_id == i)	// if termination was initiated by the current plugin on the previous loop
 		{

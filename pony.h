@@ -300,8 +300,9 @@ typedef struct						// global navigation satellite systems data
 typedef struct	// scheduled plugin structure
 {
 	void(*func)(void);	// pointer to plugin function to execute
-	int tick;			// tick number to execute plugin at (shift)
-	int ticks;			// tick cycle (period) to execute
+	int cycle;			// tick cycle (period) to execute
+	int shift;			// tick within a cycle to execute at (shift)
+	int tick;			// current tick
 } pony_plugin;
 	// CORE
 typedef struct	// core structure
