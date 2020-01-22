@@ -1312,6 +1312,8 @@ void pony_linal_mmul2T(double *res,  double *a, double *b, const int n, const in
 		}
 }
 
+
+
 	// routines for m x m upper-triangular matrices lined up in a single-dimension array
 		// index conversion for upper-triangular matrix lined up in a single-dimension array: (i,j) -> k
 void pony_linal_u_ij2k(int *k, const int i, const int j, const int m) {
