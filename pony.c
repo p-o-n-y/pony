@@ -14,10 +14,13 @@ char pony_add_plugin(void(*newplugin)(void)	);	// add plugin to the plugin execu
 char pony_init      (char*					);	// initialize the bus, except for core,			input: configuration string (see description),	output: OK/not OK (1/0)
 char pony_step      (void					);	// step through the plugin execution list,														output: OK/not OK (1/0)
 char pony_terminate (void					);	// terminate operation,																			output: OK/not OK (1/0)
-	// advanced
-char pony_remove_plugin		(void(*   plugin)(void)							);	// remove all instances of the plugin from the plugin execution list,	input: pointer to plugin function,					output: OK/not OK (1/0)
-char pony_replace_plugin	(void(*oldplugin)(void), void(*newplugin)(void)	);	// replace all instances of the plugin by another one,					input: pointers to old and new plugin functions,	output: OK/not OK (1/0)
-char pony_schedule_plugin	(void(*newplugin)(void), int cycle, int shift	);	// add scheduled plugin to the plugin execution list,					input: pointer to plugin function, cycle, shift,	output: OK/not OK (1/0)
+	// advanced scheduling
+char pony_remove_plugin		(void(*   plugin)(void)							);	// remove all instances of the plugin from the plugin execution list,	input: pointer to plugin function,							output: OK/not OK (1/0)
+char pony_replace_plugin	(void(*oldplugin)(void), void(*newplugin)(void)	);	// replace all instances of the plugin by another one,					input: pointers to old and new plugin functions,			output: OK/not OK (1/0)
+char pony_schedule_plugin	(void(*newplugin)(void), int cycle, int shift	);	// add scheduled plugin to the plugin execution list,					input: pointer to plugin function, cycle, shift,			output: OK/not OK (1/0)
+char pony_reschedule_plugin	(void(*   plugin)(void), int cycle, int shift	);	// reschedule all instances of the plugin in the plugin execution list,	input: pointer to plugin function, new cycle, new shift,	output: OK/not OK (1/0)
+char pony_suspend_plugin	(void(*   plugin)(void)							);	// suspend all instances of the plugin in the plugin execution list,	input: pointer to plugin function,							output: OK/not OK (1/0)
+char pony_resume_plugin		(void(*   plugin)(void)							);	// resume all instances of the plugin in the plugin execution list,		input: pointer to plugin function,							output: OK/not OK (1/0)
 
 // bus instance
 pony_bus pony = {
@@ -29,6 +32,9 @@ pony_bus pony = {
 	pony_remove_plugin,			// remove_plugin
 	pony_replace_plugin,		// replace_plugin
 	pony_schedule_plugin,		// schedule_plugin
+	pony_reschedule_plugin,		// reschedule_plugin
+	pony_suspend_plugin,		// suspend plugin
+	pony_resume_plugin,			// resume plugin
 	{ NULL, 0, 0, -1, 0 } };		// core.plugins, core.plugin_count, core.exit_plugin_id, core.host_termination
 
 
@@ -1036,7 +1042,8 @@ char pony_remove_plugin(void(*plugin)(void))
 		//		newplugin - pointer to plugin function to replace with
 		//	output: 
 		//		number of plugin instances found, limited to 255
-char pony_replace_plugin(void(*oldplugin)(void), void(*newplugin)(void)) {
+char pony_replace_plugin(void(*oldplugin)(void), void(*newplugin)(void)) 
+{
 
 	int i;
 	char flag = 0;
@@ -1063,13 +1070,14 @@ char pony_replace_plugin(void(*oldplugin)(void), void(*newplugin)(void)) {
 		//	output: 
 		//		1 - OK
 		//		0 - not OK (failed to allocate/realocate memory)
-char pony_schedule_plugin	(void(*newplugin)(void), int cycle, int shift	)
+char pony_schedule_plugin(void(*newplugin)(void), int cycle, int shift)
 {
 	int abs_cycle;
 
+	// add to the execution list
 	if (!pony_add_plugin(newplugin))
 		return 0;
-
+	// shrink shift to [0..cycle-1]
 	abs_cycle = abs(cycle);
 	if (abs_cycle) {
 		while (shift >= abs_cycle)
@@ -1079,12 +1087,95 @@ char pony_schedule_plugin	(void(*newplugin)(void), int cycle, int shift	)
 	}
 	else
 		shift = 0;
-
+	// set scheduling parameters
 	pony.core.plugins[pony.core.plugin_count-1].cycle = cycle;
 	pony.core.plugins[pony.core.plugin_count-1].shift = shift;
 	pony.core.plugins[pony.core.plugin_count-1].tick  = 0;
 
 	return 1;
+}
+
+
+		// reschedule all instances of the plugin in the plugin execution list
+		//	input: 
+		//		plugin	- pointer to plugin function
+		//		cycle	- new repeating cycle (in ticks of main cycle), 
+		//				  negative for suspended plugin, 
+		//				  zero for the plugin to be turned off (for further rescheduling)
+		//		shift	- new shift from the beginning of the cycle, automatically shrunk to [0..cycle-1]
+		//	output: 
+		//		1 - OK
+		//		0 - not OK (plugin not found in the execution list)
+char pony_reschedule_plugin(void(*plugin)(void), int cycle, int shift)
+{
+	int i, abs_cycle;
+	char flag = 0;
+	// shrink shift to [0..cycle-1]
+	abs_cycle = abs(cycle);
+	if (abs_cycle) {
+		while (shift >= abs_cycle)
+			shift -= abs_cycle;
+		while (shift < 0)
+			shift += abs_cycle;
+	}
+	else
+		shift = 0;
+	// go through execution list and set scheduling parameters, if found the plugin
+	for (i = 0; i < pony.core.plugin_count; i++) 
+		if (pony.core.plugins[i].func == plugin) {
+			pony.core.plugins[i].cycle = cycle;
+			pony.core.plugins[i].shift = shift;
+			pony.core.plugins[i].tick  = 0;
+			flag = 1;
+		}
+
+	return flag;
+}
+
+
+		// suspend all instances of the plugin in the plugin execution list
+		//	input: 
+		//		plugin - pointer to plugin function,							
+		//	output: 
+		//		1 - OK
+		//		0 - not OK (plugin not found)
+char pony_suspend_plugin(void(*   plugin)(void))
+{
+	int i, cycle;
+	char flag = 0;
+	// go through execution list and set cycle to negative, if found the plugin
+	for (i = 0; i < pony.core.plugin_count; i++) 
+		if (pony.core.plugins[i].func == plugin) {
+			cycle = pony.core.plugins[i].cycle;
+			if (cycle > 0)
+				pony.core.plugins[i].cycle = -cycle;
+			flag = 1;
+		}
+
+	return flag;
+}
+
+
+		// resume all instances of the plugin in the plugin execution list	
+		//	input: 
+		//		plugin - pointer to plugin function,							
+		//	output: 
+		//		1 - OK
+		//		0 - not OK (plugin not found)
+char pony_resume_plugin(void(*   plugin)(void))
+{
+	int i, cycle;
+	char flag = 0;
+	// go through execution list and set cycle to positive, if found the plugin
+	for (i = 0; i < pony.core.plugin_count; i++) 
+		if (pony.core.plugins[i].func == plugin) {
+			cycle = pony.core.plugins[i].cycle;
+			if (cycle < 0)
+				pony.core.plugins[i].cycle = -cycle;
+			flag = 1;
+		}
+
+	return flag;
 }
 
 

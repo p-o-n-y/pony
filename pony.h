@@ -320,14 +320,17 @@ typedef struct					// bus data to be used in host application
 
 	// main functions to be used in host app
 		// basic
-	char(*add_plugin)		(void(*func)(void)	);	// add plugin to the plugin execution list,	input: pointer to plugin function,				output: OK/not OK (1/0)
-	char(*init)				(char *cfg			);	// initialize the bus, except for core,		input: configuration string (see description),	output: OK/not OK (1/0)
-	char(*step)				(void				);	// step through the plugin execution list,													output: OK/not OK (1/0)
-	char(*terminate)		(void				);	// terminate operation,																		output: OK/not OK (1/0)
-		// advance
-	char(*remove_plugin)	(void(*func)(void)							);	// remove all instances of a plugin from the plugin execution list,	input: pointer to plugin function to be removed,	output: OK/not OK (1/0)
-	char(*replace_plugin)	(void(*oldfunc)(void), void(*newfunc)(void)	);	// replace all instances of the plugin by another one,				input: pointers to old and new plugin functions,	output: OK/not OK (1/0)
-	char(*schedule_plugin)	(void(*func)(void), int cycle, int shift	);	// add scheduled plugin to the plugin execution list,				input: pointer to plugin function, cycle, shift,	output: OK/not OK (1/0)
+	char(*add_plugin)	(void(*func)(void)	);	// add plugin to the plugin execution list,	input: pointer to plugin function,				output: OK/not OK (1/0)
+	char(*init)			(char *cfg			);	// initialize the bus, except for core,		input: configuration string (see description),	output: OK/not OK (1/0)
+	char(*step)			(void				);	// step through the plugin execution list,													output: OK/not OK (1/0)
+	char(*terminate)	(void				);	// terminate operation,																		output: OK/not OK (1/0)
+		// advanced scheduling
+	char(*remove_plugin)		(void(*func)(void)							);	// remove all instances of a plugin from the plugin execution list,		input: pointer to plugin function to be removed,			output: OK/not OK (1/0)
+	char(*replace_plugin)		(void(*oldfunc)(void), void(*newfunc)(void)	);	// replace all instances of the plugin by another one,					input: pointers to old and new plugin functions,			output: OK/not OK (1/0)
+	char(*schedule_plugin)		(void(*func)(void), int cycle, int shift	);	// add scheduled plugin to the plugin execution list,					input: pointer to plugin function, cycle, shift,			output: OK/not OK (1/0)
+	char(*reschedule_plugin)	(void(*func)(void), int cycle, int shift	);	// reschedule all instances of the plugin in the plugin execution list,	input: pointer to plugin function, new cycle, new shift,	output: OK/not OK (1/0)
+	char(*suspend_plugin)		(void(*func)(void)							);	// suspend all instances of the plugin in the plugin execution list,	input: pointer to plugin function,							output: OK/not OK (1/0)
+	char(*resume_plugin)		(void(*func)(void)							);	// resume all instances of the plugin in the plugin execution list,		input: pointer to plugin function,							output: OK/not OK (1/0)
 	pony_core core;								// core instances
 
 	char* cfg;									// full configuration string
