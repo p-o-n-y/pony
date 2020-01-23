@@ -1277,11 +1277,22 @@ double pony_linal_dot(double *u, double *v, const int m) {
 	double res;
 	int i;
 
-	res = u[0]*v[0];
-	for (i = 1; i < m; i++)
+	for (i = 1, res = u[0]*v[0]; i < m; i++)
 		res += u[i]*v[i];
 
 	return res;
+}
+
+		// l2 vector norm, i.e. sqrt(u^T*u)
+double pony_linal_vnorm(double *u, const int m) {
+	return sqrt(pony_linal_dot(u, u, m));
+}
+
+		// cross product for 3x1 vectors
+void pony_linal_cross3x1(double *res, double *u, double *v) {
+	res[0] = u[1]*v[2] - u[2]*v[1];
+	res[1] = u[2]*v[0] - u[0]*v[2];
+	res[2] = u[0]*v[1] - u[1]*v[0];
 }
 
 		// matrix multiplication res = a*b, a is n x n1, b is n1 x m, res is n x m
@@ -1360,12 +1371,12 @@ void pony_linal_u_inv(double *res, double *u, const int m) {
 	double s;
 
 	for (j = 0, k0 = (m+2)*(m-1)/2; j < m; k0 -= j+2, j++) {
-		res[k0] = 1/u[k0];
+		res[k0] = 1/u[k0]; // division by zero if matrix is not invertible
 		for (i = j+1, k = k0-j-1; i < m; k -= i+1, i++) {
 			p0 = k-(i-j);
 			for (p = k, q = k0, r = 0, s = 0; q > k; p--, q -= j+r+1, r++)
 				s += u[p]*res[q];
-			res[k] = -s/u[p0];
+			res[k] = -s/u[p0]; // division by zero if matrix is not invertible
 		}
 	}
 
@@ -1436,7 +1447,7 @@ double pony_linal_kalman_update(double *x, double *S, double *K, double z, doubl
 		for (j = 0, k = i; j <= i; j++, k += m-j) {
 			e = K[j];
 			K[j] += S[k]*f;
-			S[k] = (S[k]*d - e*f)/sdd1;
+			S[k] = (S[k]*d - e*f)/sdd1; // sigma = 0 not allowed
 		}
 		d = d1;
 	}
@@ -1447,7 +1458,7 @@ double pony_linal_kalman_update(double *x, double *S, double *K, double z, doubl
 
 	// K, x
 	for (i = 0; i < m; i++) {
-		K[i] /= d;
+		K[i] /= d; // sigma = 0 not allowed
 		x[i] += K[i]*z;
 	}
 
