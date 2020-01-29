@@ -204,14 +204,15 @@ void pony_init_solution(pony_sol *sol)
 	// initialize inertial navigation constants
 void pony_init_imu_const()
 {
-	pony.imu_const.pi	= 3.141592653589793;	// pi with maximum double-precision floating point digits as in IEEE 754-2008 (binary64)
+	pony.imu_const.pi		= 3.14159265358979323846264338327950288;	// pi with maximum quad-precision floating point digits as in IEEE 754-2008 (binary128)
+	pony.imu_const.rad2deg	= 180/pony.imu_const.pi;					// 180/pi
 	// Earth parameters as in Section 4 of GRS-80 by H. Moritz // Journal of Geodesy (2000) 74 (1): pp. 128–162
-	pony.imu_const.u	= 7.292115e-5;			// Earth rotation rate, rad/s
-	pony.imu_const.a	= 6378137.0;			// Earth ellipsoid semi-major axis, m
-	pony.imu_const.e2	= 6.6943800229e-3;		// Earth ellipsoid first eccentricity squared
-	pony.imu_const.ge	= 9.7803267715;			// Earth normal gravity at the equator, m/s^2
-	pony.imu_const.fg	= 5.302440112e-3;		// Earth normal gravity flattening
-	pony.imu_const.fg4	= 5.8e-6;				// Earth normal gravity second-order term flattening
+	pony.imu_const.u		= 7.292115e-5;			// Earth rotation rate, rad/s
+	pony.imu_const.a		= 6378137.0;			// Earth ellipsoid semi-major axis, m
+	pony.imu_const.e2		= 6.6943800229e-3;		// Earth ellipsoid first eccentricity squared
+	pony.imu_const.ge		= 9.7803267715;			// Earth normal gravity at the equator, m/s^2
+	pony.imu_const.fg		= 5.302440112e-3;		// Earth normal gravity flattening
+	pony.imu_const.fg4		= 5.8e-6;				// Earth normal gravity second-order term flattening
 }
 
 	// initialize imu structure

@@ -50,6 +50,7 @@ typedef struct		// inertial navigation constants
 {
 	double 
 		pi,			// pi
+		rad2deg,	// 180/pi
 		// Earth parameters as in GRS-80 by H. Moritz // Journal of Geodesy (2000) 74 (1): pp. 128–162
 		u,			// Earth rotation rate, rad/s
 		a,			// Earth ellipsoid semi-major axis, m
