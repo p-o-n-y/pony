@@ -943,7 +943,7 @@ char pony_step(void)
 	{
 		i = pony.core.current_plugin_id;
 		
-		if (pony.core.plugins[i].cycle > 0 && pony.core.plugins[i].tick == pony.core.plugins[i].shift)	// check if the scheduled tick has come
+		if (pony.mode == 0 || (pony.core.plugins[i].cycle > 0 && pony.core.plugins[i].tick == pony.core.plugins[i].shift))	// check if the scheduled tick has come, or init mode
 			pony.core.plugins[i].func();																// execute the current plugin
 
 		pony.core.plugins[i].tick++;									// current tick increment
