@@ -212,7 +212,6 @@ void pony_init_imu_const()
 	pony.imu_const.e2		= 6.6943800229e-3;		// Earth ellipsoid first eccentricity squared
 	pony.imu_const.ge		= 9.7803267715;			// Earth normal gravity at the equator, m/s^2
 	pony.imu_const.fg		= 5.302440112e-3;		// Earth normal gravity flattening
-	pony.imu_const.fg4		= 5.8e-6;				// Earth normal gravity second-order term flattening
 }
 
 	// initialize imu structure
@@ -223,10 +222,16 @@ char pony_init_imu(pony_imu *imu)
 	// validity flags
 	imu->w_valid = 0;
 	imu->f_valid = 0;
+	imu->W_valid = 0;
 	for (i = 0; i < 3; i++) {
 		imu->w[i]	= 0;
 		imu->f[i]	= 0;
+		imu->W[i]	= 0;
 	}
+	// default gravity acceleration vector
+	imu->g[0] = 0;
+	imu->g[1] = 0;
+	imu->g[2] = -pony.imu_const.ge*(1 + pony.imu_const.fg/2); // middle value
 	// drop the solution
 	pony_init_solution( &(imu->sol) );
 

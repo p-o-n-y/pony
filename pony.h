@@ -56,23 +56,28 @@ typedef struct		// inertial navigation constants
 		a,			// Earth ellipsoid semi-major axis, m
 		e2,			// Earth ellipsoid first eccentricity squared
 		ge,			// Earth normal gravity at the equator, m/s^2
-		fg,			// Earth normal gravity flattening
-		fg4;		// Earth normal gravity second-order term flattening
+		fg;			// Earth normal gravity flattening
 } pony_imu_const;
 
 	// IMU
-typedef struct					// inertial measurement unit
+typedef struct		// inertial measurement unit
 {
-	char* cfg;					// pointer to IMU configuration string
-	int cfglength;				// IMU configuration string length
+	char* cfg;		// pointer to IMU configuration string
+	int cfglength;	// IMU configuration string length
 
-	double w[3];				// up to 3 gyroscope measurements
-	char w_valid;				// validity flag (0/1)
+	double w[3];	// up to 3 gyroscope measurements
+	char w_valid;	// validity flag (0/1)
 
-	double f[3];				// up to accelerometer measurements
-	char f_valid;				// validity flag (0/1)
+	double f[3];	// up to 3 accelerometer measurements
+	char f_valid;	// validity flag (0/1)
 
-	pony_sol sol;				// inertial solution
+	double W[3];	// angular velocity of the local level reference frame
+	char W_valid;	// validity flag (0/1)
+
+	double g[3];	// current gravity acceleration vector
+	char g_valid;	// validity flag (0/1)
+
+	pony_sol sol;	// inertial solution
 } pony_imu;
 
 
