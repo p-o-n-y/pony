@@ -1,4 +1,4 @@
-// Jan-2020
+// Feb-2020
 //
 // PONY core declarations
 #define pony_bus_version 3		// current bus version
@@ -166,7 +166,7 @@ typedef struct		// BeiDou system constants
 typedef struct		// GNSS constants
 {
 	double 
-		pi,			// pi as in BeiDou interface specs
+		pi,			// circumference-to-diameter ratio
 		c,			// speed of light, m/s
 		sec_in_w,	// seconds in a week
 		sec_in_d;	// seconds in a day
