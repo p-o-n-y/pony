@@ -200,7 +200,7 @@ typedef struct				// GPS constellation data
 } pony_gnss_gps;
 
 	// GLONASS
-typedef struct				// GLONASS constellation data (not supported yet)
+typedef struct				// GLONASS constellation data
 {
 	char* cfg;				// GLONASS configuration string
 	int cfglength;			// configuration string length
