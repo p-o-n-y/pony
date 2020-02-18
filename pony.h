@@ -1,7 +1,7 @@
 // Feb-2020
 //
 // PONY core declarations
-#define pony_bus_version 3		// current bus version
+#define pony_bus_version 4		// current bus version
 
 // TIME EPOCH
 typedef struct 		// Julian-type time epoch
@@ -357,9 +357,9 @@ typedef struct					// bus data to be used in host application
 	double t;									// system time
 	int mode;									// operation mode: 0 - init, <0 termination, >0 normal operation
 	pony_sol sol;								// navigation solution
-} pony_bus;
+} pony_struct;
 
-extern pony_bus pony;
+extern pony_struct *pony;
 
 
 

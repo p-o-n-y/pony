@@ -23,7 +23,7 @@ char pony_suspend_plugin	(void(*   plugin)(void)							);	// suspend all instanc
 char pony_resume_plugin		(void(*   plugin)(void)							);	// resume all instances of the plugin in the plugin execution list,		input: pointer to plugin function,							output: OK/not OK (1/0)
 
 // bus instance
-pony_bus pony = {
+pony_struct pony_bus = {
 	pony_bus_version,			// ver
 	pony_add_plugin,			// add_plugin
 	pony_init,					// init
@@ -37,7 +37,7 @@ pony_bus pony = {
 	pony_resume_plugin,			// resume plugin
 	{ NULL, 0, 0, -1, 0 } };		// core.plugins, core.plugin_count, core.exit_plugin_id, core.host_termination
 
-
+pony_struct *pony = &pony_bus;
 
 
 
@@ -204,14 +204,14 @@ void pony_init_solution(pony_sol *sol)
 	// initialize inertial navigation constants
 void pony_init_imu_const()
 {
-	pony.imu_const.pi		= 3.14159265358979323846264338327950288;	// pi with maximum quad-precision floating point digits as in IEEE 754-2008 (binary128)
-	pony.imu_const.rad2deg	= 180/pony.imu_const.pi;					// 180/pi
+	pony->imu_const.pi		= 3.14159265358979323846264338327950288;	// pi with maximum quad-precision floating point digits as in IEEE 754-2008 (binary128)
+	pony->imu_const.rad2deg	= 180/pony->imu_const.pi;					// 180/pi
 	// Earth parameters as in Section 4 of GRS-80 by H. Moritz // Journal of Geodesy (2000) 74 (1): pp. 128–162
-	pony.imu_const.u		= 7.292115e-5;			// Earth rotation rate, rad/s
-	pony.imu_const.a		= 6378137.0;			// Earth ellipsoid semi-major axis, m
-	pony.imu_const.e2		= 6.6943800229e-3;		// Earth ellipsoid first eccentricity squared
-	pony.imu_const.ge		= 9.7803267715;			// Earth normal gravity at the equator, m/s^2
-	pony.imu_const.fg		= 5.302440112e-3;		// Earth normal gravity flattening
+	pony->imu_const.u		= 7.292115e-5;			// Earth rotation rate, rad/s
+	pony->imu_const.a		= 6378137.0;			// Earth ellipsoid semi-major axis, m
+	pony->imu_const.e2		= 6.6943800229e-3;		// Earth ellipsoid first eccentricity squared
+	pony->imu_const.ge		= 9.7803267715;			// Earth normal gravity at the equator, m/s^2
+	pony->imu_const.fg		= 5.302440112e-3;		// Earth normal gravity flattening
 }
 
 	// initialize imu structure
@@ -231,7 +231,7 @@ char pony_init_imu(pony_imu *imu)
 	// default gravity acceleration vector
 	imu->g[0] = 0;
 	imu->g[1] = 0;
-	imu->g[2] = -pony.imu_const.ge*(1 + pony.imu_const.fg/2); // middle value
+	imu->g[2] = -pony->imu_const.ge*(1 + pony->imu_const.fg/2); // middle value
 	// drop the solution
 	pony_init_solution( &(imu->sol) );
 
@@ -241,10 +241,10 @@ char pony_init_imu(pony_imu *imu)
 	// free imu memory
 void pony_free_imu(void)
 {
-	if (pony.imu == NULL)
+	if (pony->imu == NULL)
 		return;
-	free(pony.imu);
-	pony.imu = NULL;
+	free(pony->imu);
+	pony->imu = NULL;
 }
 
 
@@ -278,9 +278,9 @@ void pony_init_gnss_gps_const(pony_gps_const *gps_const)
 	gps_const->e2	=  6.694379990141e-3;	// Earth ellipsoid first eccentricity squared as in WGS-84(G1762) 2014-07-08
 	gps_const->F	= -4.442807633e-10;		// relativistic correction constant as in IS-GPS-200J (22 May 2018), s/sqrt(m)
 	gps_const->F1	=  1575.42e6;			// nominal frequency for L1 signal as in IS-GPS-200J (22 May 2018)
-	gps_const->L1	= pony.gnss_const.c/gps_const->F1;		// nominal wavelength for L1 signal
+	gps_const->L1	= pony->gnss_const.c/gps_const->F1;		// nominal wavelength for L1 signal
 	gps_const->F2	=  1227.60e6;			// nominal frequency for L2 signal as in IS-GPS-200J (22 May 2018)
-	gps_const->L2	= pony.gnss_const.c/gps_const->F2;		// nominal wavelength for L2 signal
+	gps_const->L2	= pony->gnss_const.c/gps_const->F2;		// nominal wavelength for L2 signal
 }
 
 	// initialize gnss gps structure
@@ -454,13 +454,13 @@ void pony_init_gnss_gal_const(pony_gal_const *gal_const)
 	gal_const->e2	=  6.69438002290e-3;	// Earth ellipsoid first eccentricity squared as in GRS-80 // JoG March 2000 vol. 74 issue 1
 	gal_const->F	= -4.442807309e-10;		// relativistic correction constant as in Galileo OS SIS ICD Issue 1.2 (November 2015), s/sqrt(m)
 	gal_const->F1	=  1575.42e6;			// nominal frequency for E1 signal as in Galileo OS SIS ICD Issue 1.2 (November 2015)
-	gal_const->L1	= pony.gnss_const.c/gal_const->F1;		// nominal wavelength for E1 signal
+	gal_const->L1	= pony->gnss_const.c/gal_const->F1;		// nominal wavelength for E1 signal
 	gal_const->F5a	=  1176.45e6;			// nominal frequency for E5a signal as in Galileo OS SIS ICD Issue 1.2 (November 2015)
-	gal_const->L5a	= pony.gnss_const.c/gal_const->F5a;	// nominal wavelength for E5a signal
+	gal_const->L5a	= pony->gnss_const.c/gal_const->F5a;	// nominal wavelength for E5a signal
 	gal_const->F5b	=  1207.14e6;			// nominal frequency for E5b signal as in Galileo OS SIS ICD Issue 1.2 (November 2015)
-	gal_const->L5b	= pony.gnss_const.c/gal_const->F5b;	// nominal wavelength for E5b signal
+	gal_const->L5b	= pony->gnss_const.c/gal_const->F5b;	// nominal wavelength for E5b signal
 	gal_const->F6	=  1278.75e6;			// nominal frequency for E6 signal as in Galileo OS SIS ICD Issue 1.2 (November 2015)
-	gal_const->L6	= pony.gnss_const.c/gal_const->F6;		// nominal wavelength for E6 signal
+	gal_const->L6	= pony->gnss_const.c/gal_const->F6;		// nominal wavelength for E6 signal
 }
 
 	// initialize gnss galileo structure
@@ -546,9 +546,9 @@ void pony_init_gnss_bds_const(pony_bds_const *bds_const)
 	bds_const->F			= -4.442807309043977e-10;	// relativistic correction constant derived from Earth gravity as in BeiDou SIS ICD OSS Version 2.1 (November 2016), s/sqrt(m)
 	bds_const->leap_sec		=  14;						// leap seconds between BeiDou time and GPS time as of 01-Jan-2006
 	bds_const->B1			=  1561.098e6;				// nominal frequency for B1 signal as in BeiDou SIS ICD OSS Version 2.1 (November 2016)
-	bds_const->L1			= pony.gnss_const.c/bds_const->B1;		// nominal wavelength for B1 signal
+	bds_const->L1			= pony->gnss_const.c/bds_const->B1;		// nominal wavelength for B1 signal
 	bds_const->B2			=  1207.140e6;				// nominal frequency for B2 signal as in BeiDou SIS ICD OSS Version 2.1 (November 2016)
-	bds_const->L2			= pony.gnss_const.c/bds_const->B2;		// nominal wavelength for B2 signal
+	bds_const->L2			= pony->gnss_const.c/bds_const->B2;		// nominal wavelength for B2 signal
 }
 
 	// initialize gnss beidou structure
@@ -627,16 +627,16 @@ void pony_free_gnss_bds(pony_gnss_bds *bds)
 	// initialize gnss constants
 void pony_init_gnss_const()
 {
-	pony.gnss_const.pi			= 3.1415926535898;		// pi, circumference to diameter ratio, as in as in IS-GPS-200J, Galileo OS SIS ICD Issue 1.2 (November 2015), BeiDou SIS ICD OSS Version 2.1 (November 2016)
-	pony.gnss_const.c			= 299792458;			// speed of light as in IS-GPS-200J (22 May 2018), ICD GLONASS Edition 5.1 2008, Galileo OS SIS ICD Issue 1.2 (November 2015), BeiDou SIS ICD OSS Version 2.1 (November 2016), m/s
-	pony.gnss_const.sec_in_w	= 604800;				// seconds in a week
-	pony.gnss_const.sec_in_d	= 86400;				// seconds in a day
+	pony->gnss_const.pi			= 3.1415926535898;		// pi, circumference to diameter ratio, as in as in IS-GPS-200J, Galileo OS SIS ICD Issue 1.2 (November 2015), BeiDou SIS ICD OSS Version 2.1 (November 2016)
+	pony->gnss_const.c			= 299792458;			// speed of light as in IS-GPS-200J (22 May 2018), ICD GLONASS Edition 5.1 2008, Galileo OS SIS ICD Issue 1.2 (November 2015), BeiDou SIS ICD OSS Version 2.1 (November 2016), m/s
+	pony->gnss_const.sec_in_w	= 604800;				// seconds in a week
+	pony->gnss_const.sec_in_d	= 86400;				// seconds in a day
 
 	// constellation-specific constants
-	pony_init_gnss_gps_const(&(pony.gnss_const.gps));
-	pony_init_gnss_glo_const(&(pony.gnss_const.glo));
-	pony_init_gnss_gal_const(&(pony.gnss_const.gal));
-	pony_init_gnss_bds_const(&(pony.gnss_const.bds));
+	pony_init_gnss_gps_const(&(pony->gnss_const.gps));
+	pony_init_gnss_glo_const(&(pony->gnss_const.glo));
+	pony_init_gnss_gal_const(&(pony->gnss_const.gal));
+	pony_init_gnss_bds_const(&(pony->gnss_const.bds));
 
 }
 
@@ -751,29 +751,29 @@ void pony_free()
 	int i;
 
 	// core
-	if (pony.core.plugins != NULL)
-		free(pony.core.plugins);
-	pony.core.plugins = NULL;
-	pony.core.plugin_count = 0;
+	if (pony->core.plugins != NULL)
+		free(pony->core.plugins);
+	pony->core.plugins = NULL;
+	pony->core.plugin_count = 0;
 
 	// configuration string
-	if (pony.cfg != NULL)
-		free(pony.cfg);
-	pony.cfg = NULL;
-	pony.cfglength = 0;
+	if (pony->cfg != NULL)
+		free(pony->cfg);
+	pony->cfg = NULL;
+	pony->cfglength = 0;
 
 	// imu
 	pony_free_imu();
 
 	// gnss
-	if (pony.gnss != NULL)
+	if (pony->gnss != NULL)
 	{
-		for (i = 0; i < pony.gnss_count; i++)
-			pony_free_gnss( &(pony.gnss[i]) );
-		free(pony.gnss);
-		pony.gnss = NULL;
+		for (i = 0; i < pony->gnss_count; i++)
+			pony_free_gnss( &(pony->gnss[i]) );
+		free(pony->gnss);
+		pony->gnss = NULL;
 	}
-	pony.gnss_count = 0;
+	pony->gnss_count = 0;
 
 }
 
@@ -805,7 +805,7 @@ char pony_add_plugin( void(*newplugin)(void) )
 {
 	pony_plugin *reallocated_pointer;
 
-	reallocated_pointer = (pony_plugin *)realloc( (void *)(pony.core.plugins), (pony.core.plugin_count + 1) * sizeof(pony_plugin) );
+	reallocated_pointer = (pony_plugin *)realloc( (void *)(pony->core.plugins), (pony->core.plugin_count + 1) * sizeof(pony_plugin) );
 
 	if (reallocated_pointer == NULL)	// failed to allocate/realocate memory
 	{
@@ -813,13 +813,13 @@ char pony_add_plugin( void(*newplugin)(void) )
 		return 0;
 	}
 	else
-		pony.core.plugins = reallocated_pointer;
+		pony->core.plugins = reallocated_pointer;
 
-	pony.core.plugins[pony.core.plugin_count].func  = newplugin;
-	pony.core.plugins[pony.core.plugin_count].cycle = 1;
-	pony.core.plugins[pony.core.plugin_count].shift = 0;
-	pony.core.plugins[pony.core.plugin_count].tick  = 0;
-	pony.core.plugin_count++;
+	pony->core.plugins[pony->core.plugin_count].func  = newplugin;
+	pony->core.plugins[pony->core.plugin_count].cycle = 1;
+	pony->core.plugins[pony->core.plugin_count].shift = 0;
+	pony->core.plugins[pony->core.plugin_count].tick  = 0;
+	pony->core.plugin_count++;
 
 	return 1;
 }
@@ -846,39 +846,39 @@ char pony_init(char* cfg)
 	int i;
 
 	// determine configuration string length
-	for (pony.cfglength = 0; cfg[pony.cfglength]; pony.cfglength++);
+	for (pony->cfglength = 0; cfg[pony->cfglength]; pony->cfglength++);
 
 	// assign configuration string
-	pony.cfg = (char *)malloc( sizeof(char) * (pony.cfglength + 1) );
-	if (pony.cfg == NULL)
+	pony->cfg = (char *)malloc( sizeof(char) * (pony->cfglength + 1) );
+	if (pony->cfg == NULL)
 		return 0;
-	for (i = 0; i < pony.cfglength; i++)
-		pony.cfg[i] = cfg[i];
-	pony.cfg[pony.cfglength] = '\0';
+	for (i = 0; i < pony->cfglength; i++)
+		pony->cfg[i] = cfg[i];
+	pony->cfg[pony->cfglength] = '\0';
 
 	// fetch a part of configuration that is outside of any group
-	pony.cfg_settings = NULL;
-	pony.settings_length = 0;
-	pony_locatecfggroup("", pony.cfg, pony.cfglength, &pony.cfg_settings, &pony.settings_length);
+	pony->cfg_settings = NULL;
+	pony->settings_length = 0;
+	pony_locatecfggroup("", pony->cfg, pony->cfglength, &pony->cfg_settings, &pony->settings_length);
 	
 	// imu init
 	pony_init_imu_const();
-	pony.imu = NULL;
-	if ( pony_locatecfggroup("imu:", pony.cfg, pony.cfglength, &groupptr, &grouplen) ) // if the group found in configuration
+	pony->imu = NULL;
+	if ( pony_locatecfggroup("imu:", pony->cfg, pony->cfglength, &groupptr, &grouplen) ) // if the group found in configuration
 	{
 		// try to allocate memory
-		pony.imu = (pony_imu*)calloc( 1, sizeof(pony_imu) );
-		if (pony.imu == NULL) {
+		pony->imu = (pony_imu*)calloc( 1, sizeof(pony_imu) );
+		if (pony->imu == NULL) {
 			pony_free();
 			return 0;
 		}
 
 		// set configuration pointer
-		pony.imu->cfg = groupptr;
-		pony.imu->cfglength = grouplen;
+		pony->imu->cfg = groupptr;
+		pony->imu->cfglength = grouplen;
 
 		// try to init
-		if ( !pony_init_imu(pony.imu) ) {
+		if ( !pony_init_imu(pony->imu) ) {
 			pony_free();
 			return 0;
 		}
@@ -886,39 +886,39 @@ char pony_init(char* cfg)
 
 	// gnss init
 	pony_init_gnss_const();
-	pony.gnss = NULL;
-	pony.gnss_count = 0;
+	pony->gnss = NULL;
+	pony->gnss_count = 0;
 		// multiple gnss mode support
 	for (i = 0; i < max_gnss_count; i++)
 	{
 		multi_gnss_token[multi_gnss_index_position] = '0' + (char)i;
 
-		if ( (i == 0 && pony_locatecfggroup("gnss:", pony.cfg, pony.cfglength, &groupptr, &grouplen) ) ||
-			pony_locatecfggroup(multi_gnss_token, pony.cfg, pony.cfglength, &groupptr, &grouplen) ) {
-			if (i >= pony.gnss_count) {
+		if ( (i == 0 && pony_locatecfggroup("gnss:", pony->cfg, pony->cfglength, &groupptr, &grouplen) ) ||
+			pony_locatecfggroup(multi_gnss_token, pony->cfg, pony->cfglength, &groupptr, &grouplen) ) {
+			if (i >= pony->gnss_count) {
 				// try to allocate/reallocate memory
-				reallocated_pointer = (pony_gnss*)realloc(pony.gnss, sizeof(pony_gnss)*(i+1));
+				reallocated_pointer = (pony_gnss*)realloc(pony->gnss, sizeof(pony_gnss)*(i+1));
 				if (reallocated_pointer == NULL) {
 					pony_free();
 					return 0;
 				}
 				else
-					pony.gnss = reallocated_pointer;
+					pony->gnss = reallocated_pointer;
 				// try to init new instances, except the i-th one
-				for ( ; pony.gnss_count < i; pony.gnss_count++) {
-					pony.gnss[pony.gnss_count].cfg = NULL;
-					pony.gnss[pony.gnss_count].cfglength = 0;
-					pony_init_gnss( &(pony.gnss[pony.gnss_count]) );
+				for ( ; pony->gnss_count < i; pony->gnss_count++) {
+					pony->gnss[pony->gnss_count].cfg = NULL;
+					pony->gnss[pony->gnss_count].cfglength = 0;
+					pony_init_gnss( &(pony->gnss[pony->gnss_count]) );
 				}
-				pony.gnss_count = i+1;
+				pony->gnss_count = i+1;
 			}
 
 			// set configuration pointer
-			pony.gnss[i].cfg = groupptr;
-			pony.gnss[i].cfglength = grouplen;
+			pony->gnss[i].cfg = groupptr;
+			pony->gnss[i].cfglength = grouplen;
 
 			// try to init
-			if ( !pony_init_gnss( &(pony.gnss[i]) ) ) {
+			if ( !pony_init_gnss( &(pony->gnss[i]) ) ) {
 				pony_free();
 				return 0;
 			}
@@ -926,9 +926,9 @@ char pony_init(char* cfg)
 	}
 
 	// system time, operation mode and solution
-	pony.t = 0;
-	pony.mode = 0;
-	pony_init_solution( &(pony.sol) );
+	pony->t = 0;
+	pony->mode = 0;
+	pony_init_solution( &(pony->sol) );
 	
 	return 1;
 }
@@ -944,43 +944,43 @@ char pony_step(void)
 	int i;
 
 	// loop through plugin execution list
-	for (pony.core.current_plugin_id = 0; pony.core.current_plugin_id < pony.core.plugin_count; pony.core.current_plugin_id++)
+	for (pony->core.current_plugin_id = 0; pony->core.current_plugin_id < pony->core.plugin_count; pony->core.current_plugin_id++)
 	{
-		i = pony.core.current_plugin_id;
+		i = pony->core.current_plugin_id;
 		
-		if (pony.mode == 0 || (pony.core.plugins[i].cycle > 0 && pony.core.plugins[i].tick == pony.core.plugins[i].shift))	// check if the scheduled tick has come, or init mode
-			pony.core.plugins[i].func();																// execute the current plugin
+		if (pony->mode == 0 || (pony->core.plugins[i].cycle > 0 && pony->core.plugins[i].tick == pony->core.plugins[i].shift))	// check if the scheduled tick has come, or init mode
+			pony->core.plugins[i].func();																// execute the current plugin
 
-		pony.core.plugins[i].tick++;									// current tick increment
-		if (pony.core.plugins[i].tick >= pony.core.plugins[i].cycle)	// check to stay within the cycle
-			pony.core.plugins[i].tick = 0;								// reset tick
+		pony->core.plugins[i].tick++;									// current tick increment
+		if (pony->core.plugins[i].tick >= pony->core.plugins[i].cycle)	// check to stay within the cycle
+			pony->core.plugins[i].tick = 0;								// reset tick
 
 
-		if (pony.core.exit_plugin_id == i)	// if termination was initiated by the current plugin on the previous loop
+		if (pony->core.exit_plugin_id == i)	// if termination was initiated by the current plugin on the previous loop
 		{
-			pony.core.exit_plugin_id = -1;		// set to default
-			pony.core.host_termination = 0;		// set to default
-			pony_init_solution(&(pony.sol));	// drop the solution
+			pony->core.exit_plugin_id = -1;		// set to default
+			pony->core.host_termination = 0;		// set to default
+			pony_init_solution(&(pony->sol));	// drop the solution
 			pony_free();						// free memory
 			break;
 		}
 
-		if ((pony.mode < 0 || pony.core.host_termination == 1) && pony.core.exit_plugin_id == -1)	// if termination was initiated by the current plugin on the current loop
+		if ((pony->mode < 0 || pony->core.host_termination == 1) && pony->core.exit_plugin_id == -1)	// if termination was initiated by the current plugin on the current loop
 		{
-			if (pony.mode > 0)
-				pony.mode = -1;					// set mode to -1 for external termination cases
+			if (pony->mode > 0)
+				pony->mode = -1;					// set mode to -1 for external termination cases
 
-			if (pony.mode != 0)
-				pony.core.exit_plugin_id = i;	// set the index to use in the next loop
+			if (pony->mode != 0)
+				pony->core.exit_plugin_id = i;	// set the index to use in the next loop
 
 		}
 	}
 
-	if (pony.mode == 0)		// if initialization ended
-		pony.mode = 1;		// set operation mode to regular
+	if (pony->mode == 0)		// if initialization ended
+		pony->mode = 1;		// set operation mode to regular
 
 							// success if either staying in regular operation mode, or a termination properly detected
-	return (pony.mode >= 0) || (pony.core.exit_plugin_id >= 0);
+	return (pony->mode >= 0) || (pony->core.exit_plugin_id >= 0);
 }
 
 
@@ -990,9 +990,9 @@ char pony_step(void)
 		//		0 - not OK (had been already terminated by host or by plugin)
 char pony_terminate(void)
 {
-	if (pony.mode >= 0 && pony.core.host_termination != 1)
+	if (pony->mode >= 0 && pony->core.host_termination != 1)
 	{
-		pony.core.host_termination = 1;
+		pony->core.host_termination = 1;
 
 		return 1; // termination is due in the next step
 	}
@@ -1014,26 +1014,26 @@ char pony_remove_plugin(void(*plugin)(void))
 	int i, j;
 	char flag = 0;
 
-	for (i = 0; i < pony.core.plugin_count; i++) { // go through the execution list
-		if (pony.core.plugins[i].func != plugin) // if not the requested plugin, do nothing
+	for (i = 0; i < pony->core.plugin_count; i++) { // go through the execution list
+		if (pony->core.plugins[i].func != plugin) // if not the requested plugin, do nothing
 			continue;
 		// otherwise, remove the current plugin from the execution list
-		for (j = i+1; j < pony.core.plugin_count; j++) // move all succeeding plugins one position lower
-			pony.core.plugins[j-1] = pony.core.plugins[j];
+		for (j = i+1; j < pony->core.plugin_count; j++) // move all succeeding plugins one position lower
+			pony->core.plugins[j-1] = pony->core.plugins[j];
 		// reset the last one
 		j--;
-		pony.core.plugins[j].func = NULL;
-		pony.core.plugins[j].cycle = 0;
-		pony.core.plugins[j].shift = 0;
-		pony.core.plugins[j].tick  = 0;
-		pony.core.plugin_count--;
+		pony->core.plugins[j].func = NULL;
+		pony->core.plugins[j].cycle = 0;
+		pony->core.plugins[j].shift = 0;
+		pony->core.plugins[j].tick  = 0;
+		pony->core.plugin_count--;
 		if (flag < 0xff)
 			flag++;
 	}
 
 	// reallocate memory
-	pony.core.plugins = (pony_plugin *)realloc( (void *)(pony.core.plugins), pony.core.plugin_count*sizeof(pony_plugin) );
-	if (pony.core.plugin_count > 0 &&  pony.core.plugins == NULL) { // memory reallocation somehow failed
+	pony->core.plugins = (pony_plugin *)realloc( (void *)(pony->core.plugins), pony->core.plugin_count*sizeof(pony_plugin) );
+	if (pony->core.plugin_count > 0 &&  pony->core.plugins == NULL) { // memory reallocation somehow failed
 		pony_free();
 		return 0;
 	}
@@ -1054,10 +1054,10 @@ char pony_replace_plugin(void(*oldplugin)(void), void(*newplugin)(void))
 	int i;
 	char flag = 0;
 
-	for (i = 0; i < pony.core.plugin_count; i++) {
-		if (pony.core.plugins[i].func != oldplugin)
+	for (i = 0; i < pony->core.plugin_count; i++) {
+		if (pony->core.plugins[i].func != oldplugin)
 			continue;
-		pony.core.plugins[i].func = newplugin;
+		pony->core.plugins[i].func = newplugin;
 		if (flag < 0xff)
 			flag++;
 	}
@@ -1094,9 +1094,9 @@ char pony_schedule_plugin(void(*newplugin)(void), int cycle, int shift)
 	else
 		shift = 0;
 	// set scheduling parameters
-	pony.core.plugins[pony.core.plugin_count-1].cycle = cycle;
-	pony.core.plugins[pony.core.plugin_count-1].shift = shift;
-	pony.core.plugins[pony.core.plugin_count-1].tick  = 0;
+	pony->core.plugins[pony->core.plugin_count-1].cycle = cycle;
+	pony->core.plugins[pony->core.plugin_count-1].shift = shift;
+	pony->core.plugins[pony->core.plugin_count-1].tick  = 0;
 
 	return 1;
 }
@@ -1127,11 +1127,11 @@ char pony_reschedule_plugin(void(*plugin)(void), int cycle, int shift)
 	else
 		shift = 0;
 	// go through execution list and set scheduling parameters, if found the plugin
-	for (i = 0; i < pony.core.plugin_count; i++) 
-		if (pony.core.plugins[i].func == plugin) {
-			pony.core.plugins[i].cycle = cycle;
-			pony.core.plugins[i].shift = shift;
-			pony.core.plugins[i].tick  = 0;
+	for (i = 0; i < pony->core.plugin_count; i++) 
+		if (pony->core.plugins[i].func == plugin) {
+			pony->core.plugins[i].cycle = cycle;
+			pony->core.plugins[i].shift = shift;
+			pony->core.plugins[i].tick  = 0;
 			flag = 1;
 		}
 
@@ -1150,11 +1150,11 @@ char pony_suspend_plugin(void(*   plugin)(void))
 	int i, cycle;
 	char flag = 0;
 	// go through execution list and set cycle to negative, if found the plugin
-	for (i = 0; i < pony.core.plugin_count; i++) 
-		if (pony.core.plugins[i].func == plugin) {
-			cycle = pony.core.plugins[i].cycle;
+	for (i = 0; i < pony->core.plugin_count; i++) 
+		if (pony->core.plugins[i].func == plugin) {
+			cycle = pony->core.plugins[i].cycle;
 			if (cycle > 0)
-				pony.core.plugins[i].cycle = -cycle;
+				pony->core.plugins[i].cycle = -cycle;
 			flag = 1;
 		}
 
@@ -1173,11 +1173,11 @@ char pony_resume_plugin(void(*   plugin)(void))
 	int i, cycle;
 	char flag = 0;
 	// go through execution list and set cycle to positive, if found the plugin
-	for (i = 0; i < pony.core.plugin_count; i++) 
-		if (pony.core.plugins[i].func == plugin) {
-			cycle = pony.core.plugins[i].cycle;
+	for (i = 0; i < pony->core.plugin_count; i++) 
+		if (pony->core.plugins[i].func == plugin) {
+			cycle = pony->core.plugins[i].cycle;
 			if (cycle < 0)
-				pony.core.plugins[i].cycle = -cycle;
+				pony->core.plugins[i].cycle = -cycle;
 			flag = 1;
 		}
 
