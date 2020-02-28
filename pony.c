@@ -223,6 +223,7 @@ char pony_init_imu(pony_imu *imu)
 	imu->w_valid = 0;
 	imu->f_valid = 0;
 	imu->W_valid = 0;
+	imu->t = 0;
 	for (i = 0; i < 3; i++) {
 		imu->w[i]	= 0;
 		imu->f[i]	= 0;
@@ -1327,6 +1328,14 @@ void pony_linal_mmul2T(double *res,  double *a, double *b, const int n, const in
 			for (ka++, kb++, p = 1; p < m; ka++, kb++, p++)
 				res[k] += a[ka]*b[kb];
 		}
+}
+
+		// quaternion multiplication for 4x1 quaternions res = q x r, with res0, q0, r0 being scalar parts
+void pony_linal_qmul(double *res, double *q, double *r) {
+	res[0] = q[0]*r[0] - q[1]*r[1] - q[2]*r[2] - q[3]*r[3];
+	res[1] = q[0]*r[1] + q[1]*r[0] + q[2]*r[3] - q[3]*r[2];
+	res[2] = q[0]*r[2] + q[2]*r[0] + q[3]*r[1] - q[1]*r[3];
+	res[3] = q[0]*r[3] + q[3]*r[0] + q[1]*r[2] - q[2]*r[1];
 }
 
 
