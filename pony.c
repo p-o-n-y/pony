@@ -1340,6 +1340,42 @@ void pony_linal_qmul(double *res, double *q, double *r) {
 
 
 
+
+/*	// space rotation representation
+		// 3x3 attitude matrix R to quaternion q with q0 being scalar part
+void pony_linal_mat2quat(double *q, double *R) {
+
+	int i, i1, i3;
+
+	q[0] = 1 + R[0] + R[4] + R[8];
+	q[1] = 1 + R[0] - R[4] - R[8];
+	q[2] = 1 - R[0] + R[4] - R[8];
+	q[3] = 1 - R[0] - R[4] + R[8];
+
+	for (i = 0; i < 4; i++)
+		if (q[i] > 0)
+			q[i] = sqrt(q[i])/2;
+		else
+			q[i] = 0;
+	
+
+	// this part does not always work !! -- revise
+
+	for (i = 1; i < 4; i++) {
+		// copysign function implemented for q[i], R[x]-R[y] arguments 
+		i1 = (i+1)%3;
+		i3 = (i+3)%3;
+		if ( (q[i]>0) == (R[i1*3+i3] < R[i3*3+i1]) ) // R[7]vs.R[5] for i=1, R[2]vs.R[6] for i=2, R[3]vs.R[1] for i=3.
+			q[i] = -q[i];
+	}
+	//q[1] = _copysign(q[1], R[7] - R[5]);
+	//q[2] = _copysign(q[2], R[2] - R[6]);
+	//q[3] = _copysign(q[3], R[3] - R[1]);
+}*/
+
+
+
+
 	// routines for m x m upper-triangular matrices lined up in a single-dimension array
 		// index conversion for upper-triangular matrix lined up in a single-dimension array: (i,j) -> k
 void pony_linal_u_ij2k(int *k, const int i, const int j, const int m) {
@@ -1367,7 +1403,7 @@ void pony_linal_u_mul(double *res, double *u, double *v, const int n, const int 
 		}
 }
 
-		// upper-triangular matrix lined up in a single-dimension array transposed multiplication by vector: res = U^T*v
+		// upper-triangular matrix lined up in a single-dimension array of m(m+1)/2 x 1, transposed, multiplication by vector: res = U^T*v
 void pony_linal_uT_mul_v(double *res, double *u, double *v, const int m) {
 	int i, j, k;
 
@@ -1378,7 +1414,7 @@ void pony_linal_uT_mul_v(double *res, double *u, double *v, const int m) {
 			res[i] += u[k]*v[j];
 }
 
-		// inversion of upper-triangular matrix lined up in a single-dimension array: res = U^-1
+		// inversion of upper-triangular matrix lined up in a single-dimension array of m(m+1)/2 x 1: res = U^-1
 			// overwriting input (double *res = double *u) allowed
 void pony_linal_u_inv(double *res, double *u, const int m) {
 
@@ -1397,7 +1433,7 @@ void pony_linal_u_inv(double *res, double *u, const int m) {
 
 }
 
-		// square (with transposition) of upper-triangular matrix lined up in a single-dimension array: res = U U^T
+		// square (with transposition) of upper-triangular matrix lined up in a single-dimension array of m(m+1)/2 x 1: res = U U^T
 			// overwriting input (double *res = double *u) allowed
 void pony_linal_uuT(double *res, double *u, const int m) {
 
@@ -1414,8 +1450,8 @@ void pony_linal_uuT(double *res, double *u, const int m) {
 }
 
 	// Cholesky upper-triangular factorization P = S*S^T, where P is symmetric positive-definite matrix
-		// input:	P - upper-triangular part of symmetric m-by-m positive-definite R lined in a single-dimension array
-		// output:	S - upper-triangular part of a Cholesky factor S lined in a single-dimension array
+		// input:	P - upper-triangular part of symmetric m-by-m positive-definite R lined in a single-dimension array m(m+1)/2 x 1
+		// output:	S - upper-triangular part of a Cholesky factor S lined in a single-dimension array m(m+1)/2 x 1
 		// overwriting input (double *P == double *S) allowed
 void pony_linal_chol(double *S, double *P, const int m) {
 
@@ -1437,6 +1473,16 @@ void pony_linal_chol(double *S, double *P, const int m) {
 }
 
 	// square root Kalman filtering
+	//	input: 
+	//		x - current estimate of m x 1 state vector
+	//		S - upper-truangular part of a Cholesky factor of current covariance matrix, lined in a single-dimension array m(m+1)/2 x 1
+	//		z - scalar measurement value
+	//		h - linear measurement model matrix, so that z = h*x + r
+	//		sigma - measurement error a priori standard deviation, so that sigma = sqrt(E[r^2])
+	//	output:
+	//		x - updated estimate of state vector
+	//		S - upper-truangular part of a Cholesky factor of updated covariance matrix, lined in a single-dimension array m(m+1)/2 x 1
+	//		K - Kalman gain
 double pony_linal_kalman_update(double *x, double *S, double *K, double z, double *h, double sigma, const int m) {
 
 	double d, d1, sdd1, f, e;
