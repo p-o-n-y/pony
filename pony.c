@@ -1,4 +1,4 @@
-// Feb-2020
+// Mar-2020
 //
 // PONY core source code
 
@@ -1312,6 +1312,20 @@ void pony_linal_mmul(double *res,  double *a, double *b, const int n, const int 
 			kb = j;
 			res[k] = a[ka]*b[kb];
 			for (ka++, kb += m, p = 1; p < n1; ka++, kb += m, p++)
+				res[k] += a[ka]*b[kb];
+		}
+}
+
+		// matrix multiplication with the first argument transposed res = a^T*b, a is n x m, b is n x n1, res is m x n1
+void pony_linal_mmul1T(double *res,  double *a, double *b, const int n, const int m, const int n1) {
+	int i, j, k, ka, kb, p;
+
+	for (i = 0, k = 0; i < m; i++)
+		for (j = 0; j < n1; j++, k++) {
+			ka = i;
+			kb = j;
+			res[k] = a[ka]*b[kb];
+			for (ka += m, kb += n1, p = 1; p < n; ka += m, kb += n1, p++)
 				res[k] += a[ka]*b[kb];
 		}
 }

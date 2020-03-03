@@ -1,4 +1,4 @@
-// Feb-2020
+// Mar-2020
 //
 // PONY core declarations
 #define pony_bus_version 4		// current bus version
@@ -393,6 +393,7 @@ double pony_linal_dot(double *u, double *v, const int m); // dot product
 double pony_linal_vnorm(double *u, const int m); // l2 vector norm, i.e. sqrt(u^T*u)
 void pony_linal_cross3x1(double *res, double *u, double *v); // cross product for 3x1 vectors res = u x v
 void pony_linal_mmul  (double *res,  double *a, double *b, const int n, const int n1, const int m); // matrix multiplication res = a*b, a is n x n1, b is n1 x m, res is n x m
+void pony_linal_mmul1T(double *res,  double *a, double *b, const int n, const int m, const int n1); // matrix multiplication with the first  argument transposed res = a^T*b, a is n x m, b is n x n1, res is m x n1
 void pony_linal_mmul2T(double *res,  double *a, double *b, const int n, const int m, const int n1); // matrix multiplication with the second argument transposed res = a*b^T, a is n x m, b is n1 x m, res is n x n1
 void pony_linal_qmul(double *res, double *q, double *r); // quaternion multiplication for 4x1 quaternions res = q x r, with res0, q0, r0 being scalar parts
 
