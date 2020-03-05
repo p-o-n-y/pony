@@ -1359,7 +1359,7 @@ void pony_linal_qmul(double *res, double *q, double *r) {
 		// 3x3 attitude matrix R to quaternion q with q0 being scalar part
 void pony_linal_mat2quat(double *q, double *R) {
 
-	int i, i1, i3;
+	int i, i0, i1;
 
 	q[0] = 1 + R[0] + R[4] + R[8];
 	q[1] = 1 + R[0] - R[4] - R[8];
@@ -1376,10 +1376,10 @@ void pony_linal_mat2quat(double *q, double *R) {
 	// this part does not always work !! -- revise
 
 	for (i = 1; i < 4; i++) {
-		// copysign function implemented for q[i], R[x]-R[y] arguments 
+		// copysign function implemented for q[i], R[x]-R[y] arguments, q[i]>=0
+		i0 =  i   %3;
 		i1 = (i+1)%3;
-		i3 = (i+3)%3;
-		if ( (q[i]>0) == (R[i1*3+i3] < R[i3*3+i1]) ) // R[7]vs.R[5] for i=1, R[2]vs.R[6] for i=2, R[3]vs.R[1] for i=3.
+		if (R[i1*3+i0]<R[i0*3+i1]) // R[7]vs.R[5] for i=1, R[2]vs.R[6] for i=2, R[3]vs.R[1] for i=3.
 			q[i] = -q[i];
 	}
 	//q[1] = _copysign(q[1], R[7] - R[5]);
