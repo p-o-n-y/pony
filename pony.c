@@ -108,7 +108,8 @@ char pony_locatecfggroup(const char* groupname, char* cfgstr, const int cfglen, 
 
 	// locate configuration substring inside a requested group
 	else {
-		for (i = 0; i < cfglen && cfgstr[i] && !group_found; i++) {
+		i = 0;
+		while (i < cfglen && cfgstr[i] && !group_found) {
 			// skip all non-printable characters, blank spaces and commas between groups
 			for (; cfgstr[i] && (cfgstr[i] <= ' ' || cfgstr[i] == ',') && i < cfglen; i++); 
 			// if a group started
@@ -206,7 +207,7 @@ void pony_init_imu_const()
 {
 	pony->imu_const.pi		= 3.14159265358979323846264338327950288;	// pi with maximum quad-precision floating point digits as in IEEE 754-2008 (binary128)
 	pony->imu_const.rad2deg	= 180/pony->imu_const.pi;					// 180/pi
-	// Earth parameters as in Section 4 of GRS-80 by H. Moritz // Journal of Geodesy (2000) 74 (1): pp. 128–162
+	// Earth parameters as in Section 4 of GRS-80 by H. Moritz // Journal of Geodesy (2000) 74 (1): pp. 128?162
 	pony->imu_const.u		= 7.292115e-5;			// Earth rotation rate, rad/s
 	pony->imu_const.a		= 6378137.0;			// Earth ellipsoid semi-major axis, m
 	pony->imu_const.e2		= 6.6943800229e-3;		// Earth ellipsoid first eccentricity squared
