@@ -1525,11 +1525,10 @@ double pony_linal_kalman_update(double *x, double *S, double *K, double z, doubl
 			S[k] = (S[k]*d - e*f)/sdd1; // sigma = 0 not allowed
 		}
 		d = d1;
-	}
 
-	// dz
-	for (i = 0; i < m; i++)
+		// dz
 		z -= h[i]*x[i];
+	}		
 
 	// K, x
 	for (i = 0; i < m; i++) {
