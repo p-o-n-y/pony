@@ -1517,6 +1517,8 @@ double pony_linal_kalman_update(double *x, double *S, double *K, double z, doubl
 		f = S[i]*h[0];
 		for (j = 1, k = i+m-1; j <= i; j++, k += m-j)
 			f += S[k]*h[j];
+		if (f == 0)
+			continue;	// optimization for sparse matrices
 		// d
 		d1 = d + f*f;
 		sdd1 = sqrt(d*d1);
