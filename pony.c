@@ -1,4 +1,4 @@
-// Mar-2020
+// Apr-2020
 //
 // PONY core source code
 
@@ -108,7 +108,8 @@ char pony_locatecfggroup(const char* groupname, char* cfgstr, const int cfglen, 
 
 	// locate configuration substring inside a requested group
 	else {
-		for (i = 0; i < cfglen && cfgstr[i] && !group_found; i++) {
+		i = 0;
+		while (i < cfglen && cfgstr[i] && !group_found) {
 			// skip all non-printable characters, blank spaces and commas between groups
 			for (; cfgstr[i] && (cfgstr[i] <= ' ' || cfgstr[i] == ',') && i < cfglen; i++); 
 			// if a group started
@@ -144,6 +145,7 @@ char pony_locatecfggroup(const char* groupname, char* cfgstr, const int cfglen, 
 						(*grouplen)++;
 				}
 			}
+			i++;
 		}
 	}
 
@@ -206,7 +208,7 @@ void pony_init_imu_const()
 {
 	pony->imu_const.pi		= 3.14159265358979323846264338327950288;	// pi with maximum quad-precision floating point digits as in IEEE 754-2008 (binary128)
 	pony->imu_const.rad2deg	= 180/pony->imu_const.pi;					// 180/pi
-	// Earth parameters as in Section 4 of GRS-80 by H. Moritz // Journal of Geodesy (2000) 74 (1): pp. 128–162
+	// Earth parameters as in Section 4 of GRS-80 by H. Moritz // Journal of Geodesy (2000) 74 (1): pp. 128-162
 	pony->imu_const.u		= 7.292115e-5;			// Earth rotation rate, rad/s
 	pony->imu_const.a		= 6378137.0;			// Earth ellipsoid semi-major axis, m
 	pony->imu_const.e2		= 6.6943800229e-3;		// Earth ellipsoid first eccentricity squared
@@ -1355,37 +1357,54 @@ void pony_linal_qmul(double *res, double *q, double *r) {
 
 
 
-/*	// space rotation representation
+	// space rotation representation
 		// 3x3 attitude matrix R to quaternion q with q0 being scalar part
 void pony_linal_mat2quat(double *q, double *R) {
 
 	int i;
-	double sm[3], sp[3];
+	double _q4;
 
-	// absolute values
+	// absolute values squared four times
 	q[0] = 1 + R[0] + R[4] + R[8];
 	q[1] = 1 + R[0] - R[4] - R[8];
 	q[2] = 1 - R[0] + R[4] - R[8];
 	q[3] = 1 - R[0] - R[4] + R[8];
 
 	for (i = 0; i < 4; i++)
-		if (q[i] > 0)
-			q[i] = sqrt(q[i])/2;
-		else
-			q[i] = 0;
+		if (q[i] >= 1) 
+			break;
 
-	// explicit signs
-	sp[0] = R[1] + R[3];
-	sp[1] = R[7] + R[5];
-	sp[2] = R[2] + R[6];
-	sm[0] = R[7] - R[5];
-	sm[1] = R[2] - R[6];
-	sm[2] = R[3] - R[1];
-	if (sm[0]<0 || sp[0]*sm[1]<0 || sp[2]*sm[2]<0) q[1] = -q[1];
-	if (sm[1]<0 || sp[1]*sm[2]<0 || sp[0]*sm[0]<0) q[2] = -q[2];
-	if (sm[2]<0 || sp[2]*sm[0]<0 || sp[1]*sm[1]<0) q[3] = -q[3];
-
-}*/
+	q[i] = sqrt(q[i])/2;
+	_q4 = 1/(4*q[i]);
+	switch (i) {
+		case 0:
+			q[1] = (R[7]-R[5])*_q4;
+			q[2] = (R[2]-R[6])*_q4;
+			q[3] = (R[3]-R[1])*_q4;
+			break;
+		case 1:
+			q[0] = (R[7]-R[5])*_q4;
+			q[2] = (R[3]+R[1])*_q4;
+			q[3] = (R[2]+R[6])*_q4;
+			break;
+		case 2:
+			q[0] = (R[2]-R[6])*_q4;
+			q[1] = (R[3]+R[1])*_q4;
+			q[3] = (R[7]+R[5])*_q4;
+			break;
+		case 3:
+			q[0] = (R[3]-R[1])*_q4;
+			q[1] = (R[2]+R[6])*_q4;
+			q[2] = (R[7]+R[5])*_q4;
+			break;
+		default:	// invalid matrix
+			q[0] = 0;
+			q[1] = 0;
+			q[2] = 0;
+			q[3] = 0;
+			break;
+	}
+}
 
 
 
@@ -1515,6 +1534,8 @@ double pony_linal_kalman_update(double *x, double *S, double *K, double z, doubl
 		f = S[i]*h[0];
 		for (j = 1, k = i+m-1; j <= i; j++, k += m-j)
 			f += S[k]*h[j];
+		if (f == 0)
+			continue;	// optimization for sparse matrices
 		// d
 		d1 = d + f*f;
 		sdd1 = sqrt(d*d1);
@@ -1525,11 +1546,10 @@ double pony_linal_kalman_update(double *x, double *S, double *K, double z, doubl
 			S[k] = (S[k]*d - e*f)/sdd1; // sigma = 0 not allowed
 		}
 		d = d1;
-	}
 
-	// dz
-	for (i = 0; i < m; i++)
+		// dz
 		z -= h[i]*x[i];
+	}		
 
 	// K, x
 	for (i = 0; i < m; i++) {

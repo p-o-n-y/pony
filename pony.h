@@ -1,4 +1,4 @@
-// Mar-2020
+// Apr-2020
 //
 // PONY core declarations
 #define pony_bus_version 4		// current bus version
@@ -397,8 +397,8 @@ void pony_linal_mmul1T(double *res,  double *a, double *b, const int n, const in
 void pony_linal_mmul2T(double *res,  double *a, double *b, const int n, const int m, const int n1); // matrix multiplication with the second argument transposed res = a*b^T, a is n x m, b is n1 x m, res is n x n1
 void pony_linal_qmul(double *res, double *q, double *r); // quaternion multiplication for 4x1 quaternions res = q x r, with res0, q0, r0 being scalar parts
 
-/*	// space rotation representation
-void pony_linal_mat2quat(double *q, double *R); // 3x3 attitude matrix R to quaternion q with q0 being scalar part */
+	// space rotation representation
+void pony_linal_mat2quat(double *q, double *R); // 3x3 attitude matrix R to quaternion q with q0 being scalar part 
 
 	// routines for m x m upper-triangular matrices U lined up in a single-dimension array u
 		// index conversion
