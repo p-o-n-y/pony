@@ -399,6 +399,7 @@ void pony_linal_qmul(double *res, double *q, double *r); // quaternion multiplic
 
 	// space rotation representation
 void pony_linal_mat2quat(double *q, double *R); // 3x3 attitude matrix R to quaternion q with q0 being scalar part 
+void pony_linal_quat2mat(double *R, double *q); // attitude quaternion q (with q0 being scalar part) to a 3x3 matrix R
 
 	// routines for m x m upper-triangular matrices U lined up in a single-dimension array u
 		// index conversion

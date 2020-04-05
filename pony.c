@@ -1406,6 +1406,28 @@ void pony_linal_mat2quat(double *q, double *R) {
 	}
 }
 
+		// attitude quaternion q (with q0 being scalar part) to a 3x3 matrix R
+void pony_linal_quat2mat(double *R, double *q) {
+
+	double q11, q22, q33, q10, q20, q30, q12, q23, q31;
+
+	q11 = 2*q[1]*q[1];
+	q22 = 2*q[2]*q[2];
+	q33 = 2*q[3]*q[3];
+
+	q10 = 2*q[1]*q[0];
+	q20 = 2*q[2]*q[0];
+	q30 = 2*q[3]*q[0];
+
+	q12 = 2*q[1]*q[2];
+	q23 = 2*q[2]*q[3];
+	q31 = 2*q[3]*q[1];
+
+	R[0] = 1 - q22 - q33;	R[1] =     q12 - q30;	R[2] =     q31 + q20;
+	R[3] =     q12 + q30;	R[4] = 1 - q33 - q11;	R[5] =     q23 - q10;
+	R[6] =     q31 - q20;	R[7] =     q23 - q10;	R[8] = 1 - q11 - q22;	
+}
+
 
 
 
