@@ -398,8 +398,10 @@ void pony_linal_mmul2T(double *res,  double *a, double *b, const int n, const in
 void pony_linal_qmul(double *res, double *q, double *r); // quaternion multiplication for 4x1 quaternions res = q x r, with res0, q0, r0 being scalar parts
 
 	// space rotation representation
-void pony_linal_mat2quat(double *q, double *R); // 3x3 attitude matrix R to quaternion q with q0 being scalar part 
-void pony_linal_quat2mat(double *R, double *q); // attitude quaternion q (with q0 being scalar part) to a 3x3 matrix R
+void pony_linal_mat2quat(double *q, double *R);  // 3x3 attitude matrix R to quaternion q with q0 being scalar part 
+void pony_linal_quat2mat(double *R, double *q);  // attitude quaternion q (with q0 being scalar part) to a 3x3 matrix R
+void pony_linal_rpy2mat(double *R, double *rpy); // roll, pitch and yaw (radians, airborne frame: X longitudinal, Z right-wing) to a 3x3 transition matrix R from E-N-U
+void pony_linal_mat2rpy(double *rpy, double *R); // 3x3 transition matrix R from E-N-U to roll, pitch and yaw (radians, airborne frame: X longitudinal, Z right-wing)
 
 	// routines for m x m upper-triangular matrices U lined up in a single-dimension array u
 		// index conversion

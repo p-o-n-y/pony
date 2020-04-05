@@ -1428,6 +1428,65 @@ void pony_linal_quat2mat(double *R, double *q) {
 	R[6] =     q31 - q20;	R[7] =     q23 - q10;	R[8] = 1 - q11 - q22;	
 }
 
+		// roll, pitch and yaw (radians, airborne frame: X longitudinal, Z right-wing) to a 3x3 transition matrix R from E-N-U
+void pony_linal_rpy2mat(double *R, double *rpy) {
+
+	double sr, cr, sp, cp, sy, cy;
+
+	sr = sin(rpy[0]);	cr = cos(rpy[0]);
+	sp = sin(rpy[1]);	cp = cos(rpy[1]);
+	sy = sin(rpy[2]);	cy = cos(rpy[2]);
+
+	R[0] =     cp*sy        ;	R[1] =     cp*cy        ;	R[2] =     sp;
+	R[3] = -cr*sp*sy + cy*sr;	R[4] = -cr*sp*cy - sy*sr;	R[5] =  cr*cp;
+	R[6] =  sr*sp*sy + cy*cr;	R[7] =  sr*sp*cy - sy*cr;	R[8] = -sr*cp;
+
+}
+
+		// 3x3 transition matrix R from E-N-U to roll, pitch and yaw (radians, airborne frame: X longitudinal, Z right-wing)
+void pony_linal_mat2rpy(double *rpy, double *R) {
+	
+	const double pi2 = 6.283185307179586;
+	double dp, dm;
+
+	dp = atan2( R[3]-R[7],R[6]+R[4]);
+	dm = atan2(-R[3]-R[7],R[6]-R[4]);
+
+	if (
+		R[0]>=0 && R[8]<=0 && 
+		(  R[1]>=0 && R[5]< 0 && dp<=0
+		|| R[1]< 0 && R[5]>=0 && dp<=0 
+		|| R[1]< 0 && R[5]< 0         )
+		)
+		dp += pi2;
+	else if (
+		R[0]< 0 && R[8]> 0 && 
+		(  R[1]>=0 && R[5]< 0 && dp>=0
+		|| R[1]< 0 && R[5]>=0 && dp>=0 
+		|| R[1]< 0 && R[5]< 0         )
+		)
+		dp -= pi2;
+
+	if (
+		R[0]>=0 && R[8]> 0 && 
+		(  R[1]>=0 && R[5]< 0 && dm<=0
+		|| R[1]< 0 && R[5]>=0 && dm<=0 
+		|| R[1]< 0 && R[5]< 0         )
+		)
+		dm += pi2;
+	else if (
+		R[0]< 0 && R[8]<=0 && 
+		(  R[1]>=0 && R[5]< 0 && dm>=0
+		|| R[1]< 0 && R[5]>=0 && dm>=0 
+		|| R[1]< 0 && R[5]< 0         )
+		)
+		dm -= pi2;
+
+	rpy[0] = (dp - dm)/2;
+	rpy[1] =  asin(R[2]);
+	rpy[2] = (dp + dm)/2;
+}
+
 
 
 
