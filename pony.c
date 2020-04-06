@@ -1378,24 +1378,24 @@ void pony_linal_mat2quat(double *q, double *R) {
 	_q4 = 1/(4*q[i]);
 	switch (i) {
 		case 0:
-			q[1] = (R[7]-R[5])*_q4;
-			q[2] = (R[2]-R[6])*_q4;
-			q[3] = (R[3]-R[1])*_q4;
+			q[1] = (R[5]-R[7])*_q4;
+			q[2] = (R[6]-R[2])*_q4;
+			q[3] = (R[1]-R[3])*_q4;
 			break;
 		case 1:
-			q[0] = (R[7]-R[5])*_q4;
-			q[2] = (R[3]+R[1])*_q4;
-			q[3] = (R[2]+R[6])*_q4;
+			q[0] = (R[5]-R[7])*_q4;
+			q[2] = (R[1]+R[3])*_q4;
+			q[3] = (R[6]+R[2])*_q4;
 			break;
 		case 2:
-			q[0] = (R[2]-R[6])*_q4;
-			q[1] = (R[3]+R[1])*_q4;
-			q[3] = (R[7]+R[5])*_q4;
+			q[0] = (R[6]-R[2])*_q4;
+			q[1] = (R[1]+R[3])*_q4;
+			q[3] = (R[5]+R[7])*_q4;
 			break;
 		case 3:
-			q[0] = (R[3]-R[1])*_q4;
-			q[1] = (R[2]+R[6])*_q4;
-			q[2] = (R[7]+R[5])*_q4;
+			q[0] = (R[1]-R[3])*_q4;
+			q[1] = (R[6]+R[2])*_q4;
+			q[2] = (R[5]+R[7])*_q4;
 			break;
 		default:	// invalid matrix
 			q[0] = 0;
@@ -1423,9 +1423,9 @@ void pony_linal_quat2mat(double *R, double *q) {
 	q23 = 2*q[2]*q[3];
 	q31 = 2*q[3]*q[1];
 
-	R[0] = 1 - q22 - q33;	R[1] =     q12 - q30;	R[2] =     q31 + q20;
-	R[3] =     q12 + q30;	R[4] = 1 - q33 - q11;	R[5] =     q23 - q10;
-	R[6] =     q31 - q20;	R[7] =     q23 - q10;	R[8] = 1 - q11 - q22;	
+	R[0] = 1 - q22 - q33;	R[1] =     q12 + q30;	R[2] =     q31 - q20;
+	R[3] =     q12 - q30;	R[4] = 1 - q33 - q11;	R[5] =     q23 + q10;
+	R[6] =     q31 + q20;	R[7] =     q23 - q10;	R[8] = 1 - q11 - q22;	
 }
 
 		// roll, pitch and yaw (radians, airborne frame: X longitudinal, Z right-wing) to a 3x3 transition matrix R from E-N-U
