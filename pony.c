@@ -2,8 +2,6 @@
 //
 // PONY core source code
 
-#include"stdafx.h"
-
 #include <stdlib.h>
 #include <math.h>
 
