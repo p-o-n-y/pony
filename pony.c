@@ -2,6 +2,8 @@
 //
 // PONY core source code
 
+#include"stdafx.h"
+
 #include <stdlib.h>
 #include <math.h>
 
@@ -145,7 +147,11 @@ char pony_locatecfggroup(const char* groupname, char* cfgstr, const int cfglen, 
 						(*grouplen)++;
 				}
 			}
-			i++;
+			// skip characters outside groups (common part for those groups)
+			else
+			{
+				i++;
+			}
 		}
 	}
 
