@@ -173,10 +173,16 @@ void pony_init_epoch(pony_time_epoch *epoch)
 
 
 
-// initialize solution
-void pony_init_solution(pony_sol *sol)
+// solution data handling
+	// initialize structure
+char pony_init_sol(pony_sol *sol, char *settings, const int len)
 {
+	const int default_metrics_count = 2;	// default number of metrics in solution structures
+
+	const char metrics_count_token[] = "metrics_count"; // token to look for in settings
+
 	int i;
+	char *cfgptr;
 
 	// pos & vel
 	for (i = 0; i < 3; i++) {
@@ -200,7 +206,34 @@ void pony_init_solution(pony_sol *sol)
 	// clock
 	sol->dt			= 0;
 	sol->dt_valid	= 0;
+	// metrics
+	sol->metrics_count = default_metrics_count;
+	cfgptr = pony_locate_token(metrics_count_token, settings, len, '='); // try to find number of metrics in settings string
+	if (cfgptr != NULL)	// if token found
+		sol->metrics_count = atoi(cfgptr); // parse the number
+	if (sol->metrics_count < 0) // if the number parsed is invalid
+		sol->metrics_count = default_metrics_count;
+	if (sol->metrics_count == 0)	// if no metrics required
+		sol->metrics = NULL;
+	else {	// if nonzero number of metrics requested
+		sol->metrics = (double *)calloc( sol->metrics_count, sizeof(double) );
+		if (sol->metrics == NULL) {
+			sol->metrics_count = 0;
+			return 0;
+		}
+	}
 
+	return 1;
+
+}
+
+	// free solution data memory
+void pony_free_sol(pony_sol *sol)
+{
+	if (sol->metrics == NULL)
+		return;
+	free(sol->metrics);
+	sol->metrics = NULL;
 }
 
 
@@ -240,7 +273,8 @@ char pony_init_imu(pony_imu *imu)
 	imu->g[1] = 0;
 	imu->g[2] = -pony->imu_const.ge*(1 + pony->imu_const.fg/2); // middle value
 	// drop the solution
-	pony_init_solution( &(imu->sol) );
+	if ( !pony_init_sol(&(imu->sol), imu->cfg, imu->cfglength) )
+		return 0;
 
 	return 1;
 }
@@ -250,6 +284,7 @@ void pony_free_imu(void)
 {
 	if (pony->imu == NULL)
 		return;
+	pony_free_sol( &(pony->imu->sol) );
 	free(pony->imu);
 	pony->imu = NULL;
 }
@@ -721,7 +756,7 @@ char pony_init_gnss(pony_gnss *gnss)
 	pony_init_gnss_settings(gnss);
 
 	// gnss solution
-	pony_init_solution( &(gnss->sol) );
+	pony_init_sol(&(gnss->sol), gnss->cfg_settings, gnss->settings_length);
 
 	// gnss epoch
 	pony_init_epoch( &(gnss->epoch) );
@@ -746,6 +781,8 @@ void pony_free_gnss(pony_gnss *gnss)
 
 	pony_free_gnss_glo(gnss->glo);
 	gnss->glo = NULL;
+
+	pony_free_sol( &(gnss->sol) );
 }
 
 
@@ -782,6 +819,8 @@ void pony_free()
 	}
 	pony->gnss_count = 0;
 
+	// solution
+	pony_free_sol( &(pony->sol) );
 }
 
 
@@ -840,13 +879,13 @@ char pony_add_plugin( void(*newplugin)(void) )
 		//		0 - not OK (memory allocation or partial init failed)
 char pony_init(char* cfg)
 {
-	const int max_gnss_count = 10;
+	const int max_gnss_count = 10;		// maximum number of gnss receiver data structures
 	
 	char multi_gnss_token[] = "gnss[0]:";
 	const int multi_gnss_index_position = 5;
 
 	int grouplen;
-	char* groupptr;
+	char* cfgptr;
 
 	pony_gnss *reallocated_pointer;
 
@@ -871,7 +910,7 @@ char pony_init(char* cfg)
 	// imu init
 	pony_init_imu_const();
 	pony->imu = NULL;
-	if ( pony_locatecfggroup("imu:", pony->cfg, pony->cfglength, &groupptr, &grouplen) ) // if the group found in configuration
+	if ( pony_locatecfggroup("imu:", pony->cfg, pony->cfglength, &cfgptr, &grouplen) ) // if the group found in configuration
 	{
 		// try to allocate memory
 		pony->imu = (pony_imu*)calloc( 1, sizeof(pony_imu) );
@@ -881,7 +920,7 @@ char pony_init(char* cfg)
 		}
 
 		// set configuration pointer
-		pony->imu->cfg = groupptr;
+		pony->imu->cfg = cfgptr;
 		pony->imu->cfglength = grouplen;
 
 		// try to init
@@ -900,8 +939,8 @@ char pony_init(char* cfg)
 	{
 		multi_gnss_token[multi_gnss_index_position] = '0' + (char)i;
 
-		if ( (i == 0 && pony_locatecfggroup("gnss:", pony->cfg, pony->cfglength, &groupptr, &grouplen) ) ||
-			pony_locatecfggroup(multi_gnss_token, pony->cfg, pony->cfglength, &groupptr, &grouplen) ) {
+		if ( (i == 0 && pony_locatecfggroup("gnss:", pony->cfg, pony->cfglength, &cfgptr, &grouplen) ) ||
+			pony_locatecfggroup(multi_gnss_token, pony->cfg, pony->cfglength, &cfgptr, &grouplen) ) {
 			if (i >= pony->gnss_count) {
 				// try to allocate/reallocate memory
 				reallocated_pointer = (pony_gnss*)realloc(pony->gnss, sizeof(pony_gnss)*(i+1));
@@ -921,7 +960,7 @@ char pony_init(char* cfg)
 			}
 
 			// set configuration pointer
-			pony->gnss[i].cfg = groupptr;
+			pony->gnss[i].cfg = cfgptr;
 			pony->gnss[i].cfglength = grouplen;
 
 			// try to init
@@ -932,11 +971,15 @@ char pony_init(char* cfg)
 		}
 	}
 
-	// system time, operation mode and solution
+	// solution
+	if ( !pony_init_sol(&(pony->sol), pony->cfg_settings, pony->settings_length) ) {
+		pony_free();
+		return 0;
+	}
+
+	// system time, operation mode
 	pony->t = 0;
-	pony->mode = 0;
-	pony_init_solution( &(pony->sol) );
-	
+	pony->mode = 0;	
 	return 1;
 }
 
@@ -966,8 +1009,7 @@ char pony_step(void)
 		if (pony->core.exit_plugin_id == i)	// if termination was initiated by the current plugin on the previous loop
 		{
 			pony->core.exit_plugin_id = -1;		// set to default
-			pony->core.host_termination = 0;		// set to default
-			pony_init_solution(&(pony->sol));	// drop the solution
+			pony->core.host_termination = 0;	// set to default
 			pony_free();						// free memory
 			break;
 		}

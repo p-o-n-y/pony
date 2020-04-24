@@ -40,6 +40,8 @@ typedef struct			// navigation solution structure
 	double dt;			// clock bias
 	char dt_valid;		// validity flag (0/1)
 
+	double *metrics;	// user-defined solution metrics
+	int metrics_count;	// number of user-defined metrics, 2 by default
 } pony_sol;
 
 
