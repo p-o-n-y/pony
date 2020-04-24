@@ -19,14 +19,14 @@ typedef struct			// navigation solution structure
 {
 	double x[3];		// cartesian coordinates, meters
 	char x_valid;		// validity flag (0/1)
-	double x_cov;		// coordinate RMS deviation estimate, meters
+	double x_std;		// coordinate RMS ("standard") deviation estimate, meters
 	
 	double llh[3];		// geodetic coordinates: longitude (rad), latitude (rad), height (meters)
 	char llh_valid;		// validity flag (0/1)
 
 	double v[3];		// relative-to-Earth velocity vector coordinates in local-level geodetic or cartesian frame, meters per second
 	char v_valid;		// validity flag (0/1)
-	double v_cov;		// velocity RMS deviation estimate, meters per second
+	double v_std;		// velocity RMS ("standard") deviation estimate, meters per second
 
 	double q[4];		// attitude quaternion, relative to local-level or cartesian frame
 	char q_valid;		// validity flag (0/1)
@@ -39,6 +39,7 @@ typedef struct			// navigation solution structure
 
 	double dt;			// clock bias
 	char dt_valid;		// validity flag (0/1)
+
 } pony_sol;
 
 
