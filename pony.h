@@ -1,7 +1,7 @@
 // Apr-2020
 //
 // PONY core declarations
-#define pony_bus_version 4		// current bus version
+#define pony_bus_version 5		// current bus version
 
 // TIME EPOCH
 typedef struct 		// Julian-type time epoch
@@ -18,27 +18,27 @@ typedef struct 		// Julian-type time epoch
 typedef struct			// navigation solution structure
 {
 	double x[3];		// cartesian coordinates, meters
-	char x_valid;		// validity flag (0/1)
+	char x_valid;		// validity flag (0/1), or a number of valid measurements used
 	double x_std;		// coordinate RMS ("standard") deviation estimate, meters
 	
 	double llh[3];		// geodetic coordinates: longitude (rad), latitude (rad), height (meters)
-	char llh_valid;		// validity flag (0/1)
+	char llh_valid;		// validity flag (0/1), or a number of valid measurements used
 
 	double v[3];		// relative-to-Earth velocity vector coordinates in local-level geodetic or cartesian frame, meters per second
-	char v_valid;		// validity flag (0/1)
+	char v_valid;		// validity flag (0/1), or a number of valid measurements used
 	double v_std;		// velocity RMS ("standard") deviation estimate, meters per second
 
 	double q[4];		// attitude quaternion, relative to local-level or cartesian frame
-	char q_valid;		// validity flag (0/1)
+	char q_valid;		// validity flag (0/1), or a number of valid measurements used
 
 	double L[9];		// attitude matrix for the transition from local-level or cartesian frame, row-wise: L[0] = L_11, L[1] = L_12, ..., L[8] = L[33]
-	char L_valid;		// validity flag (0/1)
+	char L_valid;		// validity flag (0/1), or a number of valid measurements used
 
 	double rpy[3];		// attitude angles relative to local-level frame: roll (rad), pitch (rad), yaw = true heading (rad)
-	char rpy_valid;		// validity flag (0/1)
+	char rpy_valid;		// validity flag (0/1), or a number of valid measurements used
 
 	double dt;			// clock bias
-	char dt_valid;		// validity flag (0/1)
+	char dt_valid;		// validity flag (0/1), or a number of valid measurements used
 
 	double *metrics;	// user-defined solution metrics
 	int metrics_count;	// number of user-defined metrics, 2 by default
@@ -71,16 +71,16 @@ typedef struct		// inertial measurement unit
 	double t;		// time of measurement update
 
 	double w[3];	// up to 3 gyroscope measurements
-	char w_valid;	// validity flag (0/1)
+	char w_valid;	// validity flag (0/1), or a number of valid components
 
 	double f[3];	// up to 3 accelerometer measurements
-	char f_valid;	// validity flag (0/1)
+	char f_valid;	// validity flag (0/1), or a number of valid components
 
 	double W[3];	// angular velocity of the local level reference frame
-	char W_valid;	// validity flag (0/1)
+	char W_valid;	// validity flag (0/1), or a number of valid components
 
 	double g[3];	// current gravity acceleration vector
-	char g_valid;	// validity flag (0/1)
+	char g_valid;	// validity flag (0/1), or a number of valid components
 
 	pony_sol sol;	// inertial solution
 } pony_imu;
@@ -297,11 +297,10 @@ typedef struct						// global navigation satellite systems data
 	pony_gnss_bds* bds;				// BeiDou constellation data pointer
 
 	pony_time_epoch epoch;			// current GNSS time epoch
-	int leap_sec;					// current number of leap seconds (for UTC by default, but may also be used for BDS leap second for BDS-only processing)
+	int  leap_sec;					// current number of leap seconds (for UTC by default, but may also be used for BDS leap second for BDS-only processing)
 	char leap_sec_valid;			// validity flag (0/1)
 
 	pony_sol sol;					// current GNSS solution
-	int obs_count;					// total observations used in solution
 } pony_gnss;
 
 
