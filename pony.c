@@ -35,7 +35,7 @@ pony_struct pony_bus = {
 	pony_reschedule_plugin,		// reschedule_plugin
 	pony_suspend_plugin,		// suspend plugin
 	pony_resume_plugin,			// resume plugin
-	{ NULL, 0, 0, -1, 0 } };		// core.plugins, core.plugin_count, core.exit_plugin_id, core.host_termination
+	{ NULL, 0, 0, SIZE_MAX, 0 } };		// core.plugins, core.plugin_count, core.exit_plugin_id, core.host_termination
 
 pony_struct *pony = &pony_bus;
 
@@ -50,8 +50,8 @@ pony_struct *pony = &pony_bus;
 	// char* groupname	-	group identifier (see documentation)
 	//						or 
 	//						empty string to locate a substring that is outside of any group
-	// char* cfgstr	-	configuration string to parse
-	// int cfglen		-	number of characters in cfgstr to parse
+	// char* cfgstr		-	configuration string to parse
+	// size_t cfglen	-	number of characters in cfgstr to parse
 	//
 	// output:
 	// char** groupptr	-	reference to a pointer to the starting character of the group contents within a configuration string
@@ -64,9 +64,9 @@ pony_struct *pony = &pony_bus;
 	// groupname = "gnss:"
 	// cfgstr = "{gnss: {gps: eph_in="gpsa.nav", obs_in="gpsa.obs"}}, out="sol.txt""
 	// cfglen = 66
-char pony_locatecfggroup(const char* groupname, char* cfgstr, const int cfglen, char** groupptr, int* grouplen)
+char pony_locatecfggroup(const char* groupname, char* cfgstr, const size_t cfglen, char** groupptr, size_t* grouplen)
 {
-	int i, j;
+	size_t i, j;
 	int group_layer;
 	char group_found = 0;
 
@@ -80,14 +80,14 @@ char pony_locatecfggroup(const char* groupname, char* cfgstr, const int cfglen, 
 	if (groupname[0] == '\0') {
 		for (i = 0; i < cfglen && cfgstr[i]; i++) {
 			// skip all non-printable characters, blank spaces and commas between groups
-			for (; cfgstr[i] && (cfgstr[i] <= ' ' || cfgstr[i] == ',') && i < cfglen; i++); 
+			for (; i < cfglen && cfgstr[i] && (cfgstr[i] <= ' ' || cfgstr[i] == ','); i++); 
 			// if no group started at this point
 			if (cfgstr[i] != '{')
 				break;
 			// if a group started
 			else {
 				group_layer = 1;
-				while (group_layer > 0 && cfgstr[i] && i < cfglen) {
+				while (i < cfglen && group_layer > 0 && cfgstr[i]) {
 					i++;
 					if (cfgstr[i] == '{')
 						group_layer++;
@@ -111,12 +111,12 @@ char pony_locatecfggroup(const char* groupname, char* cfgstr, const int cfglen, 
 		i = 0;
 		while (i < cfglen && cfgstr[i] && !group_found) {
 			// skip all non-printable characters, blank spaces and commas between groups
-			for (; cfgstr[i] && (cfgstr[i] <= ' ' || cfgstr[i] == ',') && i < cfglen; i++); 
+			for (; i < cfglen && cfgstr[i] && (cfgstr[i] <= ' ' || cfgstr[i] == ','); i++); 
 			// if a group started
 			if (cfgstr[i] == '{') {
 				group_layer = 1;
 				// skip all non-printable characters and blank spaces at the beginning of the group
-				for (i++; cfgstr[i] && (cfgstr[i] <= ' ') && i < cfglen; i++); 
+				for (i++; i < cfglen && cfgstr[i] && (cfgstr[i] <= ' '); i++); 
 
 				// check if the group is the one that has been requested
 				group_found = 1;
@@ -134,7 +134,7 @@ char pony_locatecfggroup(const char* groupname, char* cfgstr, const int cfglen, 
 					*groupptr = cfgstr + i;
 
 				// go through the rest of the group
-				while (group_layer > 0 && cfgstr[i] && i < cfglen) {
+				while (i < cfglen && group_layer > 0 && cfgstr[i]) {
 					if (cfgstr[i] == '{')
 						group_layer++;
 					if (cfgstr[i] == '}')
@@ -175,13 +175,13 @@ void pony_init_epoch(pony_time_epoch *epoch)
 
 // solution data handling
 	// initialize structure
-char pony_init_sol(pony_sol *sol, char *settings, const int len)
+char pony_init_sol(pony_sol *sol, char *settings, const size_t len)
 {
-	const int default_metrics_count = 2;	// default number of metrics in solution structures
+	const size_t default_metrics_count = 2;	// default number of metrics in solution structures
 
 	const char metrics_count_token[] = "metrics_count"; // token to look for in settings
 
-	int i;
+	size_t i;
 	char *cfgptr;
 
 	// pos & vel
@@ -256,7 +256,7 @@ void pony_init_imu_const()
 	// initialize imu structure
 char pony_init_imu(pony_imu *imu)
 {
-	int i;
+	size_t i;
 
 	// validity flags
 	imu->w_valid = 0;
@@ -296,7 +296,7 @@ void pony_free_imu(void)
 	// initialize gnss settings
 char pony_init_gnss_settings(pony_gnss *gnss)
 {
-	int i;
+	size_t i;
 
 	pony_locatecfggroup( "", gnss->cfg, gnss->cfglength, &(gnss->cfg_settings), &(gnss->settings_length) );
 
@@ -326,9 +326,9 @@ void pony_init_gnss_gps_const(pony_gps_const *gps_const)
 }
 
 	// initialize gnss gps structure
-char pony_init_gnss_gps(pony_gnss_gps *gps, const int max_sat_count, const int max_eph_count)
+char pony_init_gnss_gps(pony_gnss_gps *gps, const size_t max_sat_count, const size_t max_eph_count)
 {
-	int i;
+	size_t i;
 
 	gps->sat = NULL;
 	gps->max_sat_count = 0;
@@ -374,7 +374,7 @@ char pony_init_gnss_gps(pony_gnss_gps *gps, const int max_sat_count, const int m
 	// free gnss gps memory
 void pony_free_gnss_gps(pony_gnss_gps *gps)
 {
-	int i;
+	size_t i;
 
 	if (gps == NULL)
 		return;
@@ -413,9 +413,9 @@ void pony_init_gnss_glo_const(pony_glo_const *glo_const)
 }
 
 	// initialize gnss glonass structure
-char pony_init_gnss_glo(pony_gnss_glo *glo, const int max_sat_count, const int max_eph_count)
+char pony_init_gnss_glo(pony_gnss_glo *glo, const size_t max_sat_count, const size_t max_eph_count)
 {
-	int i;
+	size_t i;
 
 	glo->sat = NULL;
 	glo->freq_slot = NULL;
@@ -459,7 +459,7 @@ char pony_init_gnss_glo(pony_gnss_glo *glo, const int max_sat_count, const int m
 	// free gnss glonass memory
 void pony_free_gnss_glo(pony_gnss_glo *glo)
 {
-	int i;
+	size_t i;
 
 	if (glo == NULL)
 		return;
@@ -506,9 +506,9 @@ void pony_init_gnss_gal_const(pony_gal_const *gal_const)
 }
 
 	// initialize gnss galileo structure
-char pony_init_gnss_gal(pony_gnss_gal *gal, const int max_sat_count, const int max_eph_count)
+char pony_init_gnss_gal(pony_gnss_gal *gal, const size_t max_sat_count, const size_t max_eph_count)
 {
-	int i;
+	size_t i;
 
 	gal->sat = NULL;
 	gal->max_sat_count = 0;
@@ -554,7 +554,7 @@ char pony_init_gnss_gal(pony_gnss_gal *gal, const int max_sat_count, const int m
 	// free gnss galileo memory
 void pony_free_gnss_gal(pony_gnss_gal *gal)
 {
-	int i;
+	size_t i;
 
 	if (gal == NULL)
 		return;
@@ -594,9 +594,9 @@ void pony_init_gnss_bds_const(pony_bds_const *bds_const)
 }
 
 	// initialize gnss beidou structure
-char pony_init_gnss_bds(pony_gnss_bds *bds, const int max_sat_count, const int max_eph_count)
+char pony_init_gnss_bds(pony_gnss_bds *bds, const size_t max_sat_count, const size_t max_eph_count)
 {
-	int i;
+	size_t i;
 
 	bds->sat = NULL;
 	bds->max_sat_count = 0;
@@ -642,7 +642,7 @@ char pony_init_gnss_bds(pony_gnss_bds *bds, const int max_sat_count, const int m
 	// free gnss beidou memory
 void pony_free_gnss_bds(pony_gnss_bds *bds)
 {
-	int i;
+	size_t i;
 
 	if (bds == NULL)
 		return;
@@ -686,11 +686,11 @@ void pony_init_gnss_const()
 char pony_init_gnss(pony_gnss *gnss)
 {
 	// memory allocation limitations
-	enum		system_id				{gps,	glo,	gal,	bds	};
-	const int	max_sat_count[] =		{36,	36,		36,		64	},
-				max_eph_count[] =		{36,	24,		36,		36	};
+	enum			system_id				{gps,	glo,	gal,	bds	};
+	const size_t	max_sat_count[] =		{36,	36,		36,		64	},
+					max_eph_count[] =		{36,	24,		36,		36	};
 
-	int grouplen;
+	size_t grouplen;
 	char* groupptr;
 
 	if (gnss == NULL)
@@ -792,7 +792,7 @@ void pony_free_gnss(pony_gnss *gnss)
 	// free all alocated memory and set pointers and counters to NULL
 void pony_free()
 {
-	int i;
+	size_t i;
 
 	// core
 	if (pony->core.plugins != NULL)
@@ -846,10 +846,13 @@ void pony_free()
 		//		newplugin - pointer to plugin function (no arguments, no return value)
 		//	output: 
 		//		1 - OK
-		//		0 - not OK (failed to allocate/realocate memory)
+		//		0 - not OK (failed to allocate/realocate memory, plugin limit reached)
 char pony_add_plugin( void(*newplugin)(void) )
 {
 	pony_plugin *reallocated_pointer;
+
+	if (pony->core.plugin_count + 1 >= SIZE_MAX)
+		return 0;
 
 	reallocated_pointer = (pony_plugin *)realloc( (void *)(pony->core.plugins), (pony->core.plugin_count + 1) * sizeof(pony_plugin) );
 
@@ -879,17 +882,17 @@ char pony_add_plugin( void(*newplugin)(void) )
 		//		0 - not OK (memory allocation or partial init failed)
 char pony_init(char* cfg)
 {
-	const int max_gnss_count = 10;		// maximum number of gnss receiver data structures
+	const size_t max_gnss_count = 10;		// maximum number of gnss receiver data structures
 	
 	char multi_gnss_token[] = "gnss[0]:";
-	const int multi_gnss_index_position = 5;
+	const size_t multi_gnss_index_position = 5;
 
-	int grouplen;
+	size_t grouplen;
 	char* cfgptr;
 
 	pony_gnss *reallocated_pointer;
 
-	int i;
+	size_t i;
 
 	// determine configuration string length
 	for (pony->cfglength = 0; cfg[pony->cfglength]; pony->cfglength++);
@@ -991,7 +994,7 @@ char pony_init(char* cfg)
 		//		0 - not OK (otherwise)
 char pony_step(void)
 {
-	int i;
+	size_t i;
 
 	// loop through plugin execution list
 	for (pony->core.current_plugin_id = 0; pony->core.current_plugin_id < pony->core.plugin_count; pony->core.current_plugin_id++)
@@ -1008,13 +1011,13 @@ char pony_step(void)
 
 		if (pony->core.exit_plugin_id == i)	// if termination was initiated by the current plugin on the previous loop
 		{
-			pony->core.exit_plugin_id = -1;		// set to default
+			pony->core.exit_plugin_id = SIZE_MAX;		// set to default
 			pony->core.host_termination = 0;	// set to default
 			pony_free();						// free memory
 			break;
 		}
 
-		if ((pony->mode < 0 || pony->core.host_termination == 1) && pony->core.exit_plugin_id == -1)	// if termination was initiated by the current plugin on the current loop
+		if ((pony->mode < 0 || pony->core.host_termination == 1) && pony->core.exit_plugin_id == SIZE_MAX)	// if termination was initiated by the current plugin on the current loop
 		{
 			if (pony->mode > 0)
 				pony->mode = -1;					// set mode to -1 for external termination cases
@@ -1029,7 +1032,7 @@ char pony_step(void)
 		pony->mode = 1;		// set operation mode to regular
 
 							// success if either staying in regular operation mode, or a termination properly detected
-	return (pony->mode >= 0) || (pony->core.exit_plugin_id >= 0);
+	return (pony->mode >= 0) || (pony->core.exit_plugin_id < SIZE_MAX);
 }
 
 
@@ -1060,7 +1063,7 @@ char pony_terminate(void)
 		//		 0 - no instances found, or memory reallocation somehow failed
 char pony_remove_plugin(void(*plugin)(void))
 {
-	int i, j;
+	size_t i, j;
 	char flag = 0;
 
 	for (i = 0; i < pony->core.plugin_count; i++) { // go through the execution list
@@ -1100,7 +1103,7 @@ char pony_remove_plugin(void(*plugin)(void))
 char pony_replace_plugin(void(*oldplugin)(void), void(*newplugin)(void)) 
 {
 
-	int i;
+	size_t i;
 	char flag = 0;
 
 	for (i = 0; i < pony->core.plugin_count; i++) {
@@ -1163,7 +1166,8 @@ char pony_schedule_plugin(void(*newplugin)(void), int cycle, int shift)
 		//		0 - not OK (plugin not found in the execution list)
 char pony_reschedule_plugin(void(*plugin)(void), int cycle, int shift)
 {
-	int i, abs_cycle;
+	size_t i;
+	int abs_cycle;
 	char flag = 0;
 	// shrink shift to [0..cycle-1]
 	abs_cycle = abs(cycle);
@@ -1196,7 +1200,8 @@ char pony_reschedule_plugin(void(*plugin)(void), int cycle, int shift)
 		//		0 - not OK (plugin not found)
 char pony_suspend_plugin(void(*   plugin)(void))
 {
-	int i, cycle;
+	size_t i;
+	int cycle;
 	char flag = 0;
 	// go through execution list and set cycle to negative, if found the plugin
 	for (i = 0; i < pony->core.plugin_count; i++) 
@@ -1219,7 +1224,8 @@ char pony_suspend_plugin(void(*   plugin)(void))
 		//		0 - not OK (plugin not found)
 char pony_resume_plugin(void(*   plugin)(void))
 {
-	int i, cycle;
+	size_t i;
+	int cycle;
 	char flag = 0;
 	// go through execution list and set cycle to positive, if found the plugin
 	for (i = 0; i < pony->core.plugin_count; i++) 
@@ -1254,11 +1260,12 @@ char pony_resume_plugin(void(*   plugin)(void))
 	//	output:
 	//		NULL - if the token or delimiter (if delim != 0) not found, or token is invalid
 	//		pointer to the next character after the token or delimiter (if delim != 0)
-char * pony_locate_token(const char *token, char *src, const int len, const char delim) {
+char * pony_locate_token(const char *token, char *src, const size_t len, const char delim) {
 
 	const char quote = '"', brace_open = '{', brace_close = '}';
 
-	int i, j, k, n, len1;
+	size_t i, j, k, n; 
+	ptrdiff_t len1;
 
 	for (n = 0; token[n]; n++); // determine token length
 	if (n == 0) // invalid token
@@ -1266,11 +1273,11 @@ char * pony_locate_token(const char *token, char *src, const int len, const char
 	len1 = len - n;
 
 	// look for the token
-	for (i = 0, j = 0, k = 0; i < len1 && src[i]; i++) // go throughout the string
+	for (i = 0, j = 0, k = 0; (ptrdiff_t)i < len1 && src[i]; i++) // go throughout the string
 		if (src[i] == quote) // skip quoted values
-			for (i++; src[i] && i < len1 && src[i] != quote; i++);
+			for (i++; (ptrdiff_t)i < len1 && src[i] && src[i] != quote; i++);
 		else if (src[i] == brace_open) // skip groups
-			for (i++; src[i] && i < len1 && src[i] != brace_close; i++);
+			for (i++; (ptrdiff_t)i < len1 && src[i] && src[i] != brace_close; i++);
 		else {
 			for (j = 0, k = i; j < n && src[k] == token[j]; j++, k++); 
 			if (j == n) // token found
@@ -1328,9 +1335,9 @@ int pony_time_days_between_dates(pony_time_epoch epoch_from, pony_time_epoch epo
 // linear algebra functions
 	// conventional operations
 		// dot product
-double pony_linal_dot(double *u, double *v, const int m) {
+double pony_linal_dot(double *u, double *v, const size_t m) {
 	double res;
-	int i;
+	size_t i;
 
 	for (i = 1, res = u[0]*v[0]; i < m; i++)
 		res += u[i]*v[i];
@@ -1339,7 +1346,7 @@ double pony_linal_dot(double *u, double *v, const int m) {
 }
 
 		// l2 vector norm, i.e. sqrt(u^T*u)
-double pony_linal_vnorm(double *u, const int m) {
+double pony_linal_vnorm(double *u, const size_t m) {
 	return sqrt(pony_linal_dot(u, u, m));
 }
 
@@ -1351,8 +1358,8 @@ void pony_linal_cross3x1(double *res, double *u, double *v) {
 }
 
 		// matrix multiplication res = a*b, a is n x n1, b is n1 x m, res is n x m
-void pony_linal_mmul(double *res,  double *a, double *b, const int n, const int n1, const int m) {
-	int i, j, k, k0, ka, kb, p;
+void pony_linal_mmul(double *res,  double *a, double *b, const size_t n, const size_t n1, const size_t m) {
+	size_t i, j, k, k0, ka, kb, p;
 
 	for (i = 0, k = 0, k0 = 0; i < n; i++, k0 += n1)
 		for (j = 0; j < m; j++, k++) {
@@ -1365,8 +1372,8 @@ void pony_linal_mmul(double *res,  double *a, double *b, const int n, const int 
 }
 
 		// matrix multiplication with the first argument transposed res = a^T*b, a is n x m, b is n x n1, res is m x n1
-void pony_linal_mmul1T(double *res,  double *a, double *b, const int n, const int m, const int n1) {
-	int i, j, k, ka, kb, p;
+void pony_linal_mmul1T(double *res,  double *a, double *b, const size_t n, const size_t m, const size_t n1) {
+	size_t i, j, k, ka, kb, p;
 
 	for (i = 0, k = 0; i < m; i++)
 		for (j = 0; j < n1; j++, k++) {
@@ -1379,8 +1386,8 @@ void pony_linal_mmul1T(double *res,  double *a, double *b, const int n, const in
 }
 
 		// matrix multiplication with the second argument transposed res = a*b^T, a is n x m, b is n1 x m, res is n x n1
-void pony_linal_mmul2T(double *res,  double *a, double *b, const int n, const int m, const int n1) {
-	int i, j, k, k0, ka, kb, p;
+void pony_linal_mmul2T(double *res,  double *a, double *b, const size_t n, const size_t m, const size_t n1) {
+	size_t i, j, k, k0, ka, kb, p;
 
 	for (i = 0, k = 0, k0 = 0; i < n; i++, k0 += m)
 		for (j = 0; j < n1; j++, k++) {
@@ -1407,7 +1414,7 @@ void pony_linal_qmul(double *res, double *q, double *r) {
 		// 3x3 attitude matrix R to quaternion q with q0 being scalar part
 void pony_linal_mat2quat(double *q, double *R) {
 
-	int i;
+	size_t i;
 	double _q4;
 
 	// absolute values squared four times
@@ -1538,21 +1545,21 @@ void pony_linal_mat2rpy(double *rpy, double *R) {
 
 	// routines for m x m upper-triangular matrices lined up in a single-dimension array
 		// index conversion for upper-triangular matrix lined up in a single-dimension array: (i,j) -> k
-void pony_linal_u_ij2k(int *k, const int i, const int j, const int m) {
+void pony_linal_u_ij2k(size_t *k, const size_t i, const size_t j, const size_t m) {
 	*k = ( i*(2*m - 1 - i) )/2 + j;
 }
 
 		// index conversion for upper-triangular matrix lined up in a single-dimension array: k -> (i,j)
-void pony_linal_u_k2ij(int *i, int *j, const int k, const int m) {
+void pony_linal_u_k2ij(size_t *i, size_t *j, const size_t k, const size_t m) {
 	double onehalf_plus_m = 0.5+m;
-	*i = (int)(floor( onehalf_plus_m - sqrt(onehalf_plus_m*onehalf_plus_m - 2.0*k) ) + 0.5);
+	*i = (size_t)(floor( onehalf_plus_m - sqrt(onehalf_plus_m*onehalf_plus_m - 2.0*k) ) + 0.5);
 	*j = k - ( ( 2*m - 1 - (*i) )*(*i) )/2;
 }
 
 		// upper-triangular matrix lined up in a single-dimension array multiplication: res = U*v
 			// overwriting input (double *res = double *v) allowed
-void pony_linal_u_mul(double *res, double *u, double *v, const int n, const int m) {
-	int i, j, k, p, p0, mn;
+void pony_linal_u_mul(double *res, double *u, double *v, const size_t n, const size_t m) {
+	size_t i, j, k, p, p0, mn;
 
 	mn = m*n;
 	for (j = 0; j < m; j++)
@@ -1564,8 +1571,8 @@ void pony_linal_u_mul(double *res, double *u, double *v, const int n, const int 
 }
 
 		// upper-triangular matrix lined up in a single-dimension array of m(m+1)/2 x 1, transposed, multiplication by vector: res = U^T*v
-void pony_linal_uT_mul_v(double *res, double *u, double *v, const int m) {
-	int i, j, k;
+void pony_linal_uT_mul_v(double *res, double *u, double *v, const size_t m) {
+	size_t i, j, k;
 
 	for (i = 0; i < m; i++)
 		res[i] = u[i]*v[0];
@@ -1576,9 +1583,9 @@ void pony_linal_uT_mul_v(double *res, double *u, double *v, const int m) {
 
 		// inversion of upper-triangular matrix lined up in a single-dimension array of m(m+1)/2 x 1: res = U^-1
 			// overwriting input (double *res = double *u) allowed
-void pony_linal_u_inv(double *res, double *u, const int m) {
+void pony_linal_u_inv(double *res, double *u, const size_t m) {
 
-	int i, j, k, k0, p, q, p0, r;
+	size_t i, j, k, k0, p, q, p0, r;
 	double s;
 
 	for (j = 0, k0 = (m+2)*(m-1)/2; j < m; k0 -= j+2, j++) {
@@ -1595,9 +1602,9 @@ void pony_linal_u_inv(double *res, double *u, const int m) {
 
 		// square (with transposition) of upper-triangular matrix lined up in a single-dimension array of m(m+1)/2 x 1: res = U U^T
 			// overwriting input (double *res = double *u) allowed
-void pony_linal_uuT(double *res, double *u, const int m) {
+void pony_linal_uuT(double *res, double *u, const size_t m) {
 
-	int i, j, k, p, q, r;
+	size_t i, j, k, p, q, r;
 
 	for (i = 0, k = 0; i < m; i++)
 		for (j = i; j < m; j++, k++) {
@@ -1613,9 +1620,9 @@ void pony_linal_uuT(double *res, double *u, const int m) {
 		// input:	P - upper-triangular part of symmetric m-by-m positive-definite R lined in a single-dimension array m(m+1)/2 x 1
 		// output:	S - upper-triangular part of a Cholesky factor S lined in a single-dimension array m(m+1)/2 x 1
 		// overwriting input (double *P == double *S) allowed
-void pony_linal_chol(double *S, double *P, const int m) {
+void pony_linal_chol(double *S, double *P, const size_t m) {
 
-	int i, j, k, k0, p, q, p0;
+	size_t i, j, k, k0, p, q, p0;
 	double s;
 
 	for (j = 0, k0 = (m+2)*(m-1)/2; j < m; k0 -= j+2, j++) {
@@ -1643,10 +1650,10 @@ void pony_linal_chol(double *S, double *P, const int m) {
 	//		x - updated estimate of state vector
 	//		S - upper-truangular part of a Cholesky factor of updated covariance matrix, lined in a single-dimension array m(m+1)/2 x 1
 	//		K - Kalman gain
-double pony_linal_kalman_update(double *x, double *S, double *K, double z, double *h, double sigma, const int m) {
+double pony_linal_kalman_update(double *x, double *S, double *K, double z, double *h, double sigma, const size_t m) {
 
 	double d, d1, sdd1, f, e;
-	int i, j, k;
+	size_t i, j, k;
 
 	// e0 stored in K
 	for (i = 0; i < m; i++)

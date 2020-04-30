@@ -17,31 +17,31 @@ typedef struct 		// Julian-type time epoch
 // SOL
 typedef struct			// navigation solution structure
 {
-	double x[3];		// cartesian coordinates, meters
-	char x_valid;		// validity flag (0/1), or a number of valid measurements used
-	double x_std;		// coordinate RMS ("standard") deviation estimate, meters
+	double x[3];			// cartesian coordinates, meters
+	char x_valid;			// validity flag (0/1), or a number of valid measurements used
+	double x_std;			// coordinate RMS ("standard") deviation estimate, meters
 	
-	double llh[3];		// geodetic coordinates: longitude (rad), latitude (rad), height (meters)
-	char llh_valid;		// validity flag (0/1), or a number of valid measurements used
+	double llh[3];			// geodetic coordinates: longitude (rad), latitude (rad), height (meters)
+	char llh_valid;			// validity flag (0/1), or a number of valid measurements used
 
-	double v[3];		// relative-to-Earth velocity vector coordinates in local-level geodetic or cartesian frame, meters per second
-	char v_valid;		// validity flag (0/1), or a number of valid measurements used
-	double v_std;		// velocity RMS ("standard") deviation estimate, meters per second
+	double v[3];			// relative-to-Earth velocity vector coordinates in local-level geodetic or cartesian frame, meters per second
+	char v_valid;			// validity flag (0/1), or a number of valid measurements used
+	double v_std;			// velocity RMS ("standard") deviation estimate, meters per second
 
-	double q[4];		// attitude quaternion, relative to local-level or cartesian frame
-	char q_valid;		// validity flag (0/1), or a number of valid measurements used
+	double q[4];			// attitude quaternion, relative to local-level or cartesian frame
+	char q_valid;			// validity flag (0/1), or a number of valid measurements used
 
-	double L[9];		// attitude matrix for the transition from local-level or cartesian frame, row-wise: L[0] = L_11, L[1] = L_12, ..., L[8] = L[33]
-	char L_valid;		// validity flag (0/1), or a number of valid measurements used
+	double L[9];			// attitude matrix for the transition from local-level or cartesian frame, row-wise: L[0] = L_11, L[1] = L_12, ..., L[8] = L[33]
+	char L_valid;			// validity flag (0/1), or a number of valid measurements used
 
-	double rpy[3];		// attitude angles relative to local-level frame: roll (rad), pitch (rad), yaw = true heading (rad)
-	char rpy_valid;		// validity flag (0/1), or a number of valid measurements used
+	double rpy[3];			// attitude angles relative to local-level frame: roll (rad), pitch (rad), yaw = true heading (rad)
+	char rpy_valid;			// validity flag (0/1), or a number of valid measurements used
 
-	double dt;			// clock bias
-	char dt_valid;		// validity flag (0/1), or a number of valid measurements used
+	double dt;				// clock bias
+	char dt_valid;			// validity flag (0/1), or a number of valid measurements used
 
-	double *metrics;	// user-defined solution metrics
-	int metrics_count;	// number of user-defined metrics, 2 by default
+	double *metrics;		// user-defined solution metrics
+	size_t metrics_count;	// number of user-defined metrics, 2 by default
 } pony_sol;
 
 
@@ -65,24 +65,24 @@ typedef struct		// inertial navigation constants
 	// IMU
 typedef struct		// inertial measurement unit
 {
-	char* cfg;		// pointer to IMU configuration string
-	int cfglength;	// IMU configuration string length
+	char* cfg;			// pointer to IMU configuration string
+	size_t cfglength;	// IMU configuration string length
 
-	double t;		// time of measurement update
+	double t;			// time of measurement update
 
-	double w[3];	// up to 3 gyroscope measurements
-	char w_valid;	// validity flag (0/1), or a number of valid components
+	double w[3];		// up to 3 gyroscope measurements
+	char w_valid;		// validity flag (0/1), or a number of valid components
 
-	double f[3];	// up to 3 accelerometer measurements
-	char f_valid;	// validity flag (0/1), or a number of valid components
+	double f[3];		// up to 3 accelerometer measurements
+	char f_valid;		// validity flag (0/1), or a number of valid components
 
-	double W[3];	// angular velocity of the local level reference frame
-	char W_valid;	// validity flag (0/1), or a number of valid components
+	double W[3];		// angular velocity of the local level reference frame
+	char W_valid;		// validity flag (0/1), or a number of valid components
 
-	double g[3];	// current gravity acceleration vector
-	char g_valid;	// validity flag (0/1), or a number of valid components
+	double g[3];		// current gravity acceleration vector
+	char g_valid;		// validity flag (0/1), or a number of valid components
 
-	pony_sol sol;	// inertial solution
+	pony_sol sol;		// inertial solution
 } pony_imu;
 
 
@@ -186,14 +186,14 @@ typedef struct		// GNSS constants
 typedef struct				// GPS constellation data
 {
 	char* cfg;				// GPS configuration string
-	int cfglength;			// configuration string length
+	size_t cfglength;		// configuration string length
 
-	int max_sat_count;		// maximum supported number of satellites
-	int max_eph_count;		// maximum supported number of ephemeris
+	size_t max_sat_count;	// maximum supported number of satellites
+	size_t max_eph_count;	// maximum supported number of ephemeris
 
 	pony_gnss_sat *sat;		// GPS satellites
 	char **obs_types;		// observation types according to RINEX: C1C, etc.; an array of 3-character null-terminated strings in the same order as in satellites
-	int obs_count;			// number of observation types
+	size_t obs_count;		// number of observation types
 
 	double iono_a[4];		// ionospheric model parameters from GPS almanac
 	double iono_b[4];		
@@ -208,15 +208,15 @@ typedef struct				// GPS constellation data
 typedef struct				// GLONASS constellation data
 {
 	char* cfg;				// GLONASS configuration string
-	int cfglength;			// configuration string length
+	size_t cfglength;		// configuration string length
 
-	int max_sat_count;		// maximum supported number of satellites
-	int max_eph_count;		// maximum supported number of ephemeris
+	size_t max_sat_count;	// maximum supported number of satellites
+	size_t max_eph_count;	// maximum supported number of ephemeris
 
 	pony_gnss_sat *sat;		// GLONASS satellites
 	int *freq_slot;			// frequency numbers
 	char **obs_types;		// observation types according to RINEX: C1C, etc.; an array of 3-character null-terminated strings in the same order as in satellites
-	int obs_count;			// number of observation types
+	size_t obs_count;		// number of observation types
 
 	double clock_corr[4];	// clock correction parameters from GLONASS almanac: e.g. -tauC, zero, Na_day_number, N4_four_year_interval for GLONASS to UTC, optional
 	char clock_corr_to[2];	// time system, which the correction results into: GP - GPS, UT - UTC, GA - Galileo, etc.
@@ -227,14 +227,14 @@ typedef struct				// GLONASS constellation data
 typedef struct				// Galileo constellation data
 {
 	char* cfg;				// Galileo configuration string
-	int cfglength;			// configuration string length
+	size_t cfglength;		// configuration string length
 
-	int max_sat_count;		// maximum supported number of satellites
-	int max_eph_count;		// maximum supported number of ephemeris
+	size_t max_sat_count;	// maximum supported number of satellites
+	size_t max_eph_count;	// maximum supported number of ephemeris
 
 	pony_gnss_sat *sat;		// Galileo satellites
 	char **obs_types;		// observation types according to RINEX: C1C, etc.; an array of 3-character null-terminated strings in the same order as in satellites
-	int obs_count;			// number of observation types
+	size_t obs_count;		// number of observation types
 
 	double iono[3];			// ionospheric model parameters from Galileo almanac
 	char iono_valid;		// validity flag (0/1)
@@ -248,14 +248,14 @@ typedef struct				// Galileo constellation data
 typedef struct				// BeiDou constellation data
 {
 	char* cfg;				// BeiDou configuration string
-	int cfglength;			// configuration string length
+	size_t cfglength;		// configuration string length
 
-	int max_sat_count;		// maximum supported number of satellites
-	int max_eph_count;		// maximum supported number of ephemeris
+	size_t max_sat_count;	// maximum supported number of satellites
+	size_t max_eph_count;	// maximum supported number of ephemeris
 
 	pony_gnss_sat *sat;		// BeiDou satellites
 	char **obs_types;		// observation types according to RINEX: C1C, etc.; an array of 3-character null-terminated strings in the same order as in satellites
-	int obs_count;			// number of observation types
+	size_t obs_count;		// number of observation types
 
 	double iono_a[4];		// ionospheric model parameters from BeiDou almanac
 	double iono_b[4];		
@@ -284,10 +284,10 @@ typedef struct // GNSS operation settings
 typedef struct						// global navigation satellite systems data
 {
 	char* cfg;						// full GNSS configuration string pointer, NULL if gnss is not used
-	int cfglength;					// full GNSS configuration string length
+	size_t cfglength;				// full GNSS configuration string length
 
 	char* cfg_settings;				// pointer to a part of GNSS configuration string common to all systems
-	int settings_length;			// length of the part of GNSS configuration string common to all systems
+	size_t settings_length;			// length of the part of GNSS configuration string common to all systems
 
 	pony_gnss_settings settings;	// GNSS operation settings
 
@@ -319,11 +319,11 @@ typedef struct	// scheduled plugin structure
 	// CORE
 typedef struct	// core structure
 {
-	pony_plugin *plugins;	// plugin array pointer
-	int plugin_count;		// number of plugins
-	int current_plugin_id;	// current plugin in plugin execution list
-	int exit_plugin_id;		// index of a plugin that initiated termination
-	char host_termination;	// identifier of termination being called by host
+	pony_plugin *plugins;			// plugin array pointer
+	size_t		 plugin_count;		// number of plugins
+	size_t		 current_plugin_id;	// current plugin in plugin execution list
+	size_t 		 exit_plugin_id;	// index of a plugin that initiated termination, or SIZE_MAX by default
+	char		 host_termination;	// identifier of termination being called by host
 } pony_core;
 
 typedef struct					// bus data to be used in host application
@@ -346,17 +346,17 @@ typedef struct					// bus data to be used in host application
 	pony_core core;								// core instances
 
 	char* cfg;									// full configuration string
-	int cfglength;								// full configuration string length
+	size_t cfglength;							// full configuration string length
 
 	char* cfg_settings;							// pointer to a part of the configuration string common to all subsystems
-	int settings_length;						// length of the part of the configuration string common to all subsystems
+	size_t settings_length;						// length of the part of the configuration string common to all subsystems
 
 	pony_imu_const imu_const;					// inertial navigation constants, initialized independent of imu structure
 	pony_imu* imu;								// inertial measurement unit data pointer
 
 	pony_gnss_const gnss_const;					// global navigation satellite system constants, initialized independent of gnss structure
 	pony_gnss* gnss;							// global navigation satellite system data pointer
-	int gnss_count;								// number of gnss instances
+	size_t gnss_count;							// number of gnss instances
 
 	double t;									// system time
 	int mode;									// operation mode: 0 - init, <0 termination, >0 normal operation
@@ -372,7 +372,7 @@ extern pony_struct *pony;
 
 
 // basic parsing
-char * pony_locate_token(const char *token, char *src, const int len, const char delim); // locate a token (and delimiter, when given) within a configuration string
+char * pony_locate_token(const char *token, char *src, const size_t len, const char delim); // locate a token (and delimiter, when given) within a configuration string
 
 
 
@@ -391,12 +391,12 @@ int pony_time_days_between_dates(pony_time_epoch epoch_from, pony_time_epoch epo
 
 // linear algebra functions
 	// conventional operations
-double pony_linal_dot(double *u, double *v, const int m); // dot product
-double pony_linal_vnorm(double *u, const int m); // l2 vector norm, i.e. sqrt(u^T*u)
+double pony_linal_dot(double *u, double *v, const size_t m); // dot product
+double pony_linal_vnorm(double *u, const size_t m); // l2 vector norm, i.e. sqrt(u^T*u)
 void pony_linal_cross3x1(double *res, double *u, double *v); // cross product for 3x1 vectors res = u x v
-void pony_linal_mmul  (double *res,  double *a, double *b, const int n, const int n1, const int m); // matrix multiplication res = a*b, a is n x n1, b is n1 x m, res is n x m
-void pony_linal_mmul1T(double *res,  double *a, double *b, const int n, const int m, const int n1); // matrix multiplication with the first  argument transposed res = a^T*b, a is n x m, b is n x n1, res is m x n1
-void pony_linal_mmul2T(double *res,  double *a, double *b, const int n, const int m, const int n1); // matrix multiplication with the second argument transposed res = a*b^T, a is n x m, b is n1 x m, res is n x n1
+void pony_linal_mmul  (double *res,  double *a, double *b, const size_t n, const size_t n1, const size_t m ); // matrix multiplication res = a*b, a is n x n1, b is n1 x m, res is n x m
+void pony_linal_mmul1T(double *res,  double *a, double *b, const size_t n, const size_t m , const size_t n1); // matrix multiplication with the first  argument transposed res = a^T*b, a is n x m, b is n x n1, res is m x n1
+void pony_linal_mmul2T(double *res,  double *a, double *b, const size_t n, const size_t m , const size_t n1); // matrix multiplication with the second argument transposed res = a*b^T, a is n x m, b is n1 x m, res is n x n1
 void pony_linal_qmul(double *res, double *q, double *r); // quaternion multiplication for 4x1 quaternions res = q x r, with res0, q0, r0 being scalar parts
 
 	// space rotation representation
@@ -407,17 +407,17 @@ void pony_linal_mat2rpy(double *rpy, double *R); // 3x3 transition matrix R from
 
 	// routines for m x m upper-triangular matrices U lined up in a single-dimension array u
 		// index conversion
-void pony_linal_u_ij2k(int *k,  const int i, const int j, const int m);	// upper-triangular matrix lined up in a single-dimension array index conversion: (i,j) -> k
-void pony_linal_u_k2ij(int *i,  int *j, const int k, const int m);		// upper-triangular matrix lined up in a single-dimension array index conversion: k -> (i,j)
+void pony_linal_u_ij2k(size_t *k,  const size_t i, const size_t j, const size_t m);	// upper-triangular matrix lined up in a single-dimension array index conversion: (i,j) -> k
+void pony_linal_u_k2ij(size_t *i,  size_t *j, const size_t k, const size_t m);		// upper-triangular matrix lined up in a single-dimension array index conversion: k -> (i,j)
 		// conventional matrix operations
-void pony_linal_u_mul(double *res,  double *u, double *v, const int n, const int m);	// upper-triangular matrix lined up in a single-dimension array multiplication: res = U*v
-void pony_linal_uT_mul_v(double *res,  double *u, double *v, const int m);	// upper-triangular matrix lined up in a single-dimension array transposed multiplication by vector: res = U^T*v
-void pony_linal_u_inv(double *res,  double *u, const int m); // inversion of upper-triangular matrix lined up in a single-dimension array: res = U^-1
-void pony_linal_uuT(double *res,  double *u, const int m); // square (with transposition) of upper-triangular matrix lined up in a single-dimension array: res = U U^T
+void pony_linal_u_mul(double *res,  double *u, double *v, const size_t n, const size_t m);	// upper-triangular matrix lined up in a single-dimension array multiplication: res = U*v
+void pony_linal_uT_mul_v(double *res,  double *u, double *v, const size_t m);	// upper-triangular matrix lined up in a single-dimension array transposed multiplication by vector: res = U^T*v
+void pony_linal_u_inv(double *res,  double *u, const size_t m); // inversion of upper-triangular matrix lined up in a single-dimension array: res = U^-1
+void pony_linal_uuT(double *res,  double *u, const size_t m); // square (with transposition) of upper-triangular matrix lined up in a single-dimension array: res = U U^T
 	
 	// matrix factorizations
-void pony_linal_chol(double *S,  double *P, const int m); // Cholesky upper-triangular factorization P = S*S^T, where P is symmetric positive-definite matrix
+void pony_linal_chol(double *S,  double *P, const size_t m); // Cholesky upper-triangular factorization P = S*S^T, where P is symmetric positive-definite matrix
 
 	// square root Kalman filtering
-double pony_linal_kalman_update(double *x, double *S, double *K,  double z, double *h, double sigma, const int m);
+double pony_linal_kalman_update(double *x, double *S, double *K,  double z, double *h, double sigma, const size_t m);
 
