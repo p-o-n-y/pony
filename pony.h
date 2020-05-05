@@ -1,5 +1,7 @@
 // May-2020
 //
+#include <stddef.h>
+
 // PONY core declarations
 #define pony_bus_version 5		// current bus version
 
@@ -40,8 +42,8 @@ typedef struct			// navigation solution structure
 	double dt;				// clock bias
 	char dt_valid;			// validity flag (0/1), or a number of valid measurements used
 
-	double *metrics;		// user-defined solution metrics
-	size_t metrics_count;	// number of user-defined metrics, 2 by default
+	double *metrics;		// application-specific solution metrics
+	size_t metrics_count;	// number of application-specific metrics, given in cfg ("metrics_count = ..."), 2 by default
 } pony_sol;
 
 
@@ -68,7 +70,7 @@ typedef struct		// inertial measurement unit
 	char* cfg;			// pointer to IMU configuration string
 	size_t cfglength;	// IMU configuration string length
 
-	double t;			// time of measurement update
+	double t;			// measurement update time
 
 	double w[3];		// up to 3 gyroscope measurements
 	char w_valid;		// validity flag (0/1), or a number of valid components
