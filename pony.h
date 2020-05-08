@@ -324,7 +324,7 @@ typedef struct	// core structure
 	pony_plugin *plugins;			// plugin array pointer
 	size_t		 plugin_count;		// number of plugins
 	size_t		 current_plugin_id;	// current plugin in plugin execution list
-	size_t 		 exit_plugin_id;	// index of a plugin that initiated termination, or SIZE_MAX by default
+	size_t 		 exit_plugin_id;	// index of a plugin that initiated termination, or UINT_MAX by default
 	char		 host_termination;	// identifier of termination being called by host
 } pony_core;
 

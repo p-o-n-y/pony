@@ -4,6 +4,7 @@
 
 #include <stdlib.h>
 #include <math.h>
+#include <limits.h>
 
 #include "pony.h"
 
@@ -35,7 +36,7 @@ pony_struct pony_bus = {
 	pony_reschedule_plugin,		// reschedule_plugin
 	pony_suspend_plugin,		// suspend plugin
 	pony_resume_plugin,			// resume plugin
-	{ NULL, 0, 0, SIZE_MAX, 0 } };		// core.plugins, core.plugin_count, core.exit_plugin_id, core.host_termination
+	{ NULL, 0, 0, UINT_MAX, 0 } };		// core.plugins, core.plugin_count, core.exit_plugin_id, core.host_termination
 
 pony_struct *pony = &pony_bus;
 
@@ -851,7 +852,7 @@ char pony_add_plugin( void(*newplugin)(void) )
 {
 	pony_plugin *reallocated_pointer;
 
-	if (pony->core.plugin_count + 1 >= SIZE_MAX)
+	if (pony->core.plugin_count + 1 >= UINT_MAX)
 		return 0;
 
 	reallocated_pointer = (pony_plugin *)realloc( (void *)(pony->core.plugins), (pony->core.plugin_count + 1) * sizeof(pony_plugin) );
@@ -1011,13 +1012,13 @@ char pony_step(void)
 
 		if (pony->core.exit_plugin_id == i)	// if termination was initiated by the current plugin on the previous loop
 		{
-			pony->core.exit_plugin_id = SIZE_MAX;		// set to default
+			pony->core.exit_plugin_id = UINT_MAX;		// set to default
 			pony->core.host_termination = 0;	// set to default
 			pony_free();						// free memory
 			break;
 		}
 
-		if ((pony->mode < 0 || pony->core.host_termination == 1) && pony->core.exit_plugin_id == SIZE_MAX)	// if termination was initiated by the current plugin on the current loop
+		if ((pony->mode < 0 || pony->core.host_termination == 1) && pony->core.exit_plugin_id == UINT_MAX)	// if termination was initiated by the current plugin on the current loop
 		{
 			if (pony->mode > 0)
 				pony->mode = -1;					// set mode to -1 for external termination cases
@@ -1032,7 +1033,7 @@ char pony_step(void)
 		pony->mode = 1;		// set operation mode to regular
 
 							// success if either staying in regular operation mode, or a termination properly detected
-	return (pony->mode >= 0) || (pony->core.exit_plugin_id < SIZE_MAX);
+	return (pony->mode >= 0) || (pony->core.exit_plugin_id < UINT_MAX);
 }
 
 
@@ -1264,20 +1265,21 @@ char * pony_locate_token(const char *token, char *src, const size_t len, const c
 
 	const char quote = '"', brace_open = '{', brace_close = '}';
 
-	size_t i, j, k, n; 
-	ptrdiff_t len1;
+	size_t i, j, k, n, len1;
 
 	for (n = 0; token[n]; n++); // determine token length
 	if (n == 0) // invalid token
 		return NULL; 
+	if (len < n) // string too short
+		return NULL;
 	len1 = len - n;
 
 	// look for the token
-	for (i = 0, j = 0, k = 0; (ptrdiff_t)i < len1 && src[i]; i++) // go throughout the string
+	for (i = 0, j = 0, k = 0; i < len1 && src[i]; i++) // go throughout the string
 		if (src[i] == quote) // skip quoted values
-			for (i++; (ptrdiff_t)i < len1 && src[i] && src[i] != quote; i++);
+			for (i++; i < len1 && src[i] && src[i] != quote; i++);
 		else if (src[i] == brace_open) // skip groups
-			for (i++; (ptrdiff_t)i < len1 && src[i] && src[i] != brace_close; i++);
+			for (i++; i < len1 && src[i] && src[i] != brace_close; i++);
 		else {
 			for (j = 0, k = i; j < n && src[k] == token[j]; j++, k++); 
 			if (j == n) // token found
