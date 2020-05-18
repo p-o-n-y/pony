@@ -24,7 +24,7 @@ char pony_suspend_plugin	(void(*   plugin)(void)							);	// suspend all instanc
 char pony_resume_plugin		(void(*   plugin)(void)							);	// resume all instances of the plugin in the plugin execution list,		input: pointer to plugin function,							output: OK/not OK (1/0)
 
 // bus instance
-pony_struct pony_bus = {
+static pony_struct pony_bus = {
 	pony_bus_version,			// ver
 	pony_add_plugin,			// add_plugin
 	pony_init,					// init
@@ -36,7 +36,8 @@ pony_struct pony_bus = {
 	pony_reschedule_plugin,		// reschedule_plugin
 	pony_suspend_plugin,		// suspend plugin
 	pony_resume_plugin,			// resume plugin
-	{ NULL, 0, 0, UINT_MAX, 0 } };		// core.plugins, core.plugin_count, core.exit_plugin_id, core.host_termination
+	{ NULL, 0, 0, UINT_MAX, 0 }	// core.plugins, core.plugin_count, core.exit_plugin_id, core.host_termination
+};
 
 pony_struct *pony = &pony_bus;
 
@@ -178,11 +179,14 @@ void pony_init_epoch(pony_time_epoch *epoch)
 	// initialize structure
 char pony_init_sol(pony_sol *sol, char *settings, const size_t len)
 {
-	const size_t default_metrics_count = 2;	// default number of metrics in solution structures
+	const size_t 
+		metrics_count_default = 2,		// default number of metrics in solution structures
+		metrics_count_limit   = 255;	// maximum number of metrics in solution structures
 
 	const char metrics_count_token[] = "metrics_count"; // token to look for in settings
 
 	size_t i;
+	int val;
 	char *cfgptr;
 
 	// pos & vel
@@ -208,12 +212,16 @@ char pony_init_sol(pony_sol *sol, char *settings, const size_t len)
 	sol->dt			= 0;
 	sol->dt_valid	= 0;
 	// metrics
-	sol->metrics_count = default_metrics_count;
+	val = -1;
 	cfgptr = pony_locate_token(metrics_count_token, settings, len, '='); // try to find number of metrics in settings string
-	if (cfgptr != NULL)	// if token found
-		sol->metrics_count = atoi(cfgptr); // parse the number
-	if (sol->metrics_count < 0) // if the number parsed is invalid
-		sol->metrics_count = default_metrics_count;
+	if (cfgptr != NULL)	{// if token found
+		val = atoi(cfgptr); // parse the number
+	}
+	if (val < 0)
+		sol->metrics_count = metrics_count_default;
+	else
+		sol->metrics_count = (val<metrics_count_limit) ? ((size_t)val) : metrics_count_limit;
+
 	if (sol->metrics_count == 0)	// if no metrics required
 		sol->metrics = NULL;
 	else {	// if nonzero number of metrics requested
@@ -1509,31 +1517,31 @@ void pony_linal_mat2rpy(double *rpy, double *R) {
 
 	if (
 		R[0]>=0 && R[8]<=0 && 
-		(  R[1]>=0 && R[5]< 0 && dp<=0
-		|| R[1]< 0 && R[5]>=0 && dp<=0 
-		|| R[1]< 0 && R[5]< 0         )
+		(  (R[1]>=0 && R[5]< 0 && dp<=0)
+		|| (R[1]< 0 && R[5]>=0 && dp<=0) 
+		|| (R[1]< 0 && R[5]< 0         ) )
 		)
 		dp += pi2;
 	else if (
 		R[0]< 0 && R[8]> 0 && 
-		(  R[1]>=0 && R[5]< 0 && dp>=0
-		|| R[1]< 0 && R[5]>=0 && dp>=0 
-		|| R[1]< 0 && R[5]< 0         )
+		(  (R[1]>=0 && R[5]< 0 && dp>=0) 
+		|| (R[1]< 0 && R[5]>=0 && dp>=0)  
+		|| (R[1]< 0 && R[5]< 0         ) )
 		)
 		dp -= pi2;
 
 	if (
 		R[0]>=0 && R[8]> 0 && 
-		(  R[1]>=0 && R[5]< 0 && dm<=0
-		|| R[1]< 0 && R[5]>=0 && dm<=0 
-		|| R[1]< 0 && R[5]< 0         )
+		(  (R[1]>=0 && R[5]< 0 && dm<=0) 
+		|| (R[1]< 0 && R[5]>=0 && dm<=0)  
+		|| (R[1]< 0 && R[5]< 0         ) )
 		)
 		dm += pi2;
 	else if (
 		R[0]< 0 && R[8]<=0 && 
-		(  R[1]>=0 && R[5]< 0 && dm>=0
-		|| R[1]< 0 && R[5]>=0 && dm>=0 
-		|| R[1]< 0 && R[5]< 0         )
+		(  (R[1]>=0 && R[5]< 0 && dm>=0) 
+		|| (R[1]< 0 && R[5]>=0 && dm>=0)  
+		|| (R[1]< 0 && R[5]< 0         ) )
 		)
 		dm -= pi2;
 

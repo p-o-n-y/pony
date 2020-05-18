@@ -43,7 +43,7 @@ typedef struct			// navigation solution structure
 	char dt_valid;			// validity flag (0/1), or a number of valid measurements used
 
 	double *metrics;		// application-specific solution metrics
-	size_t metrics_count;	// number of application-specific metrics, given in cfg ("metrics_count = ..."), 2 by default
+	size_t metrics_count;	// number of application-specific metrics, given in cfg ("metrics_count = ..."), 2 by default, 255 max
 } pony_sol;
 
 
