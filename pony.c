@@ -797,6 +797,35 @@ void pony_free_gnss(pony_gnss *gnss)
 
 
 
+// air data handling subroutines
+	// initialize air data structure
+char pony_init_air(pony_air *air)
+{
+	// validity flags
+	air->alt_valid = 0;
+	air->vv_valid = 0;
+	air->airspeed_valid = 0;
+	// values
+	air->t = 0;
+	air->alt = 0;
+	air->vv = 0;
+	air->airspeed = 0;
+
+	return 1;
+}
+
+	// free air data memory
+void pony_free_air(void)
+{
+	if (pony->air == NULL)
+		return;
+	free(pony->air);
+	pony->air = NULL;
+}
+
+
+
+
 // general handling routines
 	// free all alocated memory and set pointers and counters to NULL
 void pony_free()
@@ -827,6 +856,9 @@ void pony_free()
 		pony->gnss = NULL;
 	}
 	pony->gnss_count = 0;
+
+	// air data
+	pony_free_air();
 
 	// solution
 	pony_free_sol( &(pony->sol) );
@@ -980,6 +1012,28 @@ char pony_init(char* cfg)
 				pony_free();
 				return 0;
 			}
+		}
+	}
+
+	// air data init
+	pony->air = NULL;
+	if ( pony_locatecfggroup("air:", pony->cfg, pony->cfglength, &cfgptr, &grouplen) ) // if the group found in configuration
+	{
+		// try to allocate memory
+		pony->air = (pony_air*)calloc( 1, sizeof(pony_air) );
+		if (pony->air == NULL) {
+			pony_free();
+			return 0;
+		}
+
+		// set configuration pointer
+		pony->air->cfg = cfgptr;
+		pony->air->cfglength = grouplen;
+
+		// try to init
+		if ( !pony_init_air(pony->air) ) {
+			pony_free();
+			return 0;
 		}
 	}
 

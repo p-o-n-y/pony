@@ -3,7 +3,7 @@
 #include <stddef.h>
 
 // PONY core declarations
-#define pony_bus_version 5		// current bus version
+#define pony_bus_version 6		// current bus version
 
 // TIME EPOCH
 typedef struct 		// Julian-type time epoch
@@ -308,6 +308,27 @@ typedef struct						// global navigation satellite systems data
 
 
 
+// AIR DATA
+typedef struct
+{
+	char* cfg;				// pointer to air data configuration string
+	size_t cfglength;		// air data configuration string length
+
+	double t;				// measurement update time
+
+	double alt;				// barometric altitude
+	char alt_valid;			// validity flag (0/1)
+
+	double vv;				// vertical velocity (vertical speed/rate of climb and descent)
+	char vv_valid;			// validity flag (0/1)
+
+	double airspeed;		// airspeed
+	char airspeed_valid;	// validity flag (0/1)
+} pony_air;
+
+
+
+
 
 // BUS
 	// PLUGIN
@@ -359,6 +380,8 @@ typedef struct					// bus data to be used in host application
 	pony_gnss_const gnss_const;					// global navigation satellite system constants, initialized independent of gnss structure
 	pony_gnss* gnss;							// global navigation satellite system data pointer
 	size_t gnss_count;							// number of gnss instances
+
+	pony_air* air;								// air data subsystem
 
 	double t;									// system time
 	int mode;									// operation mode: 0 - init, <0 termination, >0 normal operation
