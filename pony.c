@@ -47,6 +47,20 @@ pony_struct *pony = &pony_bus;
 
 // service subroutines
 
+	// free memory with pointer NULL-check and NULL-assignment
+	// input:
+	// void **prt - reference to a pointer to the desired memory block
+void pony_free_null(void **ptr) 
+{
+	if (*ptr == NULL)
+		return;
+	free(*ptr);
+	*ptr = NULL;
+}
+
+
+
+
 	// locate parameter group within a configuration string
 	// input:
 	// char* groupname	-	group identifier (see documentation)
@@ -239,10 +253,7 @@ char pony_init_sol(pony_sol *sol, char *settings, const size_t len)
 	// free solution data memory
 void pony_free_sol(pony_sol *sol)
 {
-	if (sol->metrics == NULL)
-		return;
-	free(sol->metrics);
-	sol->metrics = NULL;
+	pony_free_null((void **)(&(sol->metrics)));
 }
 
 
@@ -293,8 +304,13 @@ void pony_free_imu(void)
 {
 	if (pony->imu == NULL)
 		return;
+	// configuration
+	pony->imu->cfg = NULL;
+	pony->imu->cfglength = 0;
+	// solution
 	pony_free_sol( &(pony->imu->sol) );
-	free(pony->imu);
+	// pony_imu structure
+	free((void *)(pony->imu));
 	pony->imu = NULL;
 }
 
@@ -332,6 +348,26 @@ void pony_init_gnss_gps_const(pony_gps_const *gps_const)
 	gps_const->L1	= pony->gnss_const.c/gps_const->F1;		// nominal wavelength for L1 signal
 	gps_const->F2	=  1227.60e6;			// nominal frequency for L2 signal as in IS-GPS-200J (22 May 2018)
 	gps_const->L2	= pony->gnss_const.c/gps_const->F2;		// nominal wavelength for L2 signal
+}
+
+	// free satellite data
+void pony_free_gnss_sat(pony_gnss_sat **sat, const size_t sat_count)
+{
+	size_t s;
+
+	if (*sat == NULL) 
+		return;
+
+	for (s = 0; s < sat_count; s++) {
+		// ephemeris
+		pony_free_null((void **)(&((*sat)[s].eph)));
+		// observations
+		pony_free_null((void **)(&((*sat)[s].obs      )));
+		pony_free_null((void **)(&((*sat)[s].obs_valid)));
+	}
+	
+	free((void *)(*sat));
+	*sat = NULL;
 }
 
 	// initialize gnss gps structure
@@ -383,28 +419,26 @@ char pony_init_gnss_gps(pony_gnss_gps *gps, const size_t max_sat_count, const si
 	// free gnss gps memory
 void pony_free_gnss_gps(pony_gnss_gps *gps)
 {
-	size_t i;
+	size_t o;
 
 	if (gps == NULL)
 		return;
-
+	//configuration
+	gps->cfg = NULL;
+	gps->cfglength = 0;
 	// satellites
-	if (gps->sat != NULL) 
-	{
-		for (i = 0; i < gps->max_sat_count; i++) 
-			// ephemeris
-			if (gps->sat[i].eph != NULL)
-			{
-				free(gps->sat[i].eph);
-				gps->sat[i].eph = NULL;
-			}
-	
-		free(gps->sat);
-		gps->sat = NULL;
+	pony_free_gnss_sat(&(gps->sat), gps->max_sat_count);
+	gps->max_sat_count = 0;
+	// observation types
+	if (gps->obs_types != NULL) {
+		for (o = 0; o < gps->obs_count; o++)
+			pony_free_null((void **)(&(gps->obs_types[o])));
+		free((void *)(gps->obs_types));
+		gps->obs_types = NULL;
 	}
-
+	gps->obs_count = 0;
 	// gnss_gps structure
-	free(gps);
+	free((void *)gps);
 }
 
 	// initialize gnss glonass constants
@@ -468,32 +502,28 @@ char pony_init_gnss_glo(pony_gnss_glo *glo, const size_t max_sat_count, const si
 	// free gnss glonass memory
 void pony_free_gnss_glo(pony_gnss_glo *glo)
 {
-	size_t i;
+	size_t o;
 
 	if (glo == NULL)
 		return;
-
+	//configuration
+	glo->cfg = NULL;
+	glo->cfglength = 0;
 	// satellites
-	if (glo->sat != NULL) 
-	{
-		for (i = 0; i < glo->max_sat_count; i++) 
-			// ephemeris
-			if (glo->sat[i].eph != NULL)
-			{
-				free(glo->sat[i].eph);
-				glo->sat[i].eph = NULL;
-			}
-	
-		free(glo->sat);
-		glo->sat = NULL;
+	pony_free_gnss_sat(&(glo->sat), glo->max_sat_count);
+	glo->max_sat_count = 0;
+	// observation types
+	if (glo->obs_types != NULL) {
+		for (o = 0; o < glo->obs_count; o++)
+			pony_free_null((void **)(&(glo->obs_types[o])));
+		free((void *)(glo->obs_types));
+		glo->obs_types = NULL;
 	}
-	if (glo->freq_slot != NULL) {
-		free(glo->freq_slot);
-		glo->freq_slot = NULL;
-	}
-
+	glo->obs_count = 0;
+	// frequency slots
+	pony_free_null((void **)(&(glo->freq_slot)));
 	// gnss glonass structure
-	free(glo);
+	free((void *)glo);
 }
 
 	// initialize gnss galileo constants
@@ -563,28 +593,26 @@ char pony_init_gnss_gal(pony_gnss_gal *gal, const size_t max_sat_count, const si
 	// free gnss galileo memory
 void pony_free_gnss_gal(pony_gnss_gal *gal)
 {
-	size_t i;
+	size_t o;
 
 	if (gal == NULL)
 		return;
-
+	//configuration
+	gal->cfg = NULL;
+	gal->cfglength = 0;
 	// satellites
-	if (gal->sat != NULL) 
-	{
-		for (i = 0; i < gal->max_sat_count; i++)
-			//ephemeris
-			if (gal->sat[i].eph != NULL)
-			{
-				free(gal->sat[i].eph);
-				gal->sat[i].eph = NULL;
-			}
-	
-		free(gal->sat);
-		gal->sat = NULL;
+	pony_free_gnss_sat(&(gal->sat), gal->max_sat_count);
+	gal->max_sat_count = 0;
+	// observation types
+	if (gal->obs_types != NULL) {
+		for (o = 0; o < gal->obs_count; o++)
+			pony_free_null((void **)(&(gal->obs_types[o])));
+		free((void *)(gal->obs_types));
+		gal->obs_types = NULL;
 	}
-
+	gal->obs_count = 0;
 	// gnss galileo structure
-	free(gal);
+	free((void *)gal);
 }
 
 	// initialize gnss beidou constants
@@ -651,28 +679,26 @@ char pony_init_gnss_bds(pony_gnss_bds *bds, const size_t max_sat_count, const si
 	// free gnss beidou memory
 void pony_free_gnss_bds(pony_gnss_bds *bds)
 {
-	size_t i;
+	size_t o;
 
 	if (bds == NULL)
 		return;
-
+	//configuration
+	bds->cfg = NULL;
+	bds->cfglength = 0;
 	// satellites
-	if (bds->sat != NULL) 
-	{
-		for (i = 0; i < bds->max_sat_count; i++)
-			//ephemeris
-			if (bds->sat[i].eph != NULL)
-			{
-				free(bds->sat[i].eph);
-				bds->sat[i].eph = NULL;
-			}
-	
-		free(bds->sat);
-		bds->sat = NULL;
+	pony_free_gnss_sat(&(bds->sat), bds->max_sat_count);
+	bds->max_sat_count = 0;
+	// observation types
+	if (bds->obs_types != NULL) {
+		for (o = 0; o < bds->obs_count; o++)
+			pony_free_null((void **)(&(bds->obs_types[o])));
+		free((void *)(bds->obs_types));
+		bds->obs_types = NULL;
 	}
-
+	bds->obs_count = 0;
 	// gnss beidou structure
-	free(bds);
+	free((void *)bds);
 }
 
 	// initialize gnss constants
@@ -782,14 +808,23 @@ void pony_free_gnss(pony_gnss *gnss)
 	if (gnss == NULL)
 		return;
 
+	// configuration
+	gnss->cfg = NULL;
+	gnss->cfglength = 0;
+	gnss->cfg_settings = NULL;
+	gnss->settings_length = 0;
+	// gps data
 	pony_free_gnss_gps(gnss->gps);
 	gnss->gps = NULL;
-
+	// glonass data
 	pony_free_gnss_glo(gnss->glo);
 	gnss->glo = NULL;
-
-	pony_free_gnss_glo(gnss->glo);
-	gnss->glo = NULL;
+	// galileo data
+	pony_free_gnss_gal(gnss->gal);
+	gnss->gal = NULL;
+	// beidou data
+	pony_free_gnss_bds(gnss->bds);
+	gnss->bds = NULL;
 
 	pony_free_sol( &(gnss->sol) );
 }
@@ -819,8 +854,11 @@ void pony_free_air(void)
 {
 	if (pony->air == NULL)
 		return;
-	free(pony->air);
-	pony->air = NULL;
+	// configuration
+	pony->air->cfg = NULL;
+	pony->air->cfglength = 0;
+	// air data
+	free((void *)(pony->air));
 }
 
 
@@ -830,19 +868,17 @@ void pony_free_air(void)
 	// free all alocated memory and set pointers and counters to NULL
 void pony_free()
 {
-	size_t i;
+	size_t r;
 
 	// core
-	if (pony->core.plugins != NULL)
-		free(pony->core.plugins);
-	pony->core.plugins = NULL;
+	pony_free_null((void **)(&(pony->core.plugins)));
 	pony->core.plugin_count = 0;
 
 	// configuration string
-	if (pony->cfg != NULL)
-		free(pony->cfg);
-	pony->cfg = NULL;
+	pony_free_null((void **)(&(pony->cfg)));
 	pony->cfglength = 0;
+	pony->cfg_settings = NULL;
+	pony->settings_length = 0;
 
 	// imu
 	pony_free_imu();
@@ -850,9 +886,9 @@ void pony_free()
 	// gnss
 	if (pony->gnss != NULL)
 	{
-		for (i = 0; i < pony->gnss_count; i++)
-			pony_free_gnss( &(pony->gnss[i]) );
-		free(pony->gnss);
+		for (r = 0; r < pony->gnss_count; r++)
+			pony_free_gnss( &(pony->gnss[r]) );
+		free((void *)(pony->gnss));
 		pony->gnss = NULL;
 	}
 	pony->gnss_count = 0;
