@@ -46,7 +46,6 @@ pony_struct *pony = &pony_bus;
 
 
 // service subroutines
-
 	// free memory with pointer NULL-check and NULL-assignment
 	// input:
 	// void **prt - reference to a pointer to the desired memory block
@@ -326,8 +325,9 @@ char pony_init_gnss_settings(pony_gnss *gnss)
 	pony_locatecfggroup( "", gnss->cfg, gnss->cfglength, &(gnss->cfg_settings), &(gnss->settings_length) );
 
 	gnss->settings.sinEl_mask = 0;
-	gnss->settings.code_sigma = 20;
-	gnss->settings.phase_sigma = 0.01;
+	gnss->settings.   code_sigma = 20;
+	gnss->settings.  phase_sigma = 0.01;
+	gnss->settings.doppler_sigma = 0.5;
 	for (i = 0; i < 3; i++)
 		gnss->settings.ant_pos[i] = 0;
 	gnss->settings.ant_pos_tol = -1;
@@ -419,8 +419,6 @@ char pony_init_gnss_gps(pony_gnss_gps *gps, const size_t max_sat_count, const si
 	// free gnss gps memory
 void pony_free_gnss_gps(pony_gnss_gps *gps)
 {
-	size_t o;
-
 	if (gps == NULL)
 		return;
 	//configuration
@@ -430,12 +428,7 @@ void pony_free_gnss_gps(pony_gnss_gps *gps)
 	pony_free_gnss_sat(&(gps->sat), gps->max_sat_count);
 	gps->max_sat_count = 0;
 	// observation types
-	if (gps->obs_types != NULL) {
-		for (o = 0; o < gps->obs_count; o++)
-			pony_free_null((void **)(&(gps->obs_types[o])));
-		free((void *)(gps->obs_types));
-		gps->obs_types = NULL;
-	}
+	pony_free_null((void **)(&(gps->obs_types)));
 	gps->obs_count = 0;
 	// gnss_gps structure
 	free((void *)gps);
@@ -502,8 +495,6 @@ char pony_init_gnss_glo(pony_gnss_glo *glo, const size_t max_sat_count, const si
 	// free gnss glonass memory
 void pony_free_gnss_glo(pony_gnss_glo *glo)
 {
-	size_t o;
-
 	if (glo == NULL)
 		return;
 	//configuration
@@ -513,12 +504,7 @@ void pony_free_gnss_glo(pony_gnss_glo *glo)
 	pony_free_gnss_sat(&(glo->sat), glo->max_sat_count);
 	glo->max_sat_count = 0;
 	// observation types
-	if (glo->obs_types != NULL) {
-		for (o = 0; o < glo->obs_count; o++)
-			pony_free_null((void **)(&(glo->obs_types[o])));
-		free((void *)(glo->obs_types));
-		glo->obs_types = NULL;
-	}
+	pony_free_null((void **)(&(glo->obs_types)));
 	glo->obs_count = 0;
 	// frequency slots
 	pony_free_null((void **)(&(glo->freq_slot)));
@@ -593,8 +579,6 @@ char pony_init_gnss_gal(pony_gnss_gal *gal, const size_t max_sat_count, const si
 	// free gnss galileo memory
 void pony_free_gnss_gal(pony_gnss_gal *gal)
 {
-	size_t o;
-
 	if (gal == NULL)
 		return;
 	//configuration
@@ -604,12 +588,7 @@ void pony_free_gnss_gal(pony_gnss_gal *gal)
 	pony_free_gnss_sat(&(gal->sat), gal->max_sat_count);
 	gal->max_sat_count = 0;
 	// observation types
-	if (gal->obs_types != NULL) {
-		for (o = 0; o < gal->obs_count; o++)
-			pony_free_null((void **)(&(gal->obs_types[o])));
-		free((void *)(gal->obs_types));
-		gal->obs_types = NULL;
-	}
+	pony_free_null((void **)(&(gal->obs_types)));
 	gal->obs_count = 0;
 	// gnss galileo structure
 	free((void *)gal);
@@ -679,8 +658,6 @@ char pony_init_gnss_bds(pony_gnss_bds *bds, const size_t max_sat_count, const si
 	// free gnss beidou memory
 void pony_free_gnss_bds(pony_gnss_bds *bds)
 {
-	size_t o;
-
 	if (bds == NULL)
 		return;
 	//configuration
@@ -690,12 +667,7 @@ void pony_free_gnss_bds(pony_gnss_bds *bds)
 	pony_free_gnss_sat(&(bds->sat), bds->max_sat_count);
 	bds->max_sat_count = 0;
 	// observation types
-	if (bds->obs_types != NULL) {
-		for (o = 0; o < bds->obs_count; o++)
-			pony_free_null((void **)(&(bds->obs_types[o])));
-		free((void *)(bds->obs_types));
-		bds->obs_types = NULL;
-	}
+	pony_free_null((void **)(&(bds->obs_types)));
 	bds->obs_count = 0;
 	// gnss beidou structure
 	free((void *)bds);
@@ -1110,9 +1082,9 @@ char pony_step(void)
 
 		if (pony->core.exit_plugin_id == i)	// if termination was initiated by the current plugin on the previous loop
 		{
-			pony->core.exit_plugin_id = UINT_MAX;		// set to default
-			pony->core.host_termination = 0;	// set to default
-			pony_free();						// free memory
+			pony->core.exit_plugin_id = UINT_MAX;	// set to default
+			pony->core.host_termination = 0;		// set to default
+			pony_free();							// free memory
 			break;
 		}
 
@@ -1127,10 +1099,10 @@ char pony_step(void)
 		}
 	}
 
-	if (pony->mode == 0)		// if initialization ended
-		pony->mode = 1;		// set operation mode to regular
+	if (pony->mode == 0)	// if initialization ended
+		pony->mode = 1;		// set operation mode to regular operation
 
-							// success if either staying in regular operation mode, or a termination properly detected
+	// success if either staying in regular operation mode, or a termination properly detected
 	return (pony->mode >= 0) || (pony->core.exit_plugin_id < UINT_MAX);
 }
 
@@ -1405,20 +1377,104 @@ char * pony_locate_token(const char *token, char *src, const size_t len, const c
 
 // time routines
 	// days elapsed from one date to another, based on Rata Die serial date from day one on 0001/01/01
-	// input:
-	//		epoch_from	- starting epoch, only Y, M and D are used
-	//		epoch_to	- ending epoch, only Y, M and D are used
-	// output:
-	//		number of days elapsed from starting epoch to the ending one 
-int pony_time_days_between_dates(pony_time_epoch epoch_from, pony_time_epoch epoch_to) {
+		// input:
+		//		epoch_from	- starting epoch, only Y, M and D are used
+		//		epoch_to	- ending epoch, only Y, M and D are used
+		// output:
+		//		number of days elapsed from starting epoch to the ending one 
+long pony_time_days_between_dates(pony_time_epoch epoch_from, pony_time_epoch epoch_to) {
 
 	if (epoch_to.M		< 3) 
-		epoch_to.Y--,	epoch_to.M		+= 12;
+		epoch_to  .Y--,	epoch_to  .M	+= 12;
 	if (epoch_from.M	< 3) 
 		epoch_from.Y--,	epoch_from.M	+= 12;
     return 
-		(365*epoch_to.Y		+ epoch_to.Y/4		- epoch_to.Y/100	+ epoch_to.Y/400	+ (153*epoch_to.M	- 457)/5	+ epoch_to.D	- 306) - 
+		(365*epoch_to  .Y	+ epoch_to  .Y/4	- epoch_to  .Y/100	+ epoch_to  .Y/400	+ (153*epoch_to  .M	- 457)/5	+ epoch_to  .D	- 306) - 
 		(365*epoch_from.Y	+ epoch_from.Y/4	- epoch_from.Y/100	+ epoch_from.Y/400	+ (153*epoch_from.M	- 457)/5	+ epoch_from.D	- 306);
+
+}
+
+	// GPS week and seconds to GPS Gregorian date/time conversion, DOES NOT include leap seconds
+		// input:
+		//		epoch	- pointer to epoch
+		//		week	- GPS week number
+		//		sec		- GPS seconds into the week
+		// output:
+		//		1 - OK
+		//		0 - not OK (invalid input)
+char pony_time_gps2epoch(pony_time_epoch *epoch, unsigned int week, double sec) {
+
+	const pony_time_epoch base = {1980,1,6,0,0,0.0};
+	
+	static int days_in_month[] = {31,28,31,30,31,30,31,31,30,31,30,31};
+
+	long days, days_left, years, dow;
+	double sod, soh;
+
+	if (epoch == NULL)
+		return 0;
+
+	dow = (int)(sec/86400);
+	days = week*7 + dow;
+	if (days < 0)
+		return 0; // dates before Jan,5,1980 are not supported
+
+	if (epoch->Y == 0 || epoch->M == 0 || epoch->D == 0) { // starting approximation
+		years = (int)(days/365.25);
+		epoch->Y = base.Y + years;
+		days_left = days - (int)(years*365.25);
+		epoch->M = (int)(days_left/30.5);
+		days_left -= (int)(epoch->M*30.5);
+		if (days_left < days_in_month[epoch->M]) { // no rollover
+			epoch->D = days_left+1;
+			epoch->M++;
+		}
+		else { // month rollover
+			epoch->D = days_left - days_in_month[epoch->M];
+			if (epoch->M <= 10)		
+				epoch->M += 2;
+			else { // year rollover
+				epoch->M = 1;
+				epoch->Y++;
+			}
+		}
+	}
+	days_in_month[1] = ( (!(epoch->Y%4) && epoch->Y%100) || !(epoch->Y%400) ) ? 29 : 28; // leap year check
+	// iterate to the precise date
+	while(1) {
+		days_left = pony_time_days_between_dates(base, *epoch) - days;
+		if (!days_left)
+			break;
+		epoch->D -= days_left;
+		while (epoch->D > days_in_month[epoch->M-1]) { // month forward rollover
+			epoch->D -= days_in_month[epoch->M-1];
+			if (epoch->M <= 11)		
+				epoch->M++;
+			else { // year rollover
+				epoch->M = 1;
+				epoch->Y++;
+				days_in_month[1] = ( (!(epoch->Y%4) && epoch->Y%100) || !(epoch->Y%400) ) ? 29 : 28; // leap year check
+			}
+		}
+		while (epoch->D < 1) { // month backward rollover
+			if (epoch->M > 1)		
+				epoch->M--;
+			else { // year rollover
+				epoch->M = 12;
+				epoch->Y--;
+				days_in_month[1] = ( (!(epoch->Y%4) && epoch->Y%100) || !(epoch->Y%400) ) ? 29 : 28; // leap year check
+			}
+			epoch->D += days_in_month[epoch->M-1];
+		}
+	};
+
+	sod = sec - dow*86400;
+	epoch->h = (int)(sod/3600);
+	soh = sod - epoch->h*3600;
+	epoch->m = (int)(soh/60);
+	epoch->s = soh - epoch->m*60;
+
+	return 1;
 
 }
 

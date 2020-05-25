@@ -194,7 +194,7 @@ typedef struct				// GPS constellation data
 	size_t max_eph_count;	// maximum supported number of ephemeris
 
 	pony_gnss_sat *sat;		// GPS satellites
-	char **obs_types;		// observation types according to RINEX: C1C, etc.; an array of 3-character null-terminated strings in the same order as in satellites
+	char (*obs_types)[4];	// observation types according to RINEX: C1C, etc.; an array of 3-character null-terminated strings in the same order as in satellites
 	size_t obs_count;		// number of observation types
 
 	double iono_a[4];		// ionospheric model parameters from GPS almanac
@@ -217,7 +217,7 @@ typedef struct				// GLONASS constellation data
 
 	pony_gnss_sat *sat;		// GLONASS satellites
 	int *freq_slot;			// frequency numbers
-	char **obs_types;		// observation types according to RINEX: C1C, etc.; an array of 3-character null-terminated strings in the same order as in satellites
+	char (*obs_types)[4];	// observation types according to RINEX: C1C, etc.; an array of 3-character null-terminated strings in the same order as in satellites
 	size_t obs_count;		// number of observation types
 
 	double clock_corr[4];	// clock correction parameters from GLONASS almanac: e.g. -tauC, zero, Na_day_number, N4_four_year_interval for GLONASS to UTC, optional
@@ -235,7 +235,7 @@ typedef struct				// Galileo constellation data
 	size_t max_eph_count;	// maximum supported number of ephemeris
 
 	pony_gnss_sat *sat;		// Galileo satellites
-	char **obs_types;		// observation types according to RINEX: C1C, etc.; an array of 3-character null-terminated strings in the same order as in satellites
+	char (*obs_types)[4];	// observation types according to RINEX: C1C, etc.; an array of 3-character null-terminated strings in the same order as in satellites
 	size_t obs_count;		// number of observation types
 
 	double iono[3];			// ionospheric model parameters from Galileo almanac
@@ -256,7 +256,7 @@ typedef struct				// BeiDou constellation data
 	size_t max_eph_count;	// maximum supported number of ephemeris
 
 	pony_gnss_sat *sat;		// BeiDou satellites
-	char **obs_types;		// observation types according to RINEX: C1C, etc.; an array of 3-character null-terminated strings in the same order as in satellites
+	char (*obs_types)[4];	// observation types according to RINEX: C1C, etc.; an array of 3-character null-terminated strings in the same order as in satellites
 	size_t obs_count;		// number of observation types
 
 	double iono_a[4];		// ionospheric model parameters from BeiDou almanac
@@ -275,8 +275,9 @@ typedef struct // GNSS operation settings
 
 	double code_sigma;			// pseudorange measurement rmsdev (sigma), meters
 	double phase_sigma;			// carrier phase measurement rmsdev (sigma), cycles
+	double doppler_sigma;		// doppler measurement rmsdev (sigma), Hz
 
-	double ant_pos[3];				// antenna coordinates in the instrumental frame
+	double ant_pos[3];			// antenna coordinates in the instrumental frame
 	double ant_pos_tol;			// antenna position tolerance (-1 if undefined)
 
 	double leap_sec_def;		// default value of leap seconds ( <= 0 if undefined)
@@ -406,7 +407,8 @@ char * pony_locate_token(const char *token, char *src, const size_t len, const c
 
 
 // time routines
-int pony_time_days_between_dates(pony_time_epoch epoch_from, pony_time_epoch epoch_to);	// days elapsed from one date to another, based on Rata Die serial date from day one on 0001/01/01 
+long pony_time_days_between_dates(pony_time_epoch epoch_from, pony_time_epoch epoch_to);	// days elapsed from one date to another, based on Rata Die serial date from day one on 0001/01/01 
+char pony_time_gps2epoch(pony_time_epoch *epoch, unsigned int week, double sec);			// GPS week and seconds to GPS Gregorian date/time conversion, DOES NOT include leap seconds
 
 
 
