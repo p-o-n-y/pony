@@ -409,6 +409,7 @@ char * pony_locate_token(const char *token, char *src, const size_t len, const c
 // time routines
 long pony_time_days_between_dates(pony_time_epoch epoch_from, pony_time_epoch epoch_to);	// days elapsed from one date to another, based on Rata Die serial date from day one on 0001/01/01 
 char pony_time_gps2epoch(pony_time_epoch *epoch, unsigned int week, double sec);			// GPS week and seconds to GPS Gregorian date/time conversion, DOES NOT include leap seconds
+char pony_time_epoch2gps(unsigned int *week, double *sec, pony_time_epoch *epoch);			// GPS Gregorian date/time to GPS week and seconds conversion, DOES NOT include leap seconds
 
 
 

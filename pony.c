@@ -1478,6 +1478,36 @@ char pony_time_gps2epoch(pony_time_epoch *epoch, unsigned int week, double sec) 
 
 }
 
+	// GPS Gregorian date/time to GPS week and seconds conversion, DOES NOT include leap seconds
+		// input:
+		//		week	- pointer to GPS week number (NULL to skip)
+		//		sec		- pointer to GPS seconds into the week (NULL to skip)
+		//		epoch	- pointer to epoch
+		// output:
+		//		1 - OK
+		//		0 - not OK (invalid input)
+char pony_time_epoch2gps(unsigned int *week, double *sec, pony_time_epoch *epoch) {
+
+	const pony_time_epoch base = {1980,1,6,0,0,0.0};
+
+	unsigned int days;
+
+	if (epoch == NULL || (week == NULL && sec == NULL) || epoch->M <= 0 || epoch->D <= 0)
+		return 0; // invalid input
+
+	days = pony_time_days_between_dates(base, *epoch);
+	if (days < 0)
+		return 0;
+	if (week != NULL)
+		*week	= days/7;
+	days %= 7;
+	if (sec != NULL)
+		*sec = days*86400 + epoch->h*3600 + epoch->m*60 + epoch->s;
+
+	return 1;
+
+}
+
 
 
 
