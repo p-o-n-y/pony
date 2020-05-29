@@ -1376,6 +1376,23 @@ char * pony_locate_token(const char *token, char *src, const size_t len, const c
 
 
 // time routines
+	// compare time epochs: +1 if date1 laters than date2, 0 if equal (within 1/32768 sec, half-precision compliant), -1 otherwise
+int pony_time_epochs_compare(pony_time_epoch *date1, pony_time_epoch *date2) {
+
+	const double time_precision = 1./(0x01<<15); // 1/32768, guaranteed non-zero in half precision
+	
+	int ix;
+	double dx;
+
+	ix = date1->Y - date2->Y; if(ix) return (ix > 0) ? 1 : -1;
+	ix = date1->M - date2->M; if(ix) return (ix > 0) ? 1 : -1;
+	ix = date1->D - date2->D; if(ix) return (ix > 0) ? 1 : -1;
+	ix = date1->h - date2->h; if(ix) return (ix > 0) ? 1 : -1;
+	ix = date1->m - date2->m; if(ix) return (ix > 0) ? 1 : -1;
+	
+	dx = date1->s - date2->s; return (dx > time_precision) ? 1 : ( (dx < -time_precision) ? -1 : 0 );
+
+}
 	// days elapsed from one date to another, based on Rata Die serial date from day one on 0001/01/01
 		// input:
 		//		epoch_from	- starting epoch, only Y, M and D are used

@@ -3,7 +3,7 @@
 #include <stddef.h>
 
 // PONY core declarations
-#define pony_bus_version 6		// current bus version
+#define pony_bus_version 7		// current bus version
 
 // TIME EPOCH
 typedef struct 		// Julian-type time epoch
@@ -407,6 +407,7 @@ char * pony_locate_token(const char *token, char *src, const size_t len, const c
 
 
 // time routines
+int  pony_time_epochs_compare(pony_time_epoch *date1, pony_time_epoch *date2);				// compare time epochs: +1 if date1 laters than date2, 0 if equal (within 1/32768 sec, half-precision compliant), -1 otherwise
 long pony_time_days_between_dates(pony_time_epoch epoch_from, pony_time_epoch epoch_to);	// days elapsed from one date to another, based on Rata Die serial date from day one on 0001/01/01 
 char pony_time_gps2epoch(pony_time_epoch *epoch, unsigned int week, double sec);			// GPS week and seconds to GPS Gregorian date/time conversion, DOES NOT include leap seconds
 char pony_time_epoch2gps(unsigned int *week, double *sec, pony_time_epoch *epoch);			// GPS Gregorian date/time to GPS week and seconds conversion, DOES NOT include leap seconds
