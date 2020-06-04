@@ -1,9 +1,9 @@
-// May-2020
+// Jun-2020
 //
 #include <stddef.h>
 
 // PONY core declarations
-#define pony_bus_version 7		// current bus version
+#define pony_bus_version 8		// current bus version
 
 // TIME EPOCH
 typedef struct 		// Julian-type time epoch
@@ -95,24 +95,25 @@ typedef struct		// inertial measurement unit
 typedef struct 				// GNSS satellite data
 {
 	double *eph;			// array of satellite ephemeris as defined by RINEX format (starting with toc: year, month, day, hour, min, sec, clock bias, etc., system-dependent)
-	char eph_valid;			// validity flag (0/1)
+	char    eph_valid;		// validity flag (0/1)
+	long    eph_counter;	// counter or bitfield used to indicate whether all navigation subframes/ephemeris are collected, if needed;
 
-	double Deltatsv;		// SV PRN code phase time offset (seconds), SV slock correction term to be subtracted: 
-								// GPS as in Section 20.3.3.3.3.1 of IS-GPS-200J (22 May 2018) p. 96
-								// GLONASS as in Section 3.3.3 of ICD GLONASS Edition 5.1 2008, minus sign, tau_c if present in pony_gnss_glo.clock_corr[0]
+	double  Deltatsv;		// SV PRN code phase time offset (seconds), SV slock correction term to be subtracted: 
+							// GPS as in Section 20.3.3.3.3.1 of IS-GPS-200J (22 May 2018) p. 96
+							// GLONASS as in Section 3.3.3 of ICD GLONASS Edition 5.1 2008, minus sign, tau_c if present in pony_gnss_glo.clock_corr[0]
 
-	double t_em;			// time of signal emission
-	char t_em_valid;		// validity flag (0/1)
-	double x[3];			// satellite coordinates
-	char x_valid;			// validity flag (0/1)
-	double v[3];			// satellite velocity vector
-	char v_valid;			// validity flag (0/1)
+	double  t_em;			// time of signal emission
+	char    t_em_valid;		// validity flag (0/1)
+	double  x[3];			// satellite coordinates
+	char    x_valid;		// validity flag (0/1)
+	double  v[3];			// satellite velocity vector
+	char    v_valid;		// validity flag (0/1)
 	
-	double sinEl;			// sine of satellite elevation angle
-	char sinEl_valid;		// validity flag (0/1)
+	double  sinEl;			// sine of satellite elevation angle
+	char    sinEl_valid;	// validity flag (0/1)
 
 	double *obs;			// satellite observables array, defined at runtime
-	char *obs_valid;		// satellite observables validity flag array (0/1)
+	char   *obs_valid;		// satellite observables validity flag array (0/1)
 } pony_gnss_sat;
 
 	// GPS const
@@ -407,7 +408,7 @@ char * pony_locate_token(const char *token, char *src, const size_t len, const c
 
 
 // time routines
-int  pony_time_epochs_compare(pony_time_epoch *date1, pony_time_epoch *date2);				// compare time epochs: +1 if date1 laters than date2, 0 if equal (within 1/32768 sec, half-precision compliant), -1 otherwise
+int  pony_time_epochs_compare(pony_time_epoch *date1, pony_time_epoch *date2);				// compare time epochs: +1 if date1 is later than date2, 0 if equal (within 1/32768 sec, half-precision compliant), -1 otherwise
 long pony_time_days_between_dates(pony_time_epoch epoch_from, pony_time_epoch epoch_to);	// days elapsed from one date to another, based on Rata Die serial date from day one on 0001/01/01 
 char pony_time_gps2epoch(pony_time_epoch *epoch, unsigned int week, double sec);			// GPS week and seconds to GPS Gregorian date/time conversion, DOES NOT include leap seconds
 char pony_time_epoch2gps(unsigned int *week, double *sec, pony_time_epoch *epoch);			// GPS Gregorian date/time to GPS week and seconds conversion, DOES NOT include leap seconds

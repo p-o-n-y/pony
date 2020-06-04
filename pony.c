@@ -1,4 +1,4 @@
-// May-2020
+// Jun-2020
 //
 // PONY core source code
 
@@ -350,6 +350,19 @@ void pony_init_gnss_gps_const(pony_gps_const *gps_const)
 	gps_const->L2	= pony->gnss_const.c/gps_const->F2;		// nominal wavelength for L2 signal
 }
 
+	// init satellite data
+void pony_init_gnss_sat(pony_gnss_sat *sat)
+{
+	sat->eph			= NULL;
+	sat->eph_valid		= 0;
+	sat->eph_counter	= 0;
+	sat->obs			= NULL;
+	sat->obs_valid		= NULL;
+	sat->x_valid		= 0;
+	sat->v_valid		= 0;
+	sat->t_em_valid		= 0;
+	sat->sinEl_valid	= 0;
+}
 	// free satellite data
 void pony_free_gnss_sat(pony_gnss_sat **sat, const size_t sat_count)
 {
@@ -386,16 +399,8 @@ char pony_init_gnss_gps(pony_gnss_gps *gps, const size_t max_sat_count, const si
 	gps->max_sat_count = max_sat_count;
 
 	// initialize satellite data
-	for (i = 0; i < gps->max_sat_count; i++) {
-		gps->sat[i].eph			= NULL;
-		gps->sat[i].eph_valid	= 0;
-		gps->sat[i].obs			= NULL;
-		gps->sat[i].obs_valid	= NULL;
-		gps->sat[i].x_valid		= 0;
-		gps->sat[i].v_valid		= 0;
-		gps->sat[i].t_em_valid	= 0;
-		gps->sat[i].sinEl_valid	= 0;
-	}
+	for (i = 0; i < gps->max_sat_count; i++) 
+		pony_init_gnss_sat(gps->sat + i);
 
 	// try to allocate memory for each satellite ephemeris
 	for (i = 0; i < gps->max_sat_count; i++) {
@@ -466,16 +471,8 @@ char pony_init_gnss_glo(pony_gnss_glo *glo, const size_t max_sat_count, const si
 	glo->max_sat_count = max_sat_count;
 
 	// initialize satellite data
-	for (i = 0; i < glo->max_sat_count; i++) {
-		glo->sat[i].eph			= NULL;
-		glo->sat[i].eph_valid	= 0;
-		glo->sat[i].obs			= NULL;
-		glo->sat[i].obs_valid	= NULL;
-		glo->sat[i].x_valid		= 0;
-		glo->sat[i].v_valid		= 0;
-		glo->sat[i].t_em_valid	= 0;
-		glo->sat[i].sinEl_valid	= 0;
-	}
+	for (i = 0; i < glo->max_sat_count; i++) 
+		pony_init_gnss_sat(glo->sat + i);
 
 	// try to allocate memory for each satellite ephemeris
 	for (i = 0; i < glo->max_sat_count; i++) {
@@ -546,16 +543,8 @@ char pony_init_gnss_gal(pony_gnss_gal *gal, const size_t max_sat_count, const si
 	gal->max_sat_count = max_sat_count;
 
 	// initialize satellite data
-	for (i = 0; i < gal->max_sat_count; i++) {
-		gal->sat[i].eph			= NULL;
-		gal->sat[i].eph_valid	= 0;
-		gal->sat[i].obs			= NULL;
-		gal->sat[i].obs_valid	= NULL;
-		gal->sat[i].x_valid		= 0;
-		gal->sat[i].v_valid		= 0;
-		gal->sat[i].t_em_valid	= 0;
-		gal->sat[i].sinEl_valid	= 0;
-	}
+	for (i = 0; i < gal->max_sat_count; i++) 
+		pony_init_gnss_sat(gal->sat + i);
 
 	// try to allocate memory for each satellite ephemeris
 	for (i = 0; i < gal->max_sat_count; i++) {
@@ -625,16 +614,8 @@ char pony_init_gnss_bds(pony_gnss_bds *bds, const size_t max_sat_count, const si
 	bds->max_sat_count = max_sat_count;
 
 	// initialize satellite data
-	for (i = 0; i < bds->max_sat_count; i++) {
-		bds->sat[i].eph			= NULL;
-		bds->sat[i].eph_valid	= 0;
-		bds->sat[i].obs			= NULL;
-		bds->sat[i].obs_valid	= NULL;
-		bds->sat[i].x_valid		= 0;
-		bds->sat[i].v_valid		= 0;
-		bds->sat[i].t_em_valid	= 0;
-		bds->sat[i].sinEl_valid	= 0;
-	}
+	for (i = 0; i < bds->max_sat_count; i++) 
+		pony_init_gnss_sat(bds->sat + i);
 
 	// try to allocate memory for each satellite ephemeris
 	for (i = 0; i < bds->max_sat_count; i++) {
@@ -1405,91 +1386,69 @@ long pony_time_days_between_dates(pony_time_epoch epoch_from, pony_time_epoch ep
 		epoch_to  .Y--,	epoch_to  .M	+= 12;
 	if (epoch_from.M	< 3) 
 		epoch_from.Y--,	epoch_from.M	+= 12;
-    return 
-		(365*epoch_to  .Y	+ epoch_to  .Y/4	- epoch_to  .Y/100	+ epoch_to  .Y/400	+ (153*epoch_to  .M	- 457)/5	+ epoch_to  .D	- 306) - 
-		(365*epoch_from.Y	+ epoch_from.Y/4	- epoch_from.Y/100	+ epoch_from.Y/400	+ (153*epoch_from.M	- 457)/5	+ epoch_from.D	- 306);
+    return
+		(epoch_to  .Y   - epoch_from.Y)*365 +
+		(epoch_to  .Y/4	- epoch_to  .Y/100  + epoch_to  .Y/400 + (153*epoch_to  .M - 457)/5) - 
+		(epoch_from.Y/4	- epoch_from.Y/100  + epoch_from.Y/400 + (153*epoch_from.M - 457)/5) +
+		(epoch_to  .D   - epoch_from.D);
+		// original Rata Die calculation:
+		//(365*epoch_to  .Y	+ epoch_to  .Y/4	- epoch_to  .Y/100	+ epoch_to  .Y/400	+ (153*epoch_to  .M	- 457)/5	+ epoch_to  .D	- 306) - 
+		//(365*epoch_from.Y	+ epoch_from.Y/4	- epoch_from.Y/100	+ epoch_from.Y/400	+ (153*epoch_from.M	- 457)/5	+ epoch_from.D	- 306);
 
 }
 
 	// GPS week and seconds to GPS Gregorian date/time conversion, DOES NOT include leap seconds
+	// note: checked explicitly from Jan 6, 1980 to Dec 31, 5741 (1M+ days)
 		// input:
 		//		epoch	- pointer to epoch
 		//		week	- GPS week number
-		//		sec		- GPS seconds into the week
+		//		sec		- GPS seconds into the week, positive only accepted
 		// output:
 		//		1 - OK
 		//		0 - not OK (invalid input)
 char pony_time_gps2epoch(pony_time_epoch *epoch, unsigned int week, double sec) {
 
-	const pony_time_epoch base = {1980,1,6,0,0,0.0};
-	
-	static int days_in_month[] = {31,28,31,30,31,30,31,31,30,31,30,31};
+                               // Mar Apr May Jun Jul Aug Sep Oct Nov Dec Jan
+	const unsigned short dom[] = { 30, 60, 91,121,152,183,213,244,274,305,336}; // days of year since March 1 when months end
+	unsigned long days, d1, d100, l100, d400, l400, dd;
 
-	long days, days_left, years, dow;
-	double sod, soh;
+	if (sec < 0)
+		return 0; // invalid input
 
-	if (epoch == NULL)
-		return 0;
+	days  = (unsigned int)(sec /86400);		// days into week
+	sec  -= (double)      (days*86400);		// seconds into day
 
-	dow = (int)(sec/86400);
-	days = week*7 + dow;
-	if (days < 0)
-		return 0; // dates before Jan,5,1980 are not supported
-
-	if (epoch->Y == 0 || epoch->M == 0 || epoch->D == 0) { // starting approximation
-		years = (int)(days/365.25);
-		epoch->Y = base.Y + years;
-		days_left = days - (int)(years*365.25);
-		epoch->M = (int)(days_left/30.5);
-		days_left -= (int)(epoch->M*30.5);
-		if (days_left < days_in_month[epoch->M]) { // no rollover
-			epoch->D = days_left+1;
-			epoch->M++;
-		}
-		else { // month rollover
-			epoch->D = days_left - days_in_month[epoch->M];
-			if (epoch->M <= 10)		
-				epoch->M += 2;
-			else { // year rollover
-				epoch->M = 1;
-				epoch->Y++;
-			}
-		}
+	days += week*7 + 138737;				// move starting day from January 6, 1980 to March 1, 1600 (beginning of 400-year leap cycle)
+	d1    = days + 1;
+	l400  = d1/146097;						// extra days due to 400-year cycles (146 097 days each)
+	d400  = days - l400;					// days adjusted for 400-year cycles
+	l100  = d400/36524;						// missing days due to 100-year cycles (36 524 days each)
+	d100  = d1   + l100 - l400;				// days adjusted for 100- and 400-year cycles
+	dd    = days - d100/1461 + l100 - l400;	// days adjusted for all leap years, incl. 4-year cycles (1461 days each)
+	//year
+	epoch->Y = 1600 + dd/365;
+	// day of year (starting from zero on March 1)
+	epoch->D = dd%365;
+	if ( d1%146097 == 0 || (d100%1461 == 0 && d400%36524 != 0) ) // add leap day
+		epoch->D++;
+	// month
+	epoch->M = epoch->D/31; // exact for 340 days out of 366, less by one for the rest 26
+	if (epoch->M < 11 && epoch->D > dom[epoch->M]) // if underestimated, adjust by one
+		epoch->M++;
+	// day of year (from zero) to day of month (from one)
+	epoch->D += (epoch->M > 0) ? -dom[epoch->M-1] : 1;
+	// move starting day from March 1 to January 1
+	if (epoch->M > 9) {
+		epoch->M -= 9;
+		epoch->Y++;
 	}
-	days_in_month[1] = ( (!(epoch->Y%4) && epoch->Y%100) || !(epoch->Y%400) ) ? 29 : 28; // leap year check
-	// iterate to the precise date
-	while(1) {
-		days_left = pony_time_days_between_dates(base, *epoch) - days;
-		if (!days_left)
-			break;
-		epoch->D -= days_left;
-		while (epoch->D > days_in_month[epoch->M-1]) { // month forward rollover
-			epoch->D -= days_in_month[epoch->M-1];
-			if (epoch->M <= 11)		
-				epoch->M++;
-			else { // year rollover
-				epoch->M = 1;
-				epoch->Y++;
-				days_in_month[1] = ( (!(epoch->Y%4) && epoch->Y%100) || !(epoch->Y%400) ) ? 29 : 28; // leap year check
-			}
-		}
-		while (epoch->D < 1) { // month backward rollover
-			if (epoch->M > 1)		
-				epoch->M--;
-			else { // year rollover
-				epoch->M = 12;
-				epoch->Y--;
-				days_in_month[1] = ( (!(epoch->Y%4) && epoch->Y%100) || !(epoch->Y%400) ) ? 29 : 28; // leap year check
-			}
-			epoch->D += days_in_month[epoch->M-1];
-		}
-	};
-
-	sod = sec - dow*86400;
-	epoch->h = (int)(sod/3600);
-	soh = sod - epoch->h*3600;
-	epoch->m = (int)(soh/60);
-	epoch->s = soh - epoch->m*60;
+	else
+		epoch->M += 3;
+	// time of day
+	epoch->h = (unsigned int)sec/3600;
+	sec     -= epoch->h*3600;
+	epoch->m = (unsigned int)sec/60;
+	epoch->s = sec - epoch->m*60;
 
 	return 1;
 
