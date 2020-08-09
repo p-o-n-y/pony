@@ -1,9 +1,12 @@
-// Jun-2020
+// Aug-2020
 //
+#ifndef PONY_H_
+#define PONY_H_
+
 #include <stddef.h>
 
 // PONY core declarations
-#define pony_bus_version 8		// current bus version
+#define PONY_BUS_VERSION 9		// current bus version
 
 // TIME EPOCH
 typedef struct 		// Julian-type time epoch
@@ -26,17 +29,17 @@ typedef struct			// navigation solution structure
 	double llh[3];			// geodetic coordinates: longitude (rad), latitude (rad), height (meters)
 	char llh_valid;			// validity flag (0/1), or a number of valid measurements used
 
-	double v[3];			// relative-to-Earth velocity vector coordinates in local-level geodetic or cartesian frame, meters per second
+	double v[3];			// relative-to-Earth velocity vector coordinates in local-level geodetic cartesian frame, meters per second
 	char v_valid;			// validity flag (0/1), or a number of valid measurements used
 	double v_std;			// velocity RMS ("standard") deviation estimate, meters per second
 
-	double q[4];			// attitude quaternion, relative to local-level or cartesian frame
+	double q[4];			// attitude quaternion, relative to local-level geodetic cartesian frame
 	char q_valid;			// validity flag (0/1), or a number of valid measurements used
 
-	double L[9];			// attitude matrix for the transition from local-level or cartesian frame, row-wise: L[0] = L_11, L[1] = L_12, ..., L[8] = L[33]
+	double L[9];			// attitude matrix for the transition from local-level geodetic cartesian frame, row-wise: L[0] = L_11, L[1] = L_12, ..., L[8] = L[33]
 	char L_valid;			// validity flag (0/1), or a number of valid measurements used
 
-	double rpy[3];			// attitude angles relative to local-level frame: roll (rad), pitch (rad), yaw = true heading (rad)
+	double rpy[3];			// attitude angles relative to local-level geodetic cartesian frame: roll (rad), pitch (rad), yaw (rad)
 	char rpy_valid;			// validity flag (0/1), or a number of valid measurements used
 
 	double dt;				// clock bias
@@ -56,7 +59,7 @@ typedef struct		// inertial navigation constants
 	double 
 		pi,			// pi
 		rad2deg,	// 180/pi
-		// Earth parameters as in GRS-80 by H. Moritz // Journal of Geodesy (2000) 74 (1): pp. 128–162
+		// Earth parameters as in GRS-80 by H. Moritz // Journal of Geodesy (2000) 74 (1): pp. 128-162
 		u,			// Earth rotation rate, rad/s
 		a,			// Earth ellipsoid semi-major axis, m
 		e2,			// Earth ellipsoid first eccentricity squared
@@ -67,8 +70,8 @@ typedef struct		// inertial navigation constants
 	// IMU
 typedef struct		// inertial measurement unit
 {
-	char* cfg;			// pointer to IMU configuration string
-	size_t cfglength;	// IMU configuration string length
+	char* cfg;			// pointer to IMU configuration substring
+	size_t cfglength;	// IMU configuration substring length
 
 	double t;			// measurement update time
 
@@ -188,8 +191,8 @@ typedef struct		// GNSS constants
 	// GPS
 typedef struct				// GPS constellation data
 {
-	char* cfg;				// GPS configuration string
-	size_t cfglength;		// configuration string length
+	char* cfg;				// GPS configuration substring
+	size_t cfglength;		// GPS configuration substring length
 
 	size_t max_sat_count;	// maximum supported number of satellites
 	size_t max_eph_count;	// maximum supported number of ephemeris
@@ -210,8 +213,8 @@ typedef struct				// GPS constellation data
 	// GLONASS
 typedef struct				// GLONASS constellation data
 {
-	char* cfg;				// GLONASS configuration string
-	size_t cfglength;		// configuration string length
+	char* cfg;				// GLONASS configuration substring
+	size_t cfglength;		// GLONASS configuration substring length
 
 	size_t max_sat_count;	// maximum supported number of satellites
 	size_t max_eph_count;	// maximum supported number of ephemeris
@@ -229,8 +232,8 @@ typedef struct				// GLONASS constellation data
 	// GALILEO
 typedef struct				// Galileo constellation data
 {
-	char* cfg;				// Galileo configuration string
-	size_t cfglength;		// configuration string length
+	char* cfg;				// Galileo configuration substring
+	size_t cfglength;		// Galileo configuration substring length
 
 	size_t max_sat_count;	// maximum supported number of satellites
 	size_t max_eph_count;	// maximum supported number of ephemeris
@@ -250,8 +253,8 @@ typedef struct				// Galileo constellation data
 		// BEIDOU
 typedef struct				// BeiDou constellation data
 {
-	char* cfg;				// BeiDou configuration string
-	size_t cfglength;		// configuration string length
+	char* cfg;				// BeiDou configuration substring
+	size_t cfglength;		// BeiDouconfiguration substring length
 
 	size_t max_sat_count;	// maximum supported number of satellites
 	size_t max_eph_count;	// maximum supported number of ephemeris
@@ -287,11 +290,11 @@ typedef struct // GNSS operation settings
 	// GNSS
 typedef struct						// global navigation satellite systems data
 {
-	char* cfg;						// full GNSS configuration string pointer, NULL if gnss is not used
-	size_t cfglength;				// full GNSS configuration string length
+	char* cfg;						// full GNSS configuration substring pointer, NULL if gnss is not used
+	size_t cfglength;				// full GNSS configuration substring length
 
-	char* cfg_settings;				// pointer to a part of GNSS configuration string common to all systems
-	size_t settings_length;			// length of the part of GNSS configuration string common to all systems
+	char* cfg_settings;				// pointer to a part of GNSS configuration substring common to all systems
+	size_t settings_length;			// length of the part of GNSS configuration substring common to all systems
 
 	pony_gnss_settings settings;	// GNSS operation settings
 
@@ -313,19 +316,22 @@ typedef struct						// global navigation satellite systems data
 // AIR DATA
 typedef struct
 {
-	char* cfg;				// pointer to air data configuration string
-	size_t cfglength;		// air data configuration string length
+	char* cfg;			// pointer to air data configuration substring
+	size_t cfglength;	// air data configuration substring length
 
-	double t;				// measurement update time
+	double t;			// measurement update time
 
-	double alt;				// barometric altitude
-	char alt_valid;			// validity flag (0/1)
+	double alt;			// barometric altitude
+	double alt_std;		// estimated standard deviation, <0 if undefined
+	char   alt_valid;	// validity flag (0/1)
 
-	double vv;				// vertical velocity (vertical speed/rate of climb and descent)
-	char vv_valid;			// validity flag (0/1)
+	double vv;			// vertical velocity (vertical speed/rate of climb and descent)
+	double vv_std;		// estimated standard deviation, <0 if undefined
+	char   vv_valid;	// validity flag (0/1)
 
-	double airspeed;		// airspeed
-	char airspeed_valid;	// validity flag (0/1)
+	double speed;		// airspeed
+	double speed_std;	// estimated standard deviation, <0 if undefined
+	char   speed_valid;	// validity flag (0/1)
 } pony_air;
 
 
@@ -383,7 +389,7 @@ typedef struct					// bus data to be used in host application
 	pony_gnss* gnss;							// global navigation satellite system data pointer
 	size_t gnss_count;							// number of gnss instances
 
-	pony_air* air;								// air data subsystem
+	pony_air* air;								// air data subsystem pointer
 
 	double t;									// system time
 	int mode;									// operation mode: 0 - init, <0 termination, >0 normal operation
@@ -434,6 +440,7 @@ void pony_linal_mat2quat(double *q, double *R);  // 3x3 attitude matrix R to qua
 void pony_linal_quat2mat(double *R, double *q);  // attitude quaternion q (with q0 being scalar part) to a 3x3 matrix R
 void pony_linal_rpy2mat(double *R, double *rpy); // roll, pitch and yaw (radians, airborne frame: X longitudinal, Z right-wing) to a 3x3 transition matrix R from E-N-U
 void pony_linal_mat2rpy(double *rpy, double *R); // 3x3 transition matrix R from E-N-U to roll, pitch and yaw (radians, airborne frame: X longitudinal, Z right-wing)
+void pony_linal_eul2mat(double *R, double *e);   // rotate 3x3 matrix R by 3x1 Euler vector e via Rodrigues' formula: R = (E + sin|e|/|e|*[e,] + (1-cos|e|)/|e|^2*[e,]^2)*R
 
 	// routines for m x m upper-triangular matrices U lined up in a single-dimension array u
 		// index conversion
@@ -449,5 +456,13 @@ void pony_linal_uuT(double *res,  double *u, const size_t m); // square (with tr
 void pony_linal_chol(double *S,  double *P, const size_t m); // Cholesky upper-triangular factorization P = S*S^T, where P is symmetric positive-definite matrix
 
 	// square root Kalman filtering
-double pony_linal_kalman_update(double *x, double *S, double *K,  double z, double *h, double sigma, const size_t m);
+char   pony_linal_check_measurement_residual(double *x, double *S, double z, double *h, double sigma, double k_sigma, const size_t n); // check measurement residual magnitude against predicted covariance level
+double pony_linal_kalman_update(double *x, double *S, double *K,  double z, double *h, double sigma, const size_t n); // kalman filtering - update phase
+void   pony_linal_kalman_predict_I_qI  (           double *S,            double  q2, const size_t n                ); // kalman filtering - prediction phase - identity         state transition -         scalar process noise covariance
+void   pony_linal_kalman_predict_I_qIr (           double *S,            double  q2, const size_t n, const size_t m); // kalman filtering - prediction phase - identity         state transition - reduced scalar process noise covariance
+void   pony_linal_kalman_predict_I_diag(           double *S,            double *q2, const size_t n, const size_t m); // kalman filtering - prediction phase - identity         state transition -       diagonal process noise covariance
+void   pony_linal_kalman_predict_I     (           double *S,            double *Q , const size_t n, const size_t m); // kalman filtering - prediction phase - identity         state transition         
+void   pony_linal_kalman_predict_U_diag(double *x, double *S, double *U, double *q2, const size_t n, const size_t m); // kalman filtering - prediction phase - upper triangular state transition -       diagonal process noise covariance
+void   pony_linal_kalman_predict_U     (double *x, double *S, double *U, double *Q , const size_t n, const size_t m); // kalman filtering - prediction phase - upper triangular state transition 
 
+#endif // PONY_H_

@@ -1,4 +1,4 @@
-// Jun-2020
+// Aug-2020
 //
 // PONY core source code
 
@@ -25,7 +25,7 @@ char pony_resume_plugin		(void(*   plugin)(void)							);	// resume all instance
 
 // bus instance
 static pony_struct pony_bus = {
-	pony_bus_version,			// ver
+	PONY_BUS_VERSION,			// ver
 	pony_add_plugin,			// add_plugin
 	pony_init,					// init
 	pony_step,					// step
@@ -789,15 +789,19 @@ void pony_free_gnss(pony_gnss *gnss)
 	// initialize air data structure
 char pony_init_air(pony_air *air)
 {
-	// validity flags
-	air->alt_valid = 0;
-	air->vv_valid = 0;
-	air->airspeed_valid = 0;
 	// values
-	air->t = 0;
-	air->alt = 0;
-	air->vv = 0;
-	air->airspeed = 0;
+	air->t     = 0;
+	air->alt   = 0;
+	air->vv    = 0;
+	air->speed = 0;
+	// stdev 
+	air->  alt_std = -1; // undefined
+	air->   vv_std = -1; // undefined
+	air->speed_std = -1; // undefined
+	// validity flags
+	air->  alt_valid = 0;
+	air->   vv_valid = 0;
+	air->speed_valid = 0;
 
 	return 1;
 }
@@ -1653,53 +1657,73 @@ void pony_linal_rpy2mat(double *R, double *rpy) {
 	sy = sin(rpy[2]);	cy = cos(rpy[2]);
 
 	R[0] =     cp*sy        ;	R[1] =     cp*cy        ;	R[2] =     sp;
-	R[3] = -cr*sp*sy + cy*sr;	R[4] = -cr*sp*cy - sy*sr;	R[5] =  cr*cp;
-	R[6] =  sr*sp*sy + cy*cr;	R[7] =  sr*sp*cy - sy*cr;	R[8] = -sr*cp;
+	R[3] = -cr*sp*sy + sr*cy;	R[4] = -cr*sp*cy - sr*sy;	R[5] =  cr*cp;
+	R[6] =  sr*sp*sy + cr*cy;	R[7] =  sr*sp*cy - cr*sy;	R[8] = -sr*cp;
 
 }
 
 		// 3x3 transition matrix R from E-N-U to roll, pitch and yaw (radians, airborne frame: X longitudinal, Z right-wing)
 void pony_linal_mat2rpy(double *rpy, double *R) {
 	
-	const double pi2 = 6.283185307179586;
+	const double pi2 = 6.283185307179586476925286766559005768; // pi*2, IEEE-754 quadruple precision
 	double dp, dm;
 
-	dp = atan2( R[3]-R[7],R[6]+R[4]);
-	dm = atan2(-R[3]-R[7],R[6]-R[4]);
+	rpy[1] = atan2( R[2], sqrt(R[5]*R[5] + R[8]*R[8]) ); // pitch angle
 
-	if (
-		R[0]>=0 && R[8]<=0 && 
-		(  (R[1]>=0 && R[5]< 0 && dp<=0)
-		|| (R[1]< 0 && R[5]>=0 && dp<=0) 
-		|| (R[1]< 0 && R[5]< 0         ) )
-		)
-		dp += pi2;
-	else if (
-		R[0]< 0 && R[8]> 0 && 
-		(  (R[1]>=0 && R[5]< 0 && dp>=0) 
-		|| (R[1]< 0 && R[5]>=0 && dp>=0)  
-		|| (R[1]< 0 && R[5]< 0         ) )
-		)
-		dp -= pi2;
+	if (fabs(R[2]) < 0.5) { // pitch magnitude below 30 deg
+		rpy[0] = -atan2(R[8], R[5]); // roll angle
+		rpy[2] =  atan2(R[0], R[1]); // yaw  angle
+	}
+	else {                  // pitch magnitude over 30 deg
+		dp =  atan2(R[3]-R[7],R[6]+R[4]);
+		dm = -atan2(R[3]+R[7],R[6]-R[4]);
 
-	if (
-		R[0]>=0 && R[8]> 0 && 
-		(  (R[1]>=0 && R[5]< 0 && dm<=0) 
-		|| (R[1]< 0 && R[5]>=0 && dm<=0)  
-		|| (R[1]< 0 && R[5]< 0         ) )
-		)
-		dm += pi2;
-	else if (
-		R[0]< 0 && R[8]<=0 && 
-		(  (R[1]>=0 && R[5]< 0 && dm>=0) 
-		|| (R[1]< 0 && R[5]>=0 && dm>=0)  
-		|| (R[1]< 0 && R[5]< 0         ) )
-		)
-		dm -= pi2;
+		     if (R[0] <= 0 && -R[8] <= 0 && dp > 0) dp -= pi2;
+		else if (R[0] >= 0 && -R[8] >= 0 && dp < 0) dp += pi2;
+		else if (R[0] <= 0 && -R[8] >= 0 && dm > 0) dm -= pi2;
+		else if (R[0] >= 0 && -R[8] <= 0 && dm < 0) dm += pi2;
 
-	rpy[0] = (dp - dm)/2;
-	rpy[1] =  asin(R[2]);
-	rpy[2] = (dp + dm)/2;
+		rpy[0] = (dp - dm)/2; // roll angle
+		rpy[2] = (dp + dm)/2; // yaw  angle
+	}
+
+}
+
+		// 3x3 rotation matrix R for 3x1 Euler vector e via Rodrigues' formula
+		// R = E + sin|e|/|e|*[e,] + (1-cos|e|)/|e|^2*[e,]^2
+void pony_linal_eul2mat(double *R, double *e) {
+
+	const double eps = 1.0/0x0100;	// 2^-8, guaranteed non-zero value in IEEE754 half-precision format
+
+	double 
+		e0, e02,	// |e|, |e|^2
+		e1, e2, e3,	// e[i]^2
+		s, c,		// sin|e|/|e|, (1 - cos|e|)/|e|^2
+		ps, pc;	    // Taylor expansion terms
+	unsigned char i;
+		
+	// e[i]^2, |e|^2, |e|
+	e1 = e[0]*e[0], e2 = e[1]*e[1], e3 = e[2]*e[2];
+	e02 = e1 + e2 + e3;
+	e0 = sqrt(e02);
+	// sin|e|/|e|, (1 - cos|e|)/|e|^2
+	if (e0 > eps) {
+		s = sin(e0)/e0;
+		c = (1 - cos(e0))/e02;
+	}
+	else {
+		// Taylor expansion for sin(x)/x, (1-cos(x))/x^2 up to 10-th degree terms 
+		// having the order of 2^-105, they fall below IEEE 754-2008 quad precision rounding error when multiplied by an argument less than 2^-8
+		s = 1, c = 1/2.;
+		for (i = 1, ps = -e02/6, pc = -e02/24; i < 5; i++, ps *= -e02/((double)(i*(4*i+2))), pc *= -e02/((double)((4*i+2)*(i+1)))) 
+			s += ps, c += pc;		
+	}
+
+	// rotation matrix
+	R[0] =       1 - (e2 + e3)*c; R[1] =  e[2]*s + e[0]*e[1]*c; R[2] = -e[1]*s + e[2]*e[0]*c;
+	R[3] = -e[2]*s + e[0]*e[1]*c; R[4] =       1 - (e3 + e1)*c; R[5] =  e[0]*s + e[1]*e[2]*c;
+	R[6] =  e[1]*s + e[2]*e[0]*c; R[7] = -e[0]*s + e[1]*e[2]*c; R[8] =       1 - (e1 + e2)*c;
+
 }
 
 
@@ -1718,7 +1742,8 @@ void pony_linal_u_k2ij(size_t *i, size_t *j, const size_t k, const size_t m) {
 	*j = k - ( ( 2*m - 1 - (*i) )*(*i) )/2;
 }
 
-		// upper-triangular matrix lined up in a single-dimension array multiplication: res = U*v
+		// upper-triangular matrix lined up in a single-dimension array multiplication by a regular matrix: res = U*v
+			// U is n x n, v is n x m
 			// overwriting input (double *res = double *v) allowed
 void pony_linal_u_mul(double *res, double *u, double *v, const size_t n, const size_t m) {
 	size_t i, j, k, p, p0, mn;
@@ -1733,6 +1758,7 @@ void pony_linal_u_mul(double *res, double *u, double *v, const size_t n, const s
 }
 
 		// upper-triangular matrix lined up in a single-dimension array of m(m+1)/2 x 1, transposed, multiplication by vector: res = U^T*v
+			// no overwriting input allowed
 void pony_linal_uT_mul_v(double *res, double *u, double *v, const size_t m) {
 	size_t i, j, k;
 
@@ -1801,45 +1827,85 @@ void pony_linal_chol(double *S, double *P, const size_t m) {
 
 }
 
-	// square root Kalman filtering
+	// square root Kalman filtering - check measurement residual magnitude against predicted covariance level
 	//	input: 
-	//		x - current estimate of m x 1 state vector
-	//		S - upper-truangular part of a Cholesky factor of current covariance matrix, lined in a single-dimension array m(m+1)/2 x 1
-	//		z - scalar measurement value
-	//		h - linear measurement model matrix, so that z = h*x + r
-	//		sigma - measurement error a priori standard deviation, so that sigma = sqrt(E[r^2])
+	//		x       - current estimate of m x 1 state vector
+	//		S       - upper-truangular part of the Cholesky factor of current covariance matrix, lined in a single-dimension array m(m+1)/2 x 1
+	//		z       - scalar measurement value
+	//		h       - linear measurement model matrix, so that z = h*x + r
+	//		  sigma - measurement error a priori standard deviation, so that sigma = sqrt(E[r^2])
+	//		k_sigma - confidence coefficient, 3 for 3-sigma (99.7%), 2 for 2-sigma (95%), etc.
+	//		m       - state vector size
 	//	output:
-	//		x - updated estimate of state vector
-	//		S - upper-truangular part of a Cholesky factor of updated covariance matrix, lined in a single-dimension array m(m+1)/2 x 1
-	//		K - Kalman gain
-double pony_linal_kalman_update(double *x, double *S, double *K, double z, double *h, double sigma, const size_t m) {
+	//		return value only
+    //	return value:
+	//		1 - if measurement residual magnitude lies below the predicted covariance level, i.e. |z - h*x| < k_sigma*sqrt(h*S*S^T*h^T + sigma^2)
+	//		0 - otherwise
+char pony_linal_check_measurement_residual(double *x, double *S, double z, double *h, double sigma, double k_sigma, const size_t m)
+{
+	size_t i, j, k;
 
-	double d, d1, sdd1, f, e;
+	double s;
+
+	sigma = sigma*sigma;
+	for (i = 0; i < m; i++) {
+		// dz = z - h*x: residual
+		z -= h[i]*x[i];
+		// s = h*S*S^T*h^T: predicted dispersion 
+		for (j = 0, k = i, s = 0; j <= i; j++, k += m-j)
+			s += h[j]*S[k];
+		sigma += s*s;
+	}
+	sigma = sqrt(sigma);
+
+	return (fabs(z) < k_sigma*sigma) ? 1 : 0;
+}
+
+	// square root Kalman filtering - update phase
+	//	input: 
+	//		x     - current estimate of n x 1 state vector
+	//		S     - upper-truangular part of the Cholesky factor of current covariance matrix, lined in a single-dimension array n(n+1)/2 x 1
+	//		z     - scalar measurement value
+	//		h     - linear measurement model matrix, so that z = h*x + r
+	//		sigma - measurement error a priori standard deviation, so that sigma = sqrt(E[r^2])
+	//		n     - state vector size
+	//	output:
+	//		x     - updated estimate of state vector (overwrites input)
+	//		S     - upper-truangular part of the Cholesky factor of updated covariance matrix, lined in a single-dimension array n(n+1)/2 x 1 (overwrites input)
+	//		K     - Kalman gain
+	//	return value:
+	//		measurement residual before update
+double pony_linal_kalman_update(double *x, double *S, double *K, double z, double *h, double sigma, const size_t n) {
+
+	double d, d1, sd, sd1, f, e;
 	size_t i, j, k;
 
 	// e0 stored in K
-	for (i = 0; i < m; i++)
+	for (i = 0; i < n; i++)
 		K[i] = 0;
 
 	// d0
 	d = sigma*sigma;
 
 	// S
-	for (i = 0; i < m; i++) {
+	for (i = 0; i < n; i++) {
 		// f = S^T*h
 		f = S[i]*h[0];
-		for (j = 1, k = i+m-1; j <= i; j++, k += m-j)
+		for (j = 1, k = i+n-1; j <= i; j++, k += n-j)
 			f += S[k]*h[j];
 		if (f == 0)
 			continue;	// optimization for sparse matrices
 		// d
-		d1 = d + f*f;
-		sdd1 = sqrt(d*d1);
+		 d1 = d + f*f;
+		sd  = sqrt(d);
+		sd1 = sqrt(d1);
 		// S^+, e
-		for (j = 0, k = i; j <= i; j++, k += m-j) {
+		for (j = 0, k = i; j <= i; j++, k += n-j) {
 			e = K[j];
 			K[j] += S[k]*f;
-			S[k] = (S[k]*d - e*f)/sdd1; // sigma = 0 not allowed
+			S[k] *= sd/sd1; 
+			if (e != 0)               // optimization for degenerate case
+				S[k] -= e*f/(sd*sd1); // d = 0 (sigma = 0) allowed only if e = 0
 		}
 		d = d1;
 
@@ -1848,10 +1914,186 @@ double pony_linal_kalman_update(double *x, double *S, double *K, double z, doubl
 	}		
 
 	// K, x
-	for (i = 0; i < m; i++) {
-		K[i] /= d; // sigma = 0 not allowed
-		x[i] += K[i]*z;
-	}
+	for (i = 0; i < n; i++)
+		if (K[i] != 0) { // optimization for degenerate case
+			K[i] /= d;   // d = 0 (sigma = 0) allowed only for K[i] = 0
+			x[i] += K[i]*z;
+		}
 
 	return z;
+}
+
+	// square root Kalman filtering - prediction phase - identity state transition - scalar process noise covariance
+	//		Q = q^2*I = E[(x_i - x_i-1)*(x_i - x_i-1)^T]            
+	//	input: 
+	//		S	- upper-truangular part of the Cholesky factor of current covariance matrix, lined in a single-dimension array n(n+1)/2 x 1
+	//		q2	- process noise dispersion, q2 = q^2 >= 0
+	//		n	- state vector size
+	//	output:
+	//		S	- upper-truangular part of a Cholesky factor of predicted covariance matrix, lined in a single-dimension array n(n+1)/2 x 1 (overwrites input)
+void pony_linal_kalman_predict_I_qI(double *S, double q2, const size_t n) 
+{
+	size_t i;
+
+	pony_linal_uuT(S,S,n);      // P = S*S^T
+	for (i = 0; i < n; i++)
+		S[i*(2*n-i+1)/2] += q2; // P = P + Q, Q = q2*I
+	pony_linal_chol(S,S,n);     // P = S*S^T
+}
+
+	// square root Kalman filtering - prediction phase - identity state transition - reduced scalar process noise covariance
+	//		    [q^2*I 0 0]                                     
+	//		Q = [   0  0 0] = E[(x_i - x_i-1)*(x_i - x_i-1)^T]
+	//		    [   0  0 0]                                             
+	//	input: 
+	//		S	- upper-truangular part of the Cholesky factor of current covariance matrix, lined in a single-dimension array n(n+1)/2 x 1
+	//		q2	- nonzero process noise dispersion,  q2 = q^2 >= 0
+	//		n	- state vector size
+	//		m	- nonzero process noise vector size
+	//	output:
+	//		S	- upper-truangular part of the Cholesky factor of predicted covariance matrix, lined in a single-dimension array n(n+1)/2 x 1 (overwrites input)
+void pony_linal_kalman_predict_I_qIr(double *S, double q2, const size_t n, const size_t m) 
+{
+	size_t i;
+
+	pony_linal_uuT(S,S,n);      // P = S*S^T
+	for (i = 0; i < m; i++)
+		S[i*(2*n-i+1)/2] += q2; // P = P + Q, Q = [q2*I 0; 0 0]
+	pony_linal_chol(S,S,n);     // P = S*S^T
+}
+
+	// square root Kalman filtering - prediction phase - identity state transition - diagonal process noise covariance
+	//		    [q_1^2  0   0 0]  
+	//          [    ..     . .]
+	//		Q = [  0  q_m^2 0 0] = E[(x_i - x_i-1)*(x_i - x_i-1)^T]
+	//		    [  0    0   0 0]
+	//		    [  0    0   0 0]
+	//	input: 
+	//		S	- upper-truangular part of the Cholesky factor of current covariance matrix, lined in a single-dimension array n(n+1)/2 x 1
+	//		q2	- nonzero process noise dispersion vector, q2[i] = q_i^2 >= 0, i = 1..m
+	//		n	- state vector size
+	//		m	- nonzero process noise vector size
+	//	output:
+	//		S	- upper-truangular part of the Cholesky factor of predicted covariance matrix, lined in a single-dimension array n(n+1)/2 x 1 (overwrites input)
+void pony_linal_kalman_predict_I_diag(double *S, double *q2, const size_t n, const size_t m) 
+{
+	size_t i;
+
+	pony_linal_uuT(S,S,n);         // P = S*S^T
+	for (i = 0; i < m; i++)
+		S[i*(2*n-i+1)/2] += q2[i]; // P = P + Q, Q = [diag(q2) 0; 0 0]
+	pony_linal_chol(S,S,n);        // P = S*S^T
+}
+
+	// square root Kalman filtering - prediction phase - identity state transition
+	//		          [q_11 .. q_1m  0 0]  
+	//      [Q 0 0]   [ .   ..  .    . .]
+	//		[0 0 0] = [q_1m .. q_mm  0 0] = E[(x_i - x_i-1)*(x_i - x_i-1)^T]
+	//		[0 0 0]   [  0       0   0 0]
+	//		          [  0       0   0 0]         
+	//	input: 
+	//		S	- upper-truangular part of the Cholesky factor of current covariance matrix, lined in a single-dimension array n(n+1)/2 x 1
+	//		Q	- upper triangular part of the nonzero process noise covariance, lined in a single-dimension array m(m+1)/2 x 1 
+	//		n	- state vector size
+	//		m	- nonzero process noise vector size
+	//	output:
+	//		S	- upper-truangular part of the Cholesky factor of predicted covariance matrix, lined in a single-dimension array n(n+1)/2 x 1 (overwrites input)
+void pony_linal_kalman_predict_I(double *S, double *Q, const size_t n, const size_t m) 
+{
+	size_t i, k0, j, k1;
+
+	pony_linal_uuT(S,S,n);      // P = S*S^T
+	for (i = 0; i < m; i++) {
+		k0 = i*(2*n-i+1)/2;
+		k1 = i*(2*m-i+1)/2;
+		for (j = 0; j < m-i; j++)
+			S[k0+j] += Q[k1+j]; // P = P + [Q 0; 0 0]
+	}
+	pony_linal_chol(S,S,n);     // P = S*S^T
+}
+
+	// square root Kalman filtering - prediction phase - upper triangular state transition - diagonal process noise covariance
+	//		                          [U11 . U1n]
+	//		x_i = F*x_i-1,        F = [ 0 ..  . ] 
+	//		                          [ 0  0 Unn]
+	//		      [q_1^2  0   0 0]  
+	//            [    ..     . .]
+	//		Q   = [  0  q_m^2 0 0]  = E[(x_i - x_i-1)*(x_i - x_i-1)^T]
+	//		      [  0    0   0 0]
+	//		      [  0    0   0 0]         
+	//	input: 
+	//		x	- current estimate of n x 1 state vector
+	//		S	- upper-truangular part of the Cholesky factor of current covariance matrix, lined in a single-dimension array n(n+1)/2 x 1
+	//		U	- upper-truangular state transition matrix, lined in a single-dimension array m(m+1)/2 x 1
+	//		q2	- nonzero process noise dispersion vector, q2[i] = q_i^2 >= 0, i = 1..r
+	//		n	- state vector size
+	//		m	- nonzero process noise vector size
+	//	output:
+	//		x	- predicted estimate of state vector (overwrites input)
+	//		S	- upper-truangular part of the Cholesky factor of predicted covariance matrix, lined in a single-dimension array n(n+1)/2 x 1 (overwrites input)
+void pony_linal_kalman_predict_U_diag(double *x, double *S, double *U, double *q2, const size_t n, const size_t m) 
+{
+	size_t i, j, j1, k0, k1, k2, k, k10, j10;
+
+	pony_linal_u_mul(x,U,x,n,1);    // x = F*x  	
+	for (i = 0, k0 = 0; i < n; i++) {
+		k10 = i*(2*n-i+1)/2;		    // start from the diagonal in U
+		j10 = n-i-1;
+		for (j = i; j < n; j++, k0++) {
+			k1 = k10;
+			S[k0] *= U[k1];         // S = F*S
+			k2 = j*(2*n-j+1)/2;         // finish at the diagonal in S
+			for (j1 = j10, k1++, k = k0+j1; j1 > 0 && k <= k2; j1--, k1++, k += j1)
+				S[k0] += S[k]*U[k1];
+		}
+	}
+	pony_linal_uuT(S,S,n);          // P = S*S^T
+	for (i = 0; i < m; i++)		    
+		S[i*(2*n-i+1)/2] += q2[i];  // P = P + Q, Q = [diag(q2) 0; 0 0]
+	pony_linal_chol(S,S,n);         // P = S*S^T
+}
+
+	// square root Kalman filtering - prediction phase - upper triangular state transition
+	//		                                 [U11 . U1n]
+	//		    x_i = F*x_i-1,           F = [ 0 ..  . ] 
+	//		                                 [ 0  0 Unn]
+	//		          [q_11 .. q_1m  0 0]  
+	//      [Q 0 0]   [ .   ..  .    . .]
+	//		[0 0 0] = [q_1m .. q_mm  0 0]  = E[(x_i - x_i-1)*(x_i - x_i-1)^T]
+	//		[0 0 0]   [  0       0   0 0]
+	//		          [  0       0   0 0]            
+	//	input: 
+	//		x	- current estimate of n x 1 state vector
+	//		S	- upper-truangular part of the Cholesky factor of current covariance matrix, lined in a single-dimension array n(n+1)/2 x 1
+	//		U	- upper-truangular state transition matrix, lined in a single-dimension array n(n+1)/2 x 1
+	//		Q	- upper triangular part of the nonzero process noise covariance, lined in a single-dimension array m(m+1)/2 x 1 
+	//		r	- nonzero process noise vector size
+	//		m	- state vector size
+	//	output:
+	//		x	- predicted estimate of state vector (overwrites input)
+	//		S	- upper-truangular part of the Cholesky factor of predicted covariance matrix, lined in a single-dimension array n(n+1)/2 x 1 (overwrites input)
+void pony_linal_kalman_predict_U(double *x, double *S, double *U, double *Q, const size_t n, const size_t m) 
+{
+	size_t i, j, j1, k0, k1, k2, k, k10, j10;
+
+	pony_linal_u_mul(x,U,x,n,1);    // x = F*x  	
+	for (i = 0, k0 = 0; i < n; i++) {
+		k10 = i*(2*n-i+1)/2;		    // start from the diagonal in U
+		j10 = n-i-1;
+		for (j = i; j < n; j++, k0++) {
+			k1 = k10;
+			S[k0] *= U[k1];         // S = F*S
+			k2 = j*(2*n-j+1)/2;         // finish at the diagonal in S
+			for (j1 = j10, k1++, k = k0+j1; j1 > 0 && k <= k2; j1--, k1++, k += j1)
+				S[k0] += S[k]*U[k1];
+		}
+	}
+	pony_linal_uuT(S,S,n);          // P = S*S^T
+	for (i = 0; i < m; i++) {	    
+		k0 = i*(2*n-i+1)/2;		    
+		k1 = i*(2*m-i+1)/2;		    
+		for (j = 0; j < m-i; j++)	    
+			S[k0+j] += Q[k1+j];     // P = P + [Q 0; 0 0]
+	}							    
+	pony_linal_chol(S,S,n);         // P = S*S^T
 }
