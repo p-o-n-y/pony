@@ -1852,7 +1852,7 @@ char pony_linal_check_measurement_residual(double *x, double *S, double z, doubl
 	for (i = 0; i < m; i++) {
 		// dz = z - h*x: residual
 		z -= h[i]*x[i];
-		// s = h*S*S^T*h^T: predicted dispersion 
+		// s = h*S*S^T*h^T: predicted variance 
 		for (j = 0, k = i, s = 0; j <= i; j++, k += m-j)
 			s += h[j]*S[k];
 		sigma += s*s;
@@ -1928,7 +1928,7 @@ double pony_linal_kalman_update(double *x, double *S, double *K, double z, doubl
 	//		Q = q^2*I = E[(x_i - x_i-1)*(x_i - x_i-1)^T]            
 	//	input: 
 	//		S	- upper-truangular part of the Cholesky factor of current covariance matrix, lined in a single-dimension array n(n+1)/2 x 1
-	//		q2	- process noise dispersion, q2 = q^2 >= 0
+	//		q2	- process noise variance, q2 = q^2 >= 0
 	//		n	- state vector size
 	//	output:
 	//		S	- upper-truangular part of a Cholesky factor of predicted covariance matrix, lined in a single-dimension array n(n+1)/2 x 1 (overwrites input)
@@ -1948,7 +1948,7 @@ void pony_linal_kalman_predict_I_qI(double *S, double q2, const size_t n)
 	//		    [   0  0 0]                                             
 	//	input: 
 	//		S	- upper-truangular part of the Cholesky factor of current covariance matrix, lined in a single-dimension array n(n+1)/2 x 1
-	//		q2	- nonzero process noise dispersion,  q2 = q^2 >= 0
+	//		q2	- nonzero process noise variance,  q2 = q^2 >= 0
 	//		n	- state vector size
 	//		m	- nonzero process noise vector size
 	//	output:
@@ -1971,7 +1971,7 @@ void pony_linal_kalman_predict_I_qIr(double *S, double q2, const size_t n, const
 	//		    [  0    0   0 0]
 	//	input: 
 	//		S	- upper-truangular part of the Cholesky factor of current covariance matrix, lined in a single-dimension array n(n+1)/2 x 1
-	//		q2	- nonzero process noise dispersion vector, q2[i] = q_i^2 >= 0, i = 1..m
+	//		q2	- nonzero process noise variance vector, q2[i] = q_i^2 >= 0, i = 1..m
 	//		n	- state vector size
 	//		m	- nonzero process noise vector size
 	//	output:
@@ -2026,7 +2026,7 @@ void pony_linal_kalman_predict_I(double *S, double *Q, const size_t n, const siz
 	//		x	- current estimate of n x 1 state vector
 	//		S	- upper-truangular part of the Cholesky factor of current covariance matrix, lined in a single-dimension array n(n+1)/2 x 1
 	//		U	- upper-truangular state transition matrix, lined in a single-dimension array m(m+1)/2 x 1
-	//		q2	- nonzero process noise dispersion vector, q2[i] = q_i^2 >= 0, i = 1..r
+	//		q2	- nonzero process noise variance vector, q2[i] = q_i^2 >= 0, i = 1..r
 	//		n	- state vector size
 	//		m	- nonzero process noise vector size
 	//	output:

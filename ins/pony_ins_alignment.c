@@ -24,6 +24,7 @@
 		(roll, pitch and yaw=true heading). Does not allow the first instrumental axis to point upwards.
 */
 
+#include <stdlib.h>
 #include <math.h>
 
 #include "../pony.h"
@@ -207,7 +208,7 @@ void pony_ins_alignment_rotating(void) {
 		t1_default = 900,         // default alignment duration
 		v_std      = 1,           // velocity integral standard deviation
 		S0         = 9e9,         // starting covariances
-		q2_std     = 9;           // Earth rotation axis ort dispersion, rad^2/Hz
+		q2_std     = 9;           // Earth rotation axis ort variance, rad^2/Hz
 	const size_t 
 		m      = 3;	              // approximation coefficient count
 
@@ -242,7 +243,7 @@ void pony_ins_alignment_rotating(void) {
 		   ut,          // Earth rotation angle
 		  sut, cut,     // sine and cosine of Earth rotation angle
 		  n,            // vector norm
-		  q2;           // Earth rotation axis ort dispersion, rad^2
+		  q2;           // Earth rotation axis ort variance, rad^2
 	char *cfg_ptr;      // pointer to a substring in configuration
 	size_t 			    
 		  i, j, k, k0;  // common indexing variables

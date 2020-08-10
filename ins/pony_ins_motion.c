@@ -20,6 +20,7 @@
 		Recommended when using normal gravity model and/or long navigation timeframe.
 */
 
+#include <stdlib.h>
 #include <math.h>
 
 #include "../pony.h"
