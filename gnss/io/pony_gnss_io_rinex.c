@@ -268,9 +268,9 @@ void pony_gnss_io_rinex_v3_read_obs_from_file(void) {
 			else
 				while ( 
 					pony_gnss_io_rinex_dmod(
-						(latest_epoch.h*3600+latest_epoch.m*60+latest_epoch.s) -                          // latest epoch time of day
-						(pony->gnss[r].epoch.h*3600+pony->gnss[r].epoch.m*60+pony->gnss[r].epoch.s),      // receiver epoch time of day
-						pony->gnss_const.sec_in_d)                                                        // modulo 86400 (seconds in a day)
+						(       latest_epoch.h*3600.0 +        latest_epoch.m*60 +        latest_epoch.s) - // latest   epoch time of day
+						(pony->gnss[r].epoch.h*3600.0 + pony->gnss[r].epoch.m*60 + pony->gnss[r].epoch.s),  // receiver epoch time of day
+						pony->gnss_const.sec_in_d)                                                          // modulo 86400 (seconds in a day)
 						>
 						gnss_sync )
 					if ( !pony_gnss_io_rinex_v3_obs_file_record_read(&(pony->gnss[r]), fp[r], buf[r]) ) { // read next observation data record

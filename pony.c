@@ -1451,7 +1451,7 @@ char pony_time_gps2epoch(pony_time_epoch *epoch, unsigned int week, double sec) 
 		epoch->M += 3;
 	// time of day
 	epoch->h = (unsigned int)sec/3600;
-	sec     -= epoch->h*3600;
+	sec     -= epoch->h*3600.0;
 	epoch->m = (unsigned int)sec/60;
 	epoch->s = sec - epoch->m*60;
 
@@ -1483,7 +1483,7 @@ char pony_time_epoch2gps(unsigned int *week, double *sec, pony_time_epoch *epoch
 		*week	= days/7;
 	days %= 7;
 	if (sec != NULL)
-		*sec = days*86400 + epoch->h*3600 + epoch->m*60 + epoch->s;
+		*sec = days*86400.0 + epoch->h*3600.0 + epoch->m*60 + epoch->s;
 
 	return 1;
 

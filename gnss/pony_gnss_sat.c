@@ -826,7 +826,7 @@ void pony_gnss_sat_pos_vel_clock_glo_single_receiver(pony_gnss *gnss,  double *t
 		toc.h  = pony_gnss_sat_round(sat->eph[3]);
 		toc.m  = pony_gnss_sat_round(sat->eph[4]);
 		toc.s  =                     sat->eph[5] ;
-		tb_new = pony_gnss_sat_round(toc.h*3600 + toc.m*60 + toc.s);
+		tb_new = pony_gnss_sat_round(toc.h*3600.0 + toc.m*60 + toc.s);
 		
 		// check tb
 		if (tb[s] < 0 || tb[s] != tb_new) { // new ephemeris have come
@@ -2000,8 +2000,8 @@ double pony_gnss_sat_epoch_diff_within_day(pony_time_epoch *t1, pony_time_epoch 
 
 	double t1s, t2s;
 
-	t1s = t1->h*3600 + t1->m*60 + t1->s;
-	t2s = t2->h*3600 + t2->m*60 + t2->s;
+	t1s = t1->h*3600.0 + t1->m*60 + t1->s;
+	t2s = t2->h*3600.0 + t2->m*60 + t2->s;
 
 	if (t1->D == t2->D)
 		return t1s - t2s;

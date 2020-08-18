@@ -379,7 +379,13 @@ void pony_gnss_io_ublox_read_file(void) {
 			if (pony->gnss[r].cfg == NULL)
 				continue;
 			else
-				while ( pony_gnss_io_ublox_dmod((latest_epoch.h*3600+latest_epoch.m*60+latest_epoch.s) - (pony->gnss[r].epoch.h*3600+pony->gnss[r].epoch.m*60+pony->gnss[r].epoch.s), 3600*24) > gnss_sync ) {
+				while (
+					pony_gnss_io_ublox_dmod(
+						(       latest_epoch.h*3600.0 +        latest_epoch.m*60 +        latest_epoch.s) - // latest epoch
+						(pony->gnss[r].epoch.h*3600.0 + pony->gnss[r].epoch.m*60 + pony->gnss[r].epoch.s),  // receiver epoch
+						pony->gnss_const.sec_in_d)                                                          // modulo seconds in a day
+					>	
+					gnss_sync ) {
 					for (id = UINT_MAX; !feof(fp[r]) && !ferror(fp[r]) && id != RXM_RAWX && id != RXM_RAW; id = pony_gnss_io_ublox_file_read_message(&(pony->gnss[r]), fp[r], payload_hdr, payload_blk) );
 					if (id != RXM_RAWX && id != RXM_RAW) { // end-of-file or file error before syncronized epoch found
 						pony->mode = -1;
@@ -1208,7 +1214,7 @@ char pony_gnss_io_ublox_nav_subframe_parser_glo(pony_gnss_sat *sat, pony_gnss_io
 		case 1:
 			// tk + nd*86400 (seconds into utc week)
 			pony_time_epoch2gps(NULL, &(sat->eph[tk_eph]), &epoch); // secondsi nto week
-			sat->eph[tk_eph] -= epoch.h*3600 + epoch.m*60 + epoch.s; // from day beginning
+			sat->eph[tk_eph] -= epoch.h*3600.0 + epoch.m*60 + epoch.s; // from day beginning
 			sat->eph[tk_eph] += sat->eph[ ctable[0][tk_h_entry].eph ]*3600 + sat->eph[ ctable[0][tk_s_entry].eph ];
 			sat->eph[tk_eph] -= dt_utc_s;	// to UTC
 			if (sat->eph[tk_eph] < 0)		// week rollover
