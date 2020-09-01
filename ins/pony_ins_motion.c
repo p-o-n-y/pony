@@ -1,4 +1,4 @@
-// Aug-2020
+// Sep-2020
 //
 /*	pony_ins_motion
 	
@@ -6,9 +6,9 @@
 	
 	- pony_ins_motion_euler
 		Numerically integrates Newton's second Law in local level navigation frame 
-		using first-order Euler's method over the Earth reference ellipsoid. 
+		using modified Euler's method (with midpoint for attitude matrix) over the Earth reference ellipsoid. 
 		Updates velocity and geographical coordinates. 
-		Not suitable near the Earth's poles.
+		Not suitable near the Earth's poles, at outer-space altitudes, and/or over-Mach velocities.
 		
 	- (planned) pony_ins_motion_sculling
 		Planned for future development
@@ -38,13 +38,13 @@ void   pony_ins_motion_flip_sol_over_pole(pony_sol *sol);
 /* pony_ins_motion_euler - pony plugin
 	
 	Numerically integrates Newton's second Law in local level navigation frame 
-	using first-order Euler's method over the Earth reference ellipsoid. 
+	using modified Euler's method (with midpoint for attitude matrix) over the Earth reference ellipsoid. 
 	Updates velocity and geographical coordinates. 
-	Not suitable near the Earth's poles.
+	Not suitable near the Earth's poles, at outer-space altitudes, and/or over-Mach velocities.
 
 	description:
 	    
-		V  (t+dt) = V  (t) + dt*([(W + 2u) x]*V (t) +  L^T*f + g)
+		V  (t+dt) = V  (t) + dt*([(W + 2u) x]*V (t) +  L^T(t+dt/2)*f + g)
 		lon(t+dt) = lon(t) + dt*              Ve(t)/((Re + alt(t))*cos(lat(t)))
 		lat(t+dt) = lat(t) + dt*              Vn(t)/( Rn + alt(t))
 		alt(t+dt) = alt(t) + dt*              Vu(t)              
@@ -68,6 +68,8 @@ void   pony_ins_motion_flip_sol_over_pole(pony_sol *sol);
 		pony->imu->sol.L_valid
 		pony->imu->f
 		pony->imu->f_valid
+		pony->imu->w
+		pony->imu->w_valid
 		pony->imu->g
 		pony->imu->g_valid
 		pony->imu->W
@@ -117,8 +119,9 @@ void pony_ins_motion_euler(void) {
 		Rn_h, Re_h,	                // south-to-north and east-to-west curvature radii, altitude-adjusted
 		e2s2, e4s4,	                // e^2*sin(phi)^2, (e^2*sin(phi)^2)^2
 		dvrel[3],	                // proper acceleration in navigation frame
-		dvcor[3];	                // Coriolis acceleration in navigation frame
-	size_t i;                       // common index variable
+		dvcor[3],	                // Coriolis acceleration in navigation frame
+		C_2[9];                     // intermediate matrix/vector for modified Euler component
+	size_t i, j;                    // common index variables
 
 
 	// check if imu data has been initialized
@@ -200,7 +203,17 @@ void pony_ins_motion_euler(void) {
 		dvrel[2] = pony->imu->W[2] + 2*pony->imu_const.u*sphi;
 		pony_linal_cross3x1(dvcor, pony->imu->sol.v, dvrel);
 			// proper acceleration
-		pony_linal_mmul1T(dvrel, pony->imu->sol.L, pony->imu->f, 3, 3, 1);
+		if (pony->imu->w_valid) { // if able to calculate attitude mid-point using gyroscopes
+			for (i = 0; i < 3; i++)
+				dvrel[i] = pony->imu->w[i]*dt/2; // midpoint rotation Euler vector
+			pony_linal_eul2mat(C_2, dvrel); // midpoint attitude matrix factor
+			for (i = 0; i < 3; i++) // multiply C_2*f, store in the first row of C_2
+				for (j = 1, C_2[i] = C_2[i*3]*pony->imu->f[0]; j < 3; j++)
+					C_2[i] += C_2[i*3+j]*pony->imu->f[j];
+			pony_linal_mmul1T(dvrel, pony->imu->sol.L, C_2, 3, 3, 1); // dvrel = L^T(t+dt)*C_2(w*dt/2)*f
+		}
+		else // otherwise, go on with only the current attitude matrix
+			pony_linal_mmul1T(dvrel, pony->imu->sol.L, pony->imu->f, 3, 3, 1);
 			// velocity update
 		for (i = 0; i < 3; i++)
 			pony->imu->sol.v[i] += (dvcor[i] + dvrel[i] + pony->imu->g[i])*dt;
