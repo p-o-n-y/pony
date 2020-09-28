@@ -1,5 +1,4 @@
 // Sep-2020
-//
 /*	pony_gnss_io_rinex 
 	
 	pony plugins for GNSS RINEX input/output:

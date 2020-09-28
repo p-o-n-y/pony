@@ -1,5 +1,4 @@
 // Sep-2020
-//
 /*	pony_gnss_io_ublox 
 	
 	pony plugins for GNSS u-Blox receiver input/output:

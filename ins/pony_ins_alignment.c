@@ -1,5 +1,4 @@
 // Sep-2020
-//
 /*	pony_ins_alignment 
 	
 	pony plugins for ins initial alignment (initial attitude matrix determination):
@@ -280,6 +279,10 @@ void pony_ins_alignment_rotating(void) {
 		// check if alignment duration exceeded 
 		if (pony->imu->t > t1)
 			return;
+		// drop validity flags
+		pony->imu->sol.L_valid		= 0;
+		pony->imu->sol.q_valid		= 0;
+		pony->imu->sol.rpy_valid	= 0;
 		// check for crucial data present
 		if (   !pony->imu->      w_valid     // check if angular rate measurements are available
 			|| !pony->imu->      f_valid     // check if accelerometer measurements are available
@@ -515,6 +518,10 @@ void pony_ins_alignment_rotating_rpy(void) {
 		// check if alignment duration exceeded 
 		if (pony->imu->t > t1)
 			return;
+		// drop validity flags
+		pony->imu->sol.L_valid		= 0;
+		pony->imu->sol.q_valid		= 0;
+		pony->imu->sol.rpy_valid	= 0;
 		// check for crucial data present
 		if (   !pony->imu->      w_valid     // check if angular rate measurements are available
 			|| !pony->imu->      f_valid     // check if accelerometer measurements are available

@@ -1,5 +1,4 @@
 // Sep-2020
-//
 /*	pony_ins_gravity 
 	
 	pony plugins for gravity model calculations:
