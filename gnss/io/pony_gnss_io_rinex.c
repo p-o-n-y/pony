@@ -1,4 +1,4 @@
-// Sep-2020
+// Nov-2020
 /*	pony_gnss_io_rinex 
 	
 	pony plugins for GNSS RINEX input/output:
@@ -598,12 +598,10 @@ void pony_gnss_io_rinex_read_eph_from_file(void) {
 		// observation file header
 char pony_gnss_io_rinex_v3_obs_file_header_read(pony_gnss *gnss, FILE *fp, char *buf) {
 
+	enum system_id          {gps, glo, gal, bds, sys_count};
+
+	const char   sys_id[] = {'G', 'R', 'E', 'C'}; 
 	const size_t label_offset = 61, label_len = 20;
-	const char 
-		gps_sys_id[] = "G",
-		glo_sys_id[] = "R",
-		gal_sys_id[] = "E",
-		bds_sys_id[] = "C";
 
 	// required token - version and type
 	const char rinex_version_type_label[] = "RINEX VERSION / TYPE";
@@ -627,13 +625,14 @@ char pony_gnss_io_rinex_v3_obs_file_header_read(pony_gnss *gnss, FILE *fp, char 
 
 	size_t tokens_found = 0;
 	float version;
-	size_t i;
+	size_t i, sys, maxsat, *obs_count = NULL;
 	int scanned;
-	char current_sys = 0, sys_obstypes_found = 0, glo_freq_slot_found = 0;
+	char current_sys = 0, sys_obstypes_found = 0, glo_freq_slot_found = 0, flag, (**obs_types)[4] = NULL; 
+	pony_gnss_sat *sat = NULL;
 
 
 
-	if ( feof(fp) )
+	if (fp == NULL || feof(fp))
 		return 0;
 
 	// check tokens
@@ -664,6 +663,8 @@ char pony_gnss_io_rinex_v3_obs_file_header_read(pony_gnss *gnss, FILE *fp, char 
 		}
 	}
 
+	current_sys = 0;
+	flag = 0;
 	while ( !feof(fp) ) {
 
 		fgets(buf, PONY_GNSS_IO_RINEX_BUFFER_SIZE, fp);
@@ -678,54 +679,63 @@ char pony_gnss_io_rinex_v3_obs_file_header_read(pony_gnss *gnss, FILE *fp, char 
 				tokens_found++;
 				sys_obstypes_found = 1;
 			}
-			
-			for (i = 0; buf[i] && buf[i] <= ' ' &&  i < label_offset-1; i++); // skip all non-printable
-			// check for GPS system id, if initialized on the bus
-			if ( gnss->gps != NULL && pony_gnss_io_rinex_find_token(gps_sys_id,buf+i,label_offset-i) ) {
-				current_sys = gps_sys_id[0];
-				if ( !pony_gnss_io_rinex_obs_file_header_parse_sys_obstypes(&(gnss->gps->obs_count), &(gnss->gps->obs_types), gnss->gps->sat,  buf + i, label_offset-1-i, gnss->gps->max_sat_count, 0) ) {
-					printf("\n\t\terror: RINEX observation types not parsed in header from %s", buf);
-					return 0;
-				}
-				continue;
-			}
-			// check for GLONASS system id, if initialized on the bus
-			if ( gnss->glo != NULL && pony_gnss_io_rinex_find_token(glo_sys_id,buf + i,label_offset-i) ) {
-				current_sys = glo_sys_id[0];
 
-				if ( !pony_gnss_io_rinex_obs_file_header_parse_sys_obstypes(&(gnss->glo->obs_count), &(gnss->glo->obs_types), gnss->glo->sat,  buf + i, label_offset-1-i, gnss->glo->max_sat_count, 0) ) {
-					printf("\n\t\terror: RINEX observation types not parsed in header from %s", buf);
-					return 0;
+			// check for system id at line start
+			for (i = 0, maxsat = 0, sys = 0; sys < sys_count; sys++)
+				if (buf[i] == sys_id[sys]) { // start new system
+					current_sys = sys_id[sys];
+					flag = 0;
+					break;
 				}
-				continue;
+			// if not found at line start, check if a system has already assigned
+			if (sys >= sys_count && current_sys)
+				for (sys = 0; sys < sys_count; sys++)
+					if (current_sys == sys_id[sys]) { // continue with previously selected system
+						flag = 1;
+						break;
+					}
+					
+			switch (sys) {
+				case gps:  
+					if (gnss->gps == NULL) 
+						continue;
+					obs_count = &(gnss->gps->obs_count);
+					obs_types = &(gnss->gps->obs_types);
+					sat       =   gnss->gps->sat;
+					maxsat    =   gnss->gps->max_sat_count; 
+					break;
+				case glo:  
+					if (gnss->glo == NULL) 
+						continue;
+					obs_count = &(gnss->glo->obs_count);
+					obs_types = &(gnss->glo->obs_types);
+					sat       =   gnss->glo->sat;
+					maxsat    =   gnss->glo->max_sat_count; 
+					break;
+				case gal:  
+					if (gnss->gal == NULL) 
+						continue;
+					obs_count = &(gnss->gal->obs_count);
+					obs_types = &(gnss->gal->obs_types);
+					sat       =   gnss->gal->sat;
+					maxsat    =   gnss->gal->max_sat_count; 
+					break;
+				case bds:  
+					if (gnss->bds == NULL) 
+						continue;
+					obs_count = &(gnss->bds->obs_count);
+					obs_types = &(gnss->bds->obs_types);
+					sat       =   gnss->bds->sat;
+					maxsat    =   gnss->bds->max_sat_count; 
+					break;
+				default: continue;
 			}
-			// check for Galileo system id, if initialized on the bus
-			if ( gnss->gal != NULL && pony_gnss_io_rinex_find_token(gal_sys_id,buf+i,label_offset-i) ) {
-				current_sys = gal_sys_id[0];
-				if ( !pony_gnss_io_rinex_obs_file_header_parse_sys_obstypes(&(gnss->gal->obs_count), &(gnss->gal->obs_types), gnss->gal->sat,  buf + i, label_offset-1-i, gnss->gal->max_sat_count, 0) ) {
-					printf("\n\t\terror: RINEX observation types not parsed in header from %s", buf);
-					return 0;
-				}
-				continue;
+
+			if ( !pony_gnss_io_rinex_obs_file_header_parse_sys_obstypes(obs_count, obs_types, sat,  buf + i, label_offset-1-i, maxsat, flag) ) {
+				printf("\n\t\terror: RINEX observation types not parsed in header from %s", buf);
+				return 0;
 			}
-			// check for BeiDou system id, if initialized on the bus
-			if ( gnss->bds != NULL && pony_gnss_io_rinex_find_token(bds_sys_id,buf+i,label_offset-i) ) {
-				current_sys = bds_sys_id[0];
-				if ( !pony_gnss_io_rinex_obs_file_header_parse_sys_obstypes(&(gnss->bds->obs_count), &(gnss->bds->obs_types), gnss->bds->sat,  buf + i, label_offset-1-i, gnss->bds->max_sat_count, 0) ) {
-					printf("\n\t\terror: RINEX observation types not parsed in header from %s", buf);
-					return 0;
-				}
-				continue;
-			}
-			// proceed with the current system, if present
-			if (current_sys == gps_sys_id[0])
-				pony_gnss_io_rinex_obs_file_header_parse_sys_obstypes(&(gnss->gps->obs_count), &(gnss->gps->obs_types), gnss->gps->sat,  buf + i, label_offset-1-i, gnss->gps->max_sat_count, 1);
-			if (current_sys == glo_sys_id[0])
-				pony_gnss_io_rinex_obs_file_header_parse_sys_obstypes(&(gnss->glo->obs_count), &(gnss->glo->obs_types), gnss->glo->sat,  buf + i, label_offset-1-i, gnss->glo->max_sat_count, 1);
-			if (current_sys == gal_sys_id[0])
-				pony_gnss_io_rinex_obs_file_header_parse_sys_obstypes(&(gnss->gal->obs_count), &(gnss->gal->obs_types), gnss->gal->sat,  buf + i, label_offset-1-i, gnss->gal->max_sat_count, 1);
-			if (current_sys == bds_sys_id[0])
-				pony_gnss_io_rinex_obs_file_header_parse_sys_obstypes(&(gnss->bds->obs_count), &(gnss->bds->obs_types), gnss->bds->sat,  buf + i, label_offset-1-i, gnss->bds->max_sat_count, 1);
+
 			continue;
 		}
 

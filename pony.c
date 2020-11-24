@@ -1,4 +1,4 @@
-// Sep-2020
+// Nov-2020
 // PONY core source code
 
 #include <stdlib.h>
@@ -955,7 +955,9 @@ void pony_free_gnss(pony_gnss* gnss)
 	/*
 		initialize air data structure
 		input:
-			pony_air* air --- air data structure
+			pony_air* air --- pointer to an air data structure
+		return value:
+			1
 	*/
 char pony_init_air(pony_air* air)
 {
@@ -998,6 +1000,57 @@ void pony_free_air(void)
 
 
 
+// reference data handling subroutines
+	/*
+		initialize reference data structure
+		input:
+			pony_ref* ref --- pointer to a reference data structure
+		return value:
+			1 if successful
+			0 otherwise
+	*/
+char pony_init_ref(pony_ref* ref)
+{
+	size_t i;
+
+	// variables
+	ref->t = 0;
+	ref->g_valid = 0;
+	// default gravity acceleration vector
+	ref->g[0] = 0;
+	ref->g[1] = 0;
+	ref->g[2] = -pony->imu_const.ge*(1 + pony->imu_const.fg/2); // middle value
+	// drop the solution
+	if (!pony_init_sol(&(ref->sol), ref->cfg, ref->cfglength))
+		return 0;
+
+	return 1;
+}
+
+	/*
+		free reference data memory
+	*/
+void pony_free_ref(void)
+{
+	if (pony->ref == NULL)
+		return;
+
+	// configuration
+	pony->ref->cfg = NULL;
+	pony->ref->cfglength = 0;
+
+	// solution
+	pony_free_sol(&(pony->ref->sol));
+	
+	// pony_ref structure
+	free((void*)(pony->ref));
+	pony->ref = NULL;
+}
+
+
+
+
+
 // general handling routines
 	/*
 		free all alocated memory and set pointers and counters to NULL
@@ -1030,6 +1083,9 @@ void pony_free()
 
 	// air data
 	pony_free_air();
+
+	// reference data
+	pony_free_ref();
 
 	// solution
 	pony_free_sol(&(pony->sol));
@@ -1196,6 +1252,27 @@ char pony_init(char* cfg)
 
 		// try to init
 		if (!pony_init_air(pony->air)) {
+			pony_free();
+			return 0;
+		}
+	}
+
+	// reference data init
+	pony->ref = NULL;
+	if (pony_locatecfggroup("ref:", pony->cfg, pony->cfglength, &cfgptr, &grouplen)) { // if the group found in configuration
+		// try lo allocate memory
+		pony->ref = (pony_ref*)calloc(1, sizeof(pony_ref));
+		if (pony->ref == NULL) {
+			pony_free();
+			return 0;
+		}
+
+		// set configuration pointer
+		pony->ref->cfg = cfgptr;
+		pony->ref->cfglength = grouplen;
+
+		// try to init
+		if(!pony_init_ref(pony->ref)) {
 			pony_free();
 			return 0;
 		}

@@ -1,4 +1,5 @@
-// Sep-2020
+// Nov-2020
+// Oct-2020
 /*	pony_ins_alignment 
 	
 	pony plugins for ins initial alignment (initial attitude matrix determination):
@@ -7,6 +8,7 @@
 		Conventional averaging of accelerometer and gyroscope outputs.
 		Then constructing the attitude matrix out of those averages.
 		Also calculates attitude angles (roll, pitch, yaw=true heading), and quaternion.
+		Sets velocity vector to zero, as it is assumed for this type of initial alignment.
 		Recommended for navigation/tactical-grade systems on a highly stable static base,
 		e.g. turntable or stabilized plate.
 
@@ -14,6 +16,7 @@
 		Approximation of gravity vector rotating along with the Earth in an inertial reference frame.
 		Then estimating northern direction via gravity vector displacement.
 		Also calculates attitude angles (roll, pitch, yaw=true heading), and quaternion.
+		Sets velocity vector to zero.
 		Recommended for navigation-grade systems on a rotating base, 
 		allowing vibrations with zero average acceleration,
 		e.g. an airplane standing still on the ground with engine(s) running.
@@ -21,6 +24,7 @@
 	- pony_ins_alignment_rotating_rpy
 		The same as pony_ins_alignment_rotating, but attitude matrix is calculated using attitude angles
 		(roll, pitch and yaw=true heading). Does not allow the first instrumental axis to point upwards.
+		Also sets velocity vector to zero.
 */
 
 #include <stdlib.h>
@@ -40,7 +44,8 @@
 	Then constructing the attitude matrix out of those averages.
 	Also calculates attitude angles (roll, pitch, yaw=true heading).
 	Recommended for navigation-grade systems on a highly stable static base,
-	e.g. turntable or stabilized plate.
+	e.g. turntable or stabilized plate. Sets velocity vector to zero,
+	as it is assumed for this type of initial alignment.
 
 	description:
 		    [  <w> x <f>  | <f> x (<w> x <f>) |  <f>  ]
@@ -64,6 +69,8 @@
 		pony->imu->sol.q_valid
 		pony->imu->sol.rpy
 		pony->imu->sol.rpy_valid
+		pony->imu->sol.v
+		pony->imu->sol.v_valid
 
 	cfg parameters:
 		{imu: alignment} - imu initial alignment duration, sec
@@ -152,6 +159,10 @@ void pony_ins_alignment_static(void) {
 		// renew angles
 		pony_linal_mat2rpy (pony->imu->sol.rpy, pony->imu->sol.L);
 		pony->imu->sol.rpy_valid = 1;
+		// set velocity equal to zero, as it is assumed to do so in static alignment
+		for (i = 0; i < 3; i++)
+			pony->imu->sol.v[i] = 0;
+		pony->imu->sol.v_valid = 1;
 
 	}
 
@@ -161,7 +172,7 @@ void pony_ins_alignment_static(void) {
 	
 	Approximation of gravity vector rotating along with the Earth in an inertial reference frame.
 	Then estimating northern direction via gravity vector displacement.
-	Also calculates attitude angles (roll, pitch, yaw=true heading).
+	Also calculates attitude angles (roll, pitch, yaw=true heading). Sets velocity vector to zero.
 	Recommended for navigation-grade systems on a rotating base, 
 	allowing vibrations with zero average acceleration,
 	e.g. an airplane standing still on the ground with engine(s) running.
@@ -191,6 +202,8 @@ void pony_ins_alignment_static(void) {
 		pony->imu->sol.q_valid
 		pony->imu->sol.rpy
 		pony->imu->sol.rpy_valid
+		pony->imu->sol.v
+		pony->imu->sol.v_valid
 
 	cfg parameters:
 		{imu: alignment} - imu initial alignment duration, sec
@@ -404,7 +417,10 @@ void pony_ins_alignment_rotating(void) {
 				for (k = 0, Azz0[j*3+i] = 0; k < 3; k++)
 					Azz0[j*3+i] += C[j*3+k]*a[k]; // replace column with matrix product: Azz0(t+dt) = C*Azz0(t)
 		}
-
+		// set velocity equal to zero, with no better information at initial alignment phase
+		for (i = 0; i < 3; i++)
+			pony->imu->sol.v[i] = 0;
+		pony->imu->sol.v_valid = 1;
 	}
 
 }
@@ -413,6 +429,7 @@ void pony_ins_alignment_rotating(void) {
 	
 	The same as pony_ins_alignment_rotating, but attitude matrix is calculated using attitude angles
 	(roll, pitch and yaw=true heading). Does not allow the first instrumental axis to point upwards.
+	Sets velocity vector to zero.
 
 	description:
 		algorithm may be found in a separate document [A.A. Golovan]
@@ -439,6 +456,8 @@ void pony_ins_alignment_rotating(void) {
 		pony->imu->sol.q_valid
 		pony->imu->sol.rpy
 		pony->imu->sol.rpy_valid
+		pony->imu->sol.v
+		pony->imu->sol.v_valid
 
 	cfg parameters:
 		{imu: alignment} - imu initial alignment duration, sec
@@ -629,7 +648,10 @@ void pony_ins_alignment_rotating_rpy(void) {
 				for (k = 0, Azz0[j*3+i] = 0; k < 3; k++)
 					Azz0[j*3+i] += C[j*3+k]*a[k]; // replace column with matrix product: Azz0(t+dt) = C*Azz0(t)
 		}
-
+		// set velocity equal to zero, with no better information at initial alignment phase
+		for (i = 0; i < 3; i++)
+			pony->imu->sol.v[i] = 0;
+		pony->imu->sol.v_valid = 1;
 	}
 
 }

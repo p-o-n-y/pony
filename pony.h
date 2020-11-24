@@ -1,4 +1,4 @@
-// Sep-2020
+// Nov-2020
 // PONY core header file
 
 #ifndef PONY_H_
@@ -7,7 +7,7 @@
 #include <stddef.h>
 
 // PONY core declarations
-#define PONY_BUS_VERSION 9 // current bus version
+#define PONY_BUS_VERSION 10 // current bus version
 
 
 
@@ -29,31 +29,31 @@ typedef struct {
 
 // navigation solution structure
 typedef struct {
-	double  x[3];         // cartesian coordinates, meters
-	char    x_valid;      // validity flag (0/1), or a number of valid measurements used
-	double  x_std;        // coordinate RMS ("standard") deviation estimate, meters
-
-	double  llh[3];       // geodetic coordinates: longitude (rad), latitude (rad), height (meters)
-	char    llh_valid;    // validity flag (0/1), or a number of valid measurements used
-
-	double  v[3];         // relative-to-Earth velocity vector coordinates in local-level geodetic cartesian frame, meters per second
-	char    v_valid;      // validity flag (0/1), or a number of valid measurements used
-	double  v_std;        // velocity RMS ("standard") deviation estimate, meters per second
-
-	double  q[4];         // attitude quaternion, relative to local-level geodetic cartesian frame
-	char    q_valid;      // validity flag (0/1), or a number of valid measurements used
-
-	double  L[9];         // attitude matrix for the transition from local-level geodetic cartesian frame, row-wise: L[0] = L_11, L[1] = L_12, ..., L[8] = L[33]
-	char    L_valid;      // validity flag (0/1), or a number of valid measurements used
-
-	double  rpy[3];       // attitude angles relative to local-level geodetic cartesian frame: roll (rad), pitch (rad), yaw (rad)
-	char    rpy_valid;    // validity flag (0/1), or a number of valid measurements used
-
-	double  dt;           // clock bias
-	char    dt_valid;     // validity flag (0/1), or a number of valid measurements used
-
-	double* metrics;      // application-specific solution metrics
-	size_t metrics_count; // number of application-specific metrics, given in cfg ("metrics_count = ..."), 2 by default, 255 max
+	double  x[3];          // cartesian coordinates, meters
+	char    x_valid;       // validity flag (0/1), or a number of valid measurements used
+	double  x_std;         // coordinate RMS ("standard") deviation estimate, meters
+						   
+	double  llh[3];        // geodetic coordinates: longitude (rad), latitude (rad), height (meters)
+	char    llh_valid;     // validity flag (0/1), or a number of valid measurements used
+						   
+	double  v[3];          // relative-to-Earth velocity vector coordinates in local-level geodetic cartesian frame, meters per second
+	char    v_valid;       // validity flag (0/1), or a number of valid measurements used
+	double  v_std;         // velocity RMS ("standard") deviation estimate, meters per second
+						   
+	double  q[4];          // attitude quaternion, relative to local-level geodetic cartesian frame
+	char    q_valid;       // validity flag (0/1), or a number of valid measurements used
+						   
+	double  L[9];          // attitude matrix for the transition from local-level geodetic cartesian frame, row-wise: L[0] = L_11, L[1] = L_12, ..., L[8] = L[33]
+	char    L_valid;       // validity flag (0/1), or a number of valid measurements used
+						   
+	double  rpy[3];        // attitude angles relative to local-level geodetic cartesian frame: roll (rad), pitch (rad), yaw (rad)
+	char    rpy_valid;     // validity flag (0/1), or a number of valid measurements used
+						   
+	double  dt;            // clock bias
+	char    dt_valid;      // validity flag (0/1), or a number of valid measurements used
+						   
+	double* metrics;       // application-specific solution metrics
+	size_t  metrics_count; // number of application-specific metrics, given in cfg ("metrics_count = ..."), 2 by default, 255 max
 } pony_sol;
 
 
@@ -79,7 +79,7 @@ typedef struct {
 	char*  cfg;       // pointer to IMU configuration substring
 	size_t cfglength; // IMU configuration substring length
 
-	double t;         // measurement update time
+	double t;         // measurement update time (as per IMU clock), used to calculate time step when needed
 
 	double w[3];      // up to 3 gyroscope measurements
 	char   w_valid;   // validity flag (0/1), or a number of valid components
@@ -315,7 +315,7 @@ typedef struct {
 	char*  cfg;         // pointer to air data configuration substring
 	size_t cfglength;   // air data configuration substring length
 
-	double t;           // measurement update time
+	double t;           // measurement update time (as per air data computer clock)
 
 	double alt;         // barometric altitude
 	double alt_std;     // estimated standard deviation, <0 if undefined
@@ -329,6 +329,23 @@ typedef struct {
 	double speed_std;   // estimated standard deviation, <0 if undefined
 	char   speed_valid; // validity flag (0/1)
 } pony_air;
+
+
+
+
+
+// reference data
+typedef struct {
+	char*  cfg;       // pointer to reference data configuration substring
+	size_t cfglength; // reference data configuration substring length
+
+	double t;         // reference time
+
+	double g[3];      // reference gravity acceleration vector
+	char   g_valid;   // validity flag (0/1), or a number of valid components
+
+	pony_sol sol;     // reference data
+} pony_ref;
 
 
 
@@ -388,10 +405,11 @@ typedef struct {
 	size_t          gnss_count;      // number of gnss instances
 
 	pony_air*       air;             // air data subsystem pointer
+	pony_ref*       ref;             // reference data subsystem pointer
 
-	double          t;               // system time
+	double          t;               // system time (as per main clock for integrated systems)
 	int             mode;            // operation mode: 0 - init, <0 termination, >0 normal operation
-	pony_sol        sol;             // navigation solution
+	pony_sol        sol;             // navigation solution (hybrid/integrated, etc.)
 } pony_struct;
 
 extern pony_struct* pony;

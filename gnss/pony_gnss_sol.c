@@ -1,11 +1,13 @@
-// Sep-2020
+// Nov-2020
 /*	pony_gnss_sol 
 	
 	pony plugins that provide GNSS navigation solutions:
 
 	- pony_gnss_sol_pos_code
 		Computes conventional least-squares standalone position and clock error from code pseudoranges 
-		for all available receivers/antennas.
+		for all available receivers/antennas. Also checks if estimated covariances fall inside 500-sigma
+		interval with sigma taken from gnss settings for code pseudoranges. Clock errors are obtained 
+		separately for each constellation. Their average value goes into GNSS solution.
 	- pony_gnss_sol_check_elevation_mask
 		Checks if satellites are below elevation mask and drop their measurement validity flags if the case.
 		Multi-receiver/multi-system capable. Stores separate value for each receiver in gnss->settings structure.
@@ -63,9 +65,13 @@ void   pony_gnss_sol_free_null(void **ptr);                                     
 /* pony_gnss_sol_pos_code - pony plugin
 	
 	Computes conventional least-squares standalone position and clock error from code pseudoranges 
-	for all available receivers/antennas. 
+	for all available receivers/antennas. Also checks if estimated covariances fall inside 500-sigma
+	interval with sigma taken from gnss settings for code pseudoranges. Clock errors are obtained 
+	separately for each constellation. Their average value goes into GNSS solution.
 
 	description:
+		- drops validity flag if estimated covariance exceeds 500 x gnss[].settings.code_sigma;
+		- puts estimated covariance into sol.x_std;
 		- sets sol.x_valid flag to the number of valid measurements used in position estimate;
 		- estimates receiver clock error for each satellite constellation separately, 
 		  then puts average value into sol.dt;
@@ -73,7 +79,6 @@ void   pony_gnss_sol_free_null(void **ptr);                                     
 	uses:
 		pony->gnss_count
 		pony->gnss[].sol.x
-		pony->gnss[].settings.sinEl_mask
 		pony->gnss[].settings.code_sigma
 		pony->gnss[].gps/glo/gal/bds->max_sat_count
 		pony->gnss[].gps/glo/gal/bds->    obs_count
@@ -87,6 +92,7 @@ void   pony_gnss_sol_free_null(void **ptr);                                     
 		pony->gnss[].gps/glo/gal/bds->sat[].sinEl_valid
 	changes:
 		pony->gnss[].sol.  x
+		pony->gnss[].sol.  x_std
 		pony->gnss[].sol.  x_valid
 		pony->gnss[].sol. dt
 		pony->gnss[].sol. dt_valid
@@ -188,7 +194,7 @@ void pony_gnss_sol_check_elevation_mask(void) {
 
 	enum system_id {gps, glo, gal, bds, sys_count};
 
-	const char   elev_mask_token[] = "elev_mask"; // elevetion mask parameter name in configuration
+	const char   elev_mask_token[] = "elev_mask"; // elevation mask parameter name in configuration
 	const double elev_mask_default = 5;           // elevation mask default value, degrees
 
 	char *cfg_ptr;                                // pointer to a substring in configuration
@@ -209,7 +215,7 @@ void pony_gnss_sol_check_elevation_mask(void) {
 				if (cfg_ptr != NULL)
 					pony->gnss[r].settings.sinEl_mask = atof(cfg_ptr);		
 				// if not found or invalid, set to default
-				if (cfg_ptr == NULL || -90 < pony->gnss[r].settings.sinEl_mask || pony->gnss[r].settings.sinEl_mask < 90)
+				if (cfg_ptr == NULL || pony->gnss[r].settings.sinEl_mask < -90 || 90 < pony->gnss[r].settings.sinEl_mask)
 					pony->gnss[r].settings.sinEl_mask = elev_mask_default;
 				// convert to sine
 				pony->gnss[r].settings.sinEl_mask = sin(pony->gnss[r].settings.sinEl_mask*pony->gnss_const.pi/180);
@@ -304,7 +310,9 @@ void pony_gnss_sol_check_elevation_mask(void) {
 		{gnss: {gal: obs_use}} -                      --"-- galileo --"--
 		and/or
 		{gnss: {bds: obs_use}} -                      --"-- beidou  --"--
-			type   : square brackets-enclosed, comma-separated list of three-character templates
+			type   : square brackets-enclosed, space-separated list of three-character templates 
+				     with question marks (? symbols) as wildcards, and any extra printable 
+					 characters (like commas, semicolons, etc.) being ignored
 			range  : as of RINEX specification
 			default: none
 			example: {gnss:       obs_use = [C??, L??] } - use only code pseudorange and carrier phase
@@ -319,7 +327,9 @@ void pony_gnss_sol_check_elevation_mask(void) {
 		{gnss: {gal: obs_off}} - galileo --"--
 		and/or
 		{gnss: {bds: obs_off}} - beidou  --"--
-			type   : square brackets-enclosed, comma-separated list of three-character templates
+			type   : square brackets-enclosed, space-separated list of three-character templates
+				     with question marks (? symbols) as wildcards, and any extra printable 
+					 characters (like commas, semicolons, etc.) being ignored
 			range  : as of RINEX specification
 			default: none
 			example: {gnss:       obs_off = [C2?, L1C] } - exclude code pseudoranges on L2 and C/A carrier phase on L1
@@ -513,15 +523,14 @@ void pony_gnss_sol_select_observables(void) {
 					for (i = 0; i < maxobs; i++) {
 						// select only those present in obs_use list
 						for (j = 0; j < obs_use_count[r][sys]*wildcard_len; j += wildcard_len)
-							if (!pony_gnss_sol_select_observables_match_wildcard(obstypes[i], obs_use_wildcards[r][sys] + j) ) { // does not match mandatory wildcard
-								for (s = 0; s < maxsat; s++) // drop validity for all satellites
-									sat[s].obs_valid[i] = 0;
+							if (pony_gnss_sol_select_observables_match_wildcard(obstypes[i], obs_use_wildcards[r][sys] + j) ) // does match one of mandatory wildcard
 								break;
-							}
+						if (obs_use_count[r][sys] && j >= obs_use_count[r][sys]*wildcard_len) // none matching wildcards found
+							for (s = 0; s < maxsat; s++) // drop validity for all satellites
+								sat[s].obs_valid[i] = 0;
 						// exclude those present in obs_off list
 						for (j = 0; j < obs_off_count[r][sys]*wildcard_len; j += wildcard_len)
-							if (pony_gnss_sol_select_observables_match_wildcard(obstypes[i], obs_off_wildcards[r][sys] + j) ) // does match exclusion wildcard
-							{
+							if (pony_gnss_sol_select_observables_match_wildcard(obstypes[i], obs_off_wildcards[r][sys] + j) ) { // does match exclusion wildcard
 								for (s = 0; s < maxsat; s++) // drop validity for all satellites
 									sat[s].obs_valid[i] = 0;
 								break;
@@ -546,13 +555,13 @@ void pony_gnss_sol_pos_code_single_receiver(pony_gnss *gnss, double *x, double *
 
 	const char code_id = 'C';
 	const double
-		k_sigma = 5,
+		k_sigma = 500,
 		dx2     = PONY_GNSS_SOL_POS_PRECISION*PONY_GNSS_SOL_POS_PRECISION; // m^2
 
 	size_t i, j, k, s, n, sys, maxsat, maxobs, sys_obs[sys_count];
 	pony_gnss_sat *sat;
 	double z, rho, r, sigma, sigma_pos, sigma_clock[sys_count];
-	char v, (*obs_types)[4];
+	char (*obs_types)[4];
 
 	// check if current coordinates fall within specified range
 	for (k = 0; k < 3 && fabs(gnss->sol.x[k]) <= PONY_GNSS_SOL_MAX_COORD; k++);
@@ -562,8 +571,11 @@ void pony_gnss_sol_pos_code_single_receiver(pony_gnss *gnss, double *x, double *
 		gnss->sol.x_valid = 0;
 	}
 
-	// reset validity flag
-	v = 0;
+	// drop validity flags and covariance
+	gnss->sol. dt_valid = 0;
+	gnss->sol.  x_valid = 0;
+	gnss->sol.llh_valid = 0;
+	gnss->sol.  x_std   = PONY_GNSS_SOL_MAX_COORD;
 	for (i = 0; i < PONY_GNSS_SOL_POS_MAX_ITERATIONS; i++) {
 
 		n = 0; // measurements used so far
@@ -625,9 +637,8 @@ void pony_gnss_sol_pos_code_single_receiver(pony_gnss *gnss, double *x, double *
 			// run through all satellites
 			for (s = 0; s < maxsat; s++) {
 
-				if ( !(sat[s].x_valid) 
-					|| (sat[s].sinEl_valid && sat[s].sinEl < gnss->settings.sinEl_mask) )
-					continue; // skip satellite if its coordinates aren't valid, or elevation angle known and below the mask
+				if ( !(sat[s].x_valid) )
+					continue; // skip satellite if it has no valid coordinates
 
 				// calculated distance from current solution to satellite
 				rho = 0;
@@ -667,10 +678,8 @@ void pony_gnss_sol_pos_code_single_receiver(pony_gnss *gnss, double *x, double *
 		for (k = 0; k < 3; k++)
 			gnss->sol.x[k] += x[k];
 
-		// check number of measurements vs number of unknowns
-		if ( n >= 3 + (sys_obs[gps]>0) + (sys_obs[glo]>0) + (sys_obs[gal]>0) + (sys_obs[bds]>0) )
-			v = 1;
-		else
+		// check number of measurements vs minimum number of unknowns
+		if (n < 4)
 			break;
 
 		// check to stop iterations
@@ -678,8 +687,8 @@ void pony_gnss_sol_pos_code_single_receiver(pony_gnss *gnss, double *x, double *
 			break;
 	}
 
-	if (!v || i >= PONY_GNSS_SOL_POS_MAX_ITERATIONS)
-		return; // not enough measurements of iteration limit reached
+	if (i >= PONY_GNSS_SOL_POS_MAX_ITERATIONS)
+		return; // iteration limit reached, convergence failed
 
 	// check estimate error covariances
 	for (k = 0, sigma_pos = 0, i = 0; i < 3; k += m-i, i++)
@@ -697,12 +706,13 @@ void pony_gnss_sol_pos_code_single_receiver(pony_gnss *gnss, double *x, double *
 	if (gnss->sol.dt_valid)
 		gnss->sol.dt = (gnss->sol.dt/gnss->sol.dt_valid)/pony->gnss_const.c; // receiver clock error in seconds
 	else
-		return; // regard position as invalid if the clock error is too large
+		return; // regard position as invalid also, if clock error covariance is too large
 
 	if ( sigma_pos > k_sigma*gnss->settings.code_sigma)
 		return; // position considered invalid
 
-	gnss->sol.x_valid = (char)n;
+	gnss->sol.  x_std   = sigma_pos;
+	gnss->sol.  x_valid = (char)n;
 	gnss->sol.llh_valid = pony_gnss_sol_ecef2llh(gnss->sol.x, gnss->sol.llh, pony->gnss_const.gps.a, pony->gnss_const.gps.e2); // geodetic solution
 
 }
