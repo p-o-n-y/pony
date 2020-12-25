@@ -1,5 +1,4 @@
-// Nov-2020
-// Oct-2020
+// Dec-2020
 /*	pony_ins_alignment 
 	
 	pony plugins for ins initial alignment (initial attitude matrix determination):

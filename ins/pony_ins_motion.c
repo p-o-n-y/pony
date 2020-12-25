@@ -1,5 +1,4 @@
-// Nov-2020
-// Oct-2020
+// Dec-2020
 /*	pony_ins_motion
 	
 	pony plugins for ins position and velocity algorithms:

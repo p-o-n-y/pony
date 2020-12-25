@@ -1,4 +1,4 @@
-// Nov-2020
+// Dec-2020
 // PONY core source code
 
 #include <stdlib.h>
@@ -314,14 +314,18 @@ char pony_init_imu(pony_imu* imu)
 	size_t i;
 
 	// validity flags
-	imu->w_valid = 0;
-	imu->f_valid = 0;
-	imu->W_valid = 0;
+	imu-> w_valid = 0;
+	imu-> f_valid = 0;
+	imu->Tw_valid = 0;
+	imu->Tf_valid = 0;
+	imu-> W_valid = 0;
 	imu->t = 0;
 	for (i = 0; i < 3; i++) {
-		imu->w[i] = 0;
-		imu->f[i] = 0;
-		imu->W[i] = 0;
+		imu->w [i] = 0; // gyroscopes
+		imu->f [i] = 0; // accelerometers
+		imu->Tw[i] = 0; // gyroscope temperature
+		imu->Tf[i] = 0; // accelerometer temperature
+		imu->W [i] = 0; // angular velocity of the local level reference frame
 	}
 	// default gravity acceleration vector
 	imu->g[0] = 0;
@@ -1011,15 +1015,13 @@ void pony_free_air(void)
 	*/
 char pony_init_ref(pony_ref* ref)
 {
-	size_t i;
-
-	// variables
+	// time
 	ref->t = 0;
-	ref->g_valid = 0;
 	// default gravity acceleration vector
 	ref->g[0] = 0;
 	ref->g[1] = 0;
 	ref->g[2] = -pony->imu_const.ge*(1 + pony->imu_const.fg/2); // middle value
+	ref->g_valid = 0;
 	// drop the solution
 	if (!pony_init_sol(&(ref->sol), ref->cfg, ref->cfglength))
 		return 0;
@@ -1367,14 +1369,15 @@ char pony_terminate(void)
 	*/
 char pony_remove_plugin(void(*plugin)(void))
 {
-	size_t i, j;
-	char flag = 0;
+	size_t       i, j;
+	char         flag = 0;
+	pony_plugin* reallocated_pointer;
 
 	for (i = 0; i < pony->core.plugin_count; i++) { // go through the execution list
 		if (pony->core.plugins[i].func != plugin)   // if not the requested plugin, do nothing
 			continue;
 		// otherwise, remove the current plugin from the execution list
-		for (j = i+1; j < pony->core.plugin_count; j++) // move all succeeding plugins one position lower
+		for (j = i+1; j < pony->core.plugin_count; j++) // copy all succeeding plugins one position lower
 			pony->core.plugins[j-1] = pony->core.plugins[j];
 		// reset the last one
 		j--;
@@ -1388,11 +1391,12 @@ char pony_remove_plugin(void(*plugin)(void))
 	}
 
 	// reallocate memory
-	pony->core.plugins = (pony_plugin*)realloc((void*)(pony->core.plugins), pony->core.plugin_count*sizeof(pony_plugin));
-	if (pony->core.plugin_count > 0 && pony->core.plugins == NULL) { // memory reallocation somehow failed
+	reallocated_pointer = (pony_plugin*)realloc((void*)(pony->core.plugins), pony->core.plugin_count*sizeof(pony_plugin));
+	if (pony->core.plugin_count > 0 && reallocated_pointer == NULL) { // memory reallocation somehow failed
 		pony_free();
 		return 0;
 	}
+	pony->core.plugins = reallocated_pointer;
 
 	return flag;
 }
@@ -1566,7 +1570,7 @@ char pony_resume_plugin(void(*plugin)(void))
 	*/
 char* pony_locate_token(const char* token, char* src, const size_t len, const char delim)
 {
-	const char quote = '"', brace_open = '{', brace_close = '}';
+	const char quote = '"', brace_open = '{', brace_close = '}', blank = ' ';
 
 	size_t i, j, k, n, len1;
 
@@ -1578,7 +1582,7 @@ char* pony_locate_token(const char* token, char* src, const size_t len, const ch
 	len1 = len - n;
 
 	// look for the token
-	for (i = 0, j = 0, k = 0; i < len1 && src[i]; i++) // go throughout the string
+	for (i = 0, j = 0, k = 0; i <= len1 && src[i]; i++) // go throughout the string
 		if (src[i] == quote) // skip quoted values
 			for (i++; i < len1 && src[i] && src[i] != quote; i++);
 		else if (src[i] == brace_open) // skip groups
@@ -1592,10 +1596,10 @@ char* pony_locate_token(const char* token, char* src, const size_t len, const ch
 		return NULL;
 
 	if (!delim)
-		return (src + k + 1);
+		return (src + k);
 
 	// check for delimiter
-	for (i = k+1; i < len && src[i] && src[i] <= ' '; i++); // skip all non-printables		
+	for (i = k; i < len && src[i] && src[i] <= blank; i++); // skip all non-printables		
 	if (i >= len || src[i] != delim) // no delimiter found
 		return NULL;
 	else
@@ -1758,16 +1762,16 @@ char pony_time_epoch2gps(unsigned int* week, double* sec, pony_time_epoch* epoch
 			input:
 				double* u      --- pointer to the first vector
 				double* v      --- pointer to the second vector
-				const size_t m --- dimension
+				const size_t n --- dimension
 			return value:
 				dot product u^T*v
 		*/	
-double pony_linal_dot(double* u, double* v, const size_t m)
+double pony_linal_dot(double* u, double* v, const size_t n)
 {
 	double res;
 	size_t i;
 
-	for (i = 1, res = u[0]*v[0]; i < m; i++)
+	for (i = 1, res = u[0]*v[0]; i < n; i++)
 		res += u[i]*v[i];
 
 	return res;
@@ -1777,13 +1781,13 @@ double pony_linal_dot(double* u, double* v, const size_t m)
 			calculate l_2 vector norm
 			input:
 				double* u      --- pointer to a vector
-				const size_t m --- dimension
+				const size_t n --- dimension
 			return value:
 				l_2 vector norm, i.e. sqrt(u^T*u)
 		*/
-double pony_linal_vnorm(double* u, const size_t m)
+double pony_linal_vnorm(double* u, const size_t n)
 {
-	return sqrt(pony_linal_dot(u, u, m));
+	return sqrt(pony_linal_dot(u, u, n));
 }
 
 		/*
@@ -2058,10 +2062,10 @@ void pony_linal_eul2mat(double* R, double* e)
 		c = (1 - cos(e0))/e02;
 	}
 	else {
-		// Taylor expansion for sin(x)/x, (1-cos(x))/x^2 up to 10-th degree terms 
+		// Taylor expansion for sin(x)/x, (1-cos(x))/x^2 up to 10-th degree terms (only even powers in each series)
 		// having the order of 2^-105, they fall below IEEE 754-2008 quad precision rounding error when multiplied by an argument less than 2^-8
 		s = 1, c = 1/2.;
-		for (i = 1, ps = -e02/6, pc = -e02/24; i < 5; i++, ps *= -e02/((double)(i*(4*i+2))), pc *= -e02/((double)((4*i+2)*(i+1))))
+		for (i = 2, ps = -e02/6, pc = -e02/24; i < 10 && ps != 0.0; i += 2, ps *= -e02/(i*(i+1.0)), pc *= -e02/((i+1.0)*(i+2.0)))
 			s += ps, c += pc;
 	}
 
@@ -2071,48 +2075,70 @@ void pony_linal_eul2mat(double* R, double* e)
 	R[6] =  e[1]*s + e[2]*e[0]*c; R[7] = -e[0]*s + e[1]*e[2]*c; R[8] =  1 - (e1 + e2)*c;
 }
 
-	// routines for m x m upper-triangular matrices lined up in a single-dimension array
+	// routines for n x n upper-triangular matrices lined up in one-dimensional array
 		/*
-			convert index for upper-triangular matrix lined up in a single-dimension array: (i,j) -> k
+			convert index for upper-triangular matrix lined up in one-dimensional array: (i,j) -> k
 			input:
 				const size_t i, j --- row and column indexes in upper-triangular matrix,
-				                      i,j = 0,1,...,m-1
-				const size_t m    --- upper-triangular matrix dimension
+				                      i,j = 0,1,...,n-1
+				const size_t n    --- upper-triangular matrix dimension
 			output:
-				size_t* k --- pointer to an index in a single-dimension array,
-				              k = 0,1,...,[m*(m+1)/2]-1
+				size_t* k --- pointer to an index in one-dimensional array,
+				              k = 0,1,...,[n*(n+1)/2]-1
 		*/
-void pony_linal_u_ij2k(size_t* k, const size_t i, const size_t j, const size_t m)
+void pony_linal_u_ij2k(size_t* k, const size_t i, const size_t j, const size_t n)
 {
-	*k = (i*(2*m - 1 - i))/2 + j;
+	*k = i*(2*n - 1 - i)/2 + j;
 }
 
 		/*
-			convert index for upper-triangular matrix lined up in a single-dimension array: k -> (i,j)
+			convert index for upper-triangular matrix lined up in one-dimensional array: k -> (i,j)
 			input:
-				const size_t k --- index in a single-dimension array,
-				                   k = 0,1,...,[m(m+1)/2]-1
-				const size_t m --- upper-triangular matrix dimension
+				const size_t k --- index in one-dimensional array,
+				                   k = 0,1,...,[n(n+1)/2]-1
+				const size_t n --- upper-triangular matrix dimension
 			output:
 				const size_t* i, j --- pointers to a row and column indexes in upper-triangular matrix,
-				                       i,j = 0,1,...,m-1
+				                       i,j = 0,1,...,n-1
+									   NULL pointers omit assignment
 		*/
-void pony_linal_u_k2ij(size_t* i, size_t* j, const size_t k, const size_t m)
+void pony_linal_u_k2ij(size_t* i, size_t* j, const size_t k, const size_t n)
 {
-	double onehalf_plus_m = 0.5+m;
-	*i = (size_t)(floor(onehalf_plus_m - sqrt(onehalf_plus_m*onehalf_plus_m - 2.0*k)) + 0.5);
-	*j = k - ((2*m - 1 - (*i))*(*i))/2;
+	double onehalf_plus_n = 0.5+n;
+	size_t i0;
+
+	i0 = (size_t)(floor(onehalf_plus_n - sqrt(onehalf_plus_n*onehalf_plus_n - 2.0*k)) + 0.5);
+	if (i != NULL)
+		*i = i0;
+	if (j != NULL)
+		*j = k - (2*n - 1 - i0)*i0/2;
 }
 
 		/*
-			multiply upper-triangular matrix lined up in a single-dimension array by a regular matrix
+			fill the diagonal with array elements
+			input:
+				double* u      --- pointer to an upper-triangular n x n matrix
+				                   lined up in one-dimensional array of n(n+1)/2 x 1
+				double* d      --- pointer to an array of n diagonal elements
+				const size_t n --- dimension
+		*/
+void pony_linal_diag2u(double* u, double* d, const size_t n)
+{
+	size_t i, k;
+
+	for (i = 0, k = 0; i < n; k += n-i, i++)
+		u[k] = d[i];
+}
+
+		/*
+			multiply upper-triangular matrix lined up in one-dimensional array by a regular matrix
 			input:
 				double*      u    --- pointer to an upper-triangular n x n matrix
-				                      lined up in a single-dimension array of n(n+1)/2 x 1
+				                      lined up in one-dimensional array of n(n+1)/2 x 1
 				double*      v    --- pointer to a regular n x m matrix
 				const size_t n, m --- dimensions
 			output:
-				double* res --- pointer to a n x m matrix,
+				double* res --- pointer to n x m matrix,
 				                res = U*V
 			note:
 				overwriting input (double* res = double* v) is allowed
@@ -2132,51 +2158,128 @@ void pony_linal_u_mul(double* res, double* u, double* v, const size_t n, const s
 }
 
 		/*
-			multiply upper-triangular matrix lined up in a single-dimension array of m(m+1)/2 x 1 (transposed) by vector
+			multiply transposed upper-triangular matrix lined up in one-dimensional array of n(n+1)/2 x 1, by a regular matrix
 			input:
-				double*      u --- pointer to an upper-triangular matrix 
-				                   lined up in a single-dimension array of m(m+1)/2 x 1
-				double*      v --- pointer to a m-dimensional vector
-				const size_t m --- dimension
+				double*      u   --- pointer to an upper-triangular matrix 
+				                     lined up in one-dimensional array of n(n+1)/2 x 1
+				double*      v   --- pointer to a regular n x m matrix
+				const size_t n,m --- dimensions
 			output:
-				double* res --- pointer to a m-dimensional vector,
-				                res = U^T*v
+				double* res --- pointer to a regular n x m matrix,
+				                res = U^T*V
 			note:
-				NO overwriting input is allowed
+				overwriting input (double* res = double* v) is allowed
 		*/
-void pony_linal_uT_mul_v(double* res, double* u, double* v, const size_t m)
+void pony_linal_uT_mul(double* res, double* u, double* v, const size_t n, const size_t m)
 {
-	size_t i, j, k;
+	size_t i, j, k, k0, l, r, r0, ni;
 
-	for (i = 0; i < m; i++)
-		res[i] = u[i]*v[0];
-	for (j = 1, k = m; j < m; j++) {
-		for (i = j; i < m; i++, k++)
-			res[i] += u[k]*v[j];
+	for (i = 0, k0 = n*(n+1)/2-1, r0 = m*n-1; i < n; k0 -= i+2, i++) {
+		ni = n - i;
+		for (j = 0; j < m; j++, r0--) {
+			res[r0] = v[r0]*u[k0];
+			for (l = 1, r = r0-m, k = k0-i-1; l < ni; l++, k -= i+l, r -= m)
+				res[r0] += v[r]*u[k];
+		}
 	}
 }
 
 		/*
-			invert upper-triangular matrix lined up in a single-dimension array of m(m+1)/2 x 1
+			multiply a regular matrix by upper-triangular matrix lined up in one-dimensional array of n(n+1)/2 x 1
+			input:
+				double*      v    --- pointer to a regular m x n matrix
+				double*      u    --- pointer to an upper-triangular n x n matrix
+				                      lined up in one-dimensional array of n(n+1)/2 x 1
+				const size_t m, n --- dimensions
+			output:
+				double* res --- pointer to m x n matrix,
+				                res = V*U
+			note:
+				overwriting input (double* res = double* v) is allowed
+		*/
+void pony_linal_mul_u(double* res, double* v, double* u, const size_t m, const size_t n)
+{
+	size_t 
+		i, j, k, k0, r, r0, 
+		nj, mn, nn1;
+
+	mn = m*n;
+	nn1 = n*(n+1)/2 - 1;
+	for (r0 = mn-1; r0 < mn; r0 -= n) {
+		for (j = 0, k0 = nn1; j < n; k0 -= j+2, j++) {
+			r = r0 - j;
+			nj = n - j;
+			res[r] = v[r]*u[k0];
+			for (i = 1, k = k0-j-1; i < nj; i++, k -= i+j)
+				res[r] += v[r-i]*u[k];
+		}
+		if (r0 < n)
+			break;
+	}		
+}
+
+		/* 
+			multiply a regular matrix by itself transposed, storing upper part of the result lined up in one-dimensional array of n(n+1)/2 x 1 
+			input:
+				double* v         --- pointer to a regular n x m matrix
+				const size_t n, m --- dimensions
+			output:
+				double* res       --- pointer to an upper-triangular n x n matrix
+				                      lined up in one-dimensional array of n(n+1)/2 x 1
+				                      res = v*v^T
+		*/
+void pony_linal_msq2T_u(double* res, double* v, const size_t n, const size_t m)
+{
+	size_t i, i1, j, k, im, i1m;
+
+	for (i = 0, i1 = 0, k = 0; i < n; i++)
+		for (i1 = i, im = i*m; i1 < n; i1++, k++)
+			for (j = 0, i1m = i1*m, res[k] = 0; j < m; j++)
+				res[k] += v[im + j]*v[i1m + j];
+}
+
+		/* 
+			multiply a transposed regular matrix by itself, storing upper part of the result lined up in one-dimensional array of n(n+1)/2 x 1 
+			input:
+				double* v         --- pointer to a regular n x m matrix
+				const size_t m, n --- dimensions
+			output:
+				double* res       --- pointer to an upper-triangular n x n matrix
+				                      lined up in one-dimensional array of n(n+1)/2 x 1
+				                      res = v^T*v
+		*/
+void pony_linal_msq1T_u(double* res, double* v, const size_t m, const size_t n)
+{
+	size_t j, j1, i, k, mn;
+
+	mn = m*n;
+	for (j = 0, j1 = 0, k = 0; j < n; j++)
+		for (j1 = j; j1 < n; j1++, k++)
+			for (i = 0, res[k] = 0; i < mn; i += n)
+				res[k] += v[i+j]*v[i+j1];
+}
+
+		/*
+			invert upper-triangular matrix lined up in one-dimensional array of m(m+1)/2 x 1
 			input:
 				double* u      --- pointer to an upper-triangular matrix
-				                   lined up in a single-dimension array of m(m+1)/2 x 1
-				const size_t m --- dimension
+				                   lined up in one-dimensional array of n(n+1)/2 x 1
+				const size_t n --- dimension
 			output:
 				double* res --- pointer to an upper-triangular matrix
-				                lined up in a single-dimension array of m(m+1)/2 x 1,
+				                lined up in one-dimensional array of n(n+1)/2 x 1,
 				                res = U^-1
 			note:
 				overwriting input (double* res = double* u) is allowed
 		*/
-void pony_linal_u_inv(double* res, double* u, const size_t m)
+void pony_linal_u_inv(double* res, double* u, const size_t n)
 {
 	size_t i, j, k, k0, p, q, p0, r;
 	double s;
 
-	for (j = 0, k0 = (m+2)*(m-1)/2; j < m; k0 -= j+2, j++) {
+	for (j = 0, k0 = n*(n+1)/2 - 1; j < n; k0 -= j+2, j++) {
 		res[k0] = 1/u[k0]; // division by zero if matrix is not invertible
-		for (i = j+1, k = k0-j-1; i < m; k -= i+1, i++) {
+		for (i = j+1, k = k0-j-1; i < n; k -= i+1, i++) {
 			p0 = k-(i-j);
 			for (p = k, q = k0, r = 0, s = 0; q > k; p--, q -= j+r+1, r++)
 				s += u[p]*res[q];
@@ -2186,27 +2289,27 @@ void pony_linal_u_inv(double* res, double* u, const size_t m)
 }
 
 		/*
-			calculate square (with transposition) of upper-triangular matrix lined up in a single-dimension array of m(m+1)/2 x 1
+			calculate square (with transposition) of upper-triangular matrix lined up in one-dimensional array of n(n+1)/2 x 1
 			input:
 				double* u      --- pointer to an upper-triangular matrix 
-				                   lined up in a single-dimension array of m(m+1)/2 x 1
-				const size_t m --- dimension
+				                   lined up in one-dimensional array of n(n+1)/2 x 1
+				const size_t n --- dimension
 			output:
 				double* res --- pointer to a symmetric matrix
-				                lined up in a single-dimension array of m(m+1)/2 x 1,
+				                lined up in one-dimensional array of n(n+1)/2 x 1,
 				                res = U*U^T
 			note:
 				overwriting input (double* res = double* u) is allowed
 		*/
-void pony_linal_uuT(double* res, double* u, const size_t m)
+void pony_linal_uuT(double* res, double* u, const size_t n)
 {
 	size_t i, j, k, p, q, r;
 
-	for (i = 0, k = 0; i < m; i++) {
-		for (j = i; j < m; j++, k++) {
-			pony_linal_u_ij2k(&p, j, j, m);
+	for (i = 0, k = 0; i < n; i++) {
+		for (j = i; j < n; j++, k++) {
+			pony_linal_u_ij2k(&p, j, j, n);
 			res[k] = u[k]*u[p];
-			for (q = k+1, p++, r = j+1; r < m; q++, p++, r++)
+			for (q = k+1, p++, r = j+1; r < n; q++, p++, r++)
 				res[k] += u[q]*u[p];
 		}
 	}
@@ -2216,26 +2319,26 @@ void pony_linal_uuT(double* res, double* u, const size_t m)
 			calculate Cholesky upper-triangular factorization P = S*S^T,
 			where P is symmetric positive-definite matrix
 			input:
-				double*      P --- pointer to an upper-triangular part of symmetric m x m positive-definite matrix R
-				                   lined in a single-dimension array m(m+1)/2 x 1
-				const size_t m --- dimension
+				double*      P --- pointer to an upper-triangular part of symmetric n x n positive-definite matrix R
+				                   lined in one-dimensional array n(n+1)/2 x 1
+				const size_t n --- dimension
 			output:
 				double* S --- pointer to an upper-triangular part of a Cholesky factor S
-				              lined in a single-dimension array m(m+1)/2 x 1
+				              lined in one-dimensional array n(n+1)/2 x 1
 			note:
 				overwriting input (double* P = double* S) is allowed
 		*/
-void pony_linal_chol(double* S, double* P, const size_t m)
+void pony_linal_chol(double* S, double* P, const size_t n)
 {
 	size_t i, j, k, k0, p, q, p0;
 	double s;
 
-	for (j = 0, k0 = (m+2)*(m-1)/2; j < m; k0 -= j+2, j++) {
+	for (j = 0, k0 = n*(n+1)/2 - 1; j < n; k0 -= j+2, j++) {
 		p0 = k0+j;
 		for (p = k0+1, s = 0; p <= p0; p++)
 			s += S[p]*S[p];
 		S[k0] = sqrt(P[k0] - s);
-		for (i = j+1, k = k0-j-1; i < m; k -= i+1, i++) {
+		for (i = j+1, k = k0-j-1; i < n; k -= i+1, i++) {
 			for (p = k0+1, q = k+1, s = 0; p <= p0; p++, q++)
 				s += S[p]*S[q];
 			S[k] = (S[k0] == 0) ? 0 : (P[k] - s)/S[k0];
@@ -2247,9 +2350,9 @@ void pony_linal_chol(double* S, double* P, const size_t m)
 		/*
 			check measurement residual magnitude against predicted covariance level
 			input:
-				double*      x       --- pointer to a current estimate of m x 1 state vector
+				double*      x       --- pointer to a current estimate of n x 1 state vector
 				double*      S       --- pointer to an upper-truangular part of the Cholesky factor of current covariance matrix
-				                         lined in a single-dimension array m(m+1)/2 x 1
+				                         lined in one-dimensional array n(n+1)/2 x 1
 				double       z       --- scalar measurement value
 				double*      h       --- pointer to a linear measurement model matrix, so that z = h*x + r
 				double       sigma   --- measurement error a priori standard deviation, so that sigma = sqrt(E[r^2])
@@ -2260,18 +2363,18 @@ void pony_linal_chol(double* S, double* P, const size_t m)
 				  i.e. |z - h*x| < k_sigma*sqrt(h*S*S^T*h^T + sigma^2)
 				0 otherwise
 		*/
-char pony_linal_check_measurement_residual(double* x, double* S, double z, double* h, double sigma, double k_sigma, const size_t m)
+char pony_linal_check_measurement_residual(double* x, double* S, double z, double* h, double sigma, double k_sigma, const size_t n)
 {
 	size_t i, j, k;
 
 	double s;
 
 	sigma = sigma*sigma;
-	for (i = 0; i < m; i++) {
+	for (i = 0; i < n; i++) {
 		// dz = z - h*x: residual
 		z -= h[i]*x[i];
 		// s = h*S*S^T*h^T: predicted variance 
-		for (j = 0, k = i, s = 0; j <= i; j++, k += m-j)
+		for (j = 0, k = i, s = 0; j <= i; j++, k += n-j)
 			s += h[j]*S[k];
 		sigma += s*s;
 	}
@@ -2285,7 +2388,7 @@ char pony_linal_check_measurement_residual(double* x, double* S, double z, doubl
 			input:
 				double*      x     --- pointer to a current estimate of n x 1 state vector
 				double*      S     --- pointer to an upper-truangular part of the Cholesky factor of current covariance matrix
-				                       lined in a single-dimension array n(n+1)/2 x 1
+				                       lined in one-dimensional array n(n+1)/2 x 1
 				double       z     --- scalar measurement value
 				double*      h     --- pointer to a linear measurement model matrix, so that z = h*x + r
 				double       sigma --- measurement error a priori standard deviation, so that sigma = sqrt(E[r^2])
@@ -2293,7 +2396,7 @@ char pony_linal_check_measurement_residual(double* x, double* S, double z, doubl
 			output:
 				double* x --- pointer to an updated estimate of state vector (overwrites input)
 				double* S --- pointer to an upper-truangular part of the Cholesky factor of updated covariance matrix
-				              lined in a single-dimension array n(n+1)/2 x 1 (overwrites input)
+				              lined in one-dimensional array n(n+1)/2 x 1 (overwrites input)
 				double* K --- pointer to a Kalman gain
 			return value:
 				measurement residual before update
@@ -2351,12 +2454,12 @@ double pony_linal_kalman_update(double* x, double* S, double* K, double z, doubl
 			Q = q^2*I = E[(x_i - x_i-1)*(x_i - x_i-1)^T]
 			input:
 				double*      S  --- pointer to an upper-truangular part of the Cholesky factor of current covariance matrix
-				                    lined in a single-dimension array n(n+1)/2 x 1
+				                    lined in one-dimensional array n(n+1)/2 x 1
 				double       q2 --- process noise variance, q2 = q^2 >= 0
 				const size_t n  --- state vector size
 			output:
 				double* S --- pointer to an upper-truangular part of a Cholesky factor of predicted covariance matrix
-				              lined in a single-dimension array n(n+1)/2 x 1 (overwrites input)
+				              lined in one-dimensional array n(n+1)/2 x 1 (overwrites input)
 		*/
 void pony_linal_kalman_predict_I_qI(double* S, double q2, const size_t n)
 {
@@ -2375,13 +2478,13 @@ void pony_linal_kalman_predict_I_qI(double* S, double q2, const size_t n)
 			    [  0   0 0]
 			input:
 				double*      S  --- pointer to an upper-truangular part of the Cholesky factor of current covariance matrix
-				                    lined in a single-dimension array n(n+1)/2 x 1
+				                    lined in one-dimensional array n(n+1)/2 x 1
 				double       q2 --- nonzero process noise variance, q2 = q^2 >= 0
 				const size_t n  --- state vector size
 				const size_t m  --- nonzero process noise vector size
 			output:
 				double* S --- pointer to an upper-truangular part of the Cholesky factor of predicted covariance matrix
-				              lined in a single-dimension array n(n+1)/2 x 1 (overwrites input)
+				              lined in one-dimensional array n(n+1)/2 x 1 (overwrites input)
 		*/
 void pony_linal_kalman_predict_I_qIr(double* S, double q2, const size_t n, const size_t m)
 {
@@ -2402,13 +2505,13 @@ void pony_linal_kalman_predict_I_qIr(double* S, double q2, const size_t n, const
 			    [  0    0   0 0]
 			input:
 				double*      S  --- pointer to an upper-truangular part of the Cholesky factor of current covariance matrix
-				                    lined in a single-dimension array n(n+1)/2 x 1
+				                    lined in one-dimensional array n(n+1)/2 x 1
 				double*      q2 --- pointer to a nonzero process noise variance vector, q2[i] = q_i^2 >= 0, i = 1..m
 				const size_t n  --- state vector size
 				const size_t m  --- nonzero process noise vector size
 			output:
 				double* S --- pointer to an upper-truangular part of the Cholesky factor of predicted covariance matrix
-				              lined in a single-dimension array n(n+1)/2 x 1 (overwrites input)
+				              lined in one-dimensional array n(n+1)/2 x 1 (overwrites input)
 		*/
 void pony_linal_kalman_predict_I_diag(double* S, double* q2, const size_t n, const size_t m)
 {
@@ -2429,14 +2532,14 @@ void pony_linal_kalman_predict_I_diag(double* S, double* q2, const size_t n, con
 			          [  0  ..   0  0 0]
 			input:
 				double*      S --- pointer to an upper-truangular part of the Cholesky factor of current covariance matrix
-				                   lined in a single-dimension array n(n+1)/2 x 1
-				double*      Q --- upper triangular part of the nonzero process noise covariance, lined in a single-dimension array m(m+1)/2 x 1 
+				                   lined in one-dimensional array n(n+1)/2 x 1
+				double*      Q --- upper triangular part of the nonzero process noise covariance, lined in one-dimensional array m(m+1)/2 x 1 
 
 				const size_t n --- state vector size
 				const size_t m --- nonzero process noise vector size
 			output:
 				double* S --- pointer to an upper-truangular part of the Cholesky factor of predicted covariance matrix
-				              lined in a single-dimension array n(n+1)/2 x 1 (overwrites input)		
+				              lined in one-dimensional array n(n+1)/2 x 1 (overwrites input)		
 		*/
 void pony_linal_kalman_predict_I(double* S, double* Q, const size_t n, const size_t m)
 {
@@ -2465,16 +2568,16 @@ void pony_linal_kalman_predict_I(double* S, double* Q, const size_t n, const siz
 			input:
 				double*      x  --- pointer to a current estimate of n x 1 state vector
 				double*      S  --- pointer to an upper-truangular part of the Cholesky factor of current covariance matrix
-				                    lined in a single-dimension array n(n+1)/2 x 1
+				                    lined in one-dimensional array n(n+1)/2 x 1
 				double*      U  --- pointer to an upper-truangular state transition matrix
-				                    lined in a single-dimension array m(m+1)/2 x 1
+				                    lined in one-dimensional array m(m+1)/2 x 1
 				double*      q2 --- pointer to a nonzero process noise variance vector, q2[i] = q_i^2 >= 0, i = 1..r
 				const size_t n  --- state vector size
 				const size_t m  --- nonzero process noise vector size
 			output:
 				double* x --- pointer to a predicted estimate of state vector (overwrites input)
 				double* S --- pointer to an upper-truangular part of the Cholesky factor of predicted covariance matrix
-				              lined in a single-dimension array n(n+1)/2 x 1 (overwrites input)
+				              lined in one-dimensional array n(n+1)/2 x 1 (overwrites input)
 		*/
 void pony_linal_kalman_predict_U_diag(double* x, double* S, double* U, double* q2, const size_t n, const size_t m)
 {
@@ -2511,17 +2614,17 @@ void pony_linal_kalman_predict_U_diag(double* x, double* S, double* U, double* q
 			input:
 				double*      x --- pointer to a current estimate of n x 1 state vector
 				double*      S --- pointer to an upper-truangular part of the Cholesky factor of current covariance matrix
-				                   lined in a single-dimension array n(n+1)/2 x 1
+				                   lined in one-dimensional array n(n+1)/2 x 1
 				double*      U --- pointer to an upper-truangular state transition matrix
-				                   lined in a single-dimension array n(n+1)/2 x 1
+				                   lined in one-dimensional array n(n+1)/2 x 1
 				double*      Q --- pointer to an upper triangular part of the nonzero process noise covariance
-				                   lined in a single-dimension array m(m+1)/2 x 1 
+				                   lined in one-dimensional array m(m+1)/2 x 1 
 				const size_t n --- nonzero process noise vector size
 				const size_t m --- state vector size
 			output:
 				double* x --- pointer to a predicted estimate of state vector (overwrites input)
 				double* S --- pointer to an upper-truangular part of the Cholesky factor of predicted covariance matrix
-				              lined in a single-dimension array n(n+1)/2 x 1 (overwrites input)
+				              lined in one-dimensional array n(n+1)/2 x 1 (overwrites input)
 		*/
 void pony_linal_kalman_predict_U(double* x, double* S, double* U, double* Q, const size_t n, const size_t m)
 {

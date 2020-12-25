@@ -1,16 +1,16 @@
-// Nov-2020
+// Dec-2020
 /*	pony_gnss_sat 
 	
 	pony plugins for GNSS satellite-related calculations:
 
 	- pony_gnss_sat_pos_vel_clock_gps
-		Calculates position, velocity and clock correction for all GPS     satellites with valid ephemeris.
-	- pony_gnss_sat_pos_vel_clock_glo
-		Calculates position, velocity and clock correction for all GLONASS satellites with valid ephemeris.
-	- pony_gnss_sat_pos_vel_clock_gal
-		Calculates position, velocity and clock correction for all Galileo satellites with valid ephemeris.
+		Calculates position, velocity and clock correction for all GPS             satellites with valid ephemeris.
+	- pony_gnss_sat_pos_vel_clock_glo									           
+		Calculates position, velocity and clock correction for all GLONASS         satellites with valid ephemeris.
+	- pony_gnss_sat_pos_vel_clock_gal									           
+		Calculates position, velocity and clock correction for all Galileo         satellites with valid ephemeris.
 	- pony_gnss_sat_pos_vel_clock_bds 
-		Calculates position, velocity and clock correction for all BeiDou  satellites with valid ephemeris.
+		Calculates position, velocity and clock correction for all BeiDou MEO/IGSO satellites with valid ephemeris.
 */
 
 #include <stdlib.h>
@@ -111,8 +111,8 @@ int    pony_gnss_sat_round(double x);                                           
 	cfg parameters:
 		none
 */
-void pony_gnss_sat_pos_vel_clock_gps(void) {
-
+void pony_gnss_sat_pos_vel_clock_gps(void) 
+{
 	static double **allIODE = NULL; // issues of data, ephemeris, for each receiver and each satellite to check if they have changed
 	// elements pre-calculated and constant between ephemeride issues to speed up epoch processing
 	static double **allA = NULL, **alln = NULL, **allE = NULL, ***allaf = NULL;
@@ -221,8 +221,8 @@ void pony_gnss_sat_pos_vel_clock_gps(void) {
 	cfg parameters:
 		none
 */
-void pony_gnss_sat_pos_vel_clock_glo(void) {
-
+void pony_gnss_sat_pos_vel_clock_glo(void) 
+{
 	const int rk4_state = 6, rk4_coeff = 4;
 	static double 
 		**t ,			// at times t (sec) within a day [0 86400], for each receiver and each satellite:
@@ -338,8 +338,8 @@ void pony_gnss_sat_pos_vel_clock_glo(void) {
 	cfg parameters:
 		none
 */
-void pony_gnss_sat_pos_vel_clock_gal(void) {
-
+void pony_gnss_sat_pos_vel_clock_gal(void) 
+{
 	static double **allIODnav = NULL; // issues of data, ephemeris, for each receiver and each satellite to check if they have changed
 	// elements pre-calculated and constant between ephemeride issues to speed up epoch processing
 	static double **allA = NULL, **alln = NULL, **allE = NULL, ***allaf = NULL;
@@ -404,7 +404,7 @@ void pony_gnss_sat_pos_vel_clock_gal(void) {
 
 /* pony_gnss_sat_pos_vel_clock_bds - pony plugin
 	
-	Calculates position, velocity and clock correction for all BeiDou satellites with valid ephemeris. 
+	Calculates position, velocity and clock correction for all BeiDou MEO/IGSO satellites with valid ephemeris. 
 
 	description:
 		- ephemeris have to match RINEX format and order;
@@ -445,8 +445,8 @@ void pony_gnss_sat_pos_vel_clock_gal(void) {
 	cfg parameters:
 		none
 */
-void pony_gnss_sat_pos_vel_clock_bds(void) {
-
+void pony_gnss_sat_pos_vel_clock_bds(void) 
+{
 	static double **allSOW = NULL; // seconds of the week of the NAV message, for each receiver and each satellite to check if they have changed
 	// elements pre-calculated and constant between ephemeride issues to speed up epoch processing
 	static double **allA = NULL, **alln = NULL, **allE = NULL, ***alla = NULL;
@@ -520,15 +520,15 @@ void pony_gnss_sat_pos_vel_clock_bds(void) {
 	// single-receiver satellite calculations for GPS
 void pony_gnss_sat_pos_vel_clock_gps_single_receiver(pony_gnss *gnss, double *allIODE, double *allA, double *alln, double *allE, double **allaf)
 {
-	const char   code_id          = 'C';
 	const double 
-		max_fit_interval          = 6*3600,           // maximum fit interval, seconds
-		anomaly_precision         = 1.0/0xe000000000, // radians, roughly 1e-12
-		orbit_radius_squared_min  = 676e12,           //  m^2
-		orbit_radius_squared_max  = 784e12,           //  m^2
-		orbital_speed_squared_min = 1.4e7,            // (m/s)^2
-		orbital_speed_squared_max = 1.6e7;            // (m/s)^2
-	const int max_iterations      = 32;
+		radius_squared_min   = 650e12,           //  m^2,    approx. (25.5e6)^2
+		radius_squared_max   = 756e12,           //  m^2,    approx. (27.5e6)^2
+		 speed_squared_min   =  13e6,            // (m/s)^2, approx. ( 3.6e3)^2
+		 speed_squared_max   =  18e6,            // (m/s)^2, approx. ( 4.1e3)^2
+		max_fit_interval     = 6*3600,           // maximum fit interval, seconds
+		anomaly_precision    = 1.0/0xe000000000; // threshold to stop Kepler's equation iterations, radians, roughly 1e-12
+	const int max_iterations = 32;				 // threshold to stop Kepler's equation iterations
+	const char   code_id     = 'C';
 
 	// ephemeris as in Table 20-I of IS-GPS-200J (22 May 2018) p. 95
 	// (!) toc fit intervals only less than 24 hours supported yet
@@ -721,7 +721,7 @@ void pony_gnss_sat_pos_vel_clock_gps_single_receiver(pony_gnss *gnss, double *al
 		sat->x[0] =  xk*cut + yk*sut;
 		sat->x[1] = -xk*sut + yk*cut;
 		sat->x[2] =  zk;
-		if (orbit_radius_squared_min < r && r < orbit_radius_squared_max)
+		if (radius_squared_min < r && r < radius_squared_max)
 			sat->x_valid = 1;
 
 		// SV clock correction as in 20.3.3.3.3.1 of IS-GPS-200J (22 May 2018), p. 96
@@ -774,7 +774,7 @@ void pony_gnss_sat_pos_vel_clock_gps_single_receiver(pony_gnss *gnss, double *al
 		sat->v[1] = v[1] - (pony->gnss_const.gps.u - Omdot)*sat->x[0];
 		sat->v[2] = v[2];
 
-		if (orbital_speed_squared_min < r && r < orbital_speed_squared_max)
+		if (speed_squared_min < r && r < speed_squared_max)
 			sat->v_valid = 1;
 		else
 			sat->v_valid = 0;
@@ -782,16 +782,20 @@ void pony_gnss_sat_pos_vel_clock_gps_single_receiver(pony_gnss *gnss, double *al
 
 }
 
-	// single-receiver satellite calculations for GLONASS
-void pony_gnss_sat_pos_vel_clock_glo_single_receiver(pony_gnss *gnss,  double *t, double **x, double **v, double **a, int *tb,  double *rk4_y, double **rk4_k) {
 
-	const char code_id = 'C', utc_time_id[] = "UT";
+	// single-receiver satellite calculations for GLONASS
+void pony_gnss_sat_pos_vel_clock_glo_single_receiver(pony_gnss *gnss,  double *t, double **x, double **v, double **a, int *tb,  double *rk4_y, double **rk4_k) 
+{
 	const double 
-		max_dt           = 1,              // maximum integration step size, sec
-		max_fit_interval = 6*3600,         // maximum fit interval, seconds
-		orbit_radius_squared_min = 625e12, //  m^2
-		orbit_radius_squared_max = 676e12, //  m^2
-		orbital_speed_squared_max = 3.6e7; // (m/s)^2
+		radius_squared_min = 600e12, //  m^2,    (24.5e6)^2
+		radius_squared_max = 702e12, //  m^2,    (26.5e6)^2
+		 speed_squared_min =   3e6,  // (m/s)^2, ( 1.8e3)^2 - relative to the Earth (+/- 1.9e3 m/s in equatorial plane)
+		 speed_squared_max =  37e6,  // (m/s)^2, ( 6.1e3)^2 - relative to the Earth (+/- 1.9e3 m/s in equatorial plane)
+		max_dt             = 1,      // maximum integration step size, sec
+		max_fit_interval   = 6*3600; // maximum fit interval, seconds
+	const char 
+		code_id            = 'C', 
+		utc_time_id[]      = "UT";
 
 	// ephemeris as in Table 4.5 of ICD GLONASS Edition 5.1 2008
 	double gamma_n, tau_n;	// clock correction parameters
@@ -935,12 +939,12 @@ void pony_gnss_sat_pos_vel_clock_glo_single_receiver(pony_gnss *gnss,  double *t
 		sat->x[0] =  x[s][0]*cut + x[s][1]*sut;
 		sat->x[1] = -x[s][0]*sut + x[s][1]*cut;
 		sat->x[2] =  x[s][2];
-		if (orbit_radius_squared_min < r && r < orbit_radius_squared_max)
+		if (radius_squared_min < r && r < radius_squared_max)
 			sat->x_valid = 1;
 		sat->v[0] =  v[s][0]*cut + v[s][1]*sut;
 		sat->v[1] = -v[s][0]*sut + v[s][1]*cut;
 		sat->v[2] =  v[s][2];
-		if (vel < orbital_speed_squared_max)
+		if (speed_squared_min < vel && vel < speed_squared_max)
 			sat->v_valid = 1;
 
 		// SV clock correction as in Section 3.3.3 of ICD GLONASS Edition 5.1 2008, minus sign, tau_c if present in gnss->glo->clock_corr
@@ -973,8 +977,8 @@ void pony_gnss_sat_pos_vel_clock_glo_single_receiver(pony_gnss *gnss,  double *t
 
 }
 
-void pony_gnss_sat_glo_motion_rk4_step(double *x, double *v, double *a,  double dt, double *y, double **k) {
-
+void pony_gnss_sat_glo_motion_rk4_step(double *x, double *v, double *a,  double dt, double *y, double **k) 
+{
 	double dt_2, dt_6;
 	size_t i;
 
@@ -1017,8 +1021,8 @@ void pony_gnss_sat_glo_motion_rk4_step(double *x, double *v, double *a,  double 
 }
 
 	// equations of satellite motion as in ICD GLONASS Edition 5.1 2008
-void pony_gnss_sat_glo_motion_ode_fun(double *dy,  double *y, double *a) {
-
+void pony_gnss_sat_glo_motion_ode_fun(double *dy,  double *y, double *a) 
+{
 	double r, r3, r2, mu_r3, J02x3_2xa2_r2, z2_r2x5, w2;
 	size_t i;
 
@@ -1041,18 +1045,19 @@ void pony_gnss_sat_glo_motion_ode_fun(double *dy,  double *y, double *a) {
 
 }
 
+
 	// single-receiver satellite calculations for Galileo
 void pony_gnss_sat_pos_vel_clock_gal_single_receiver(pony_gnss *gnss, double *allIODnav, double *allA, double *alln, double *allE, double **allaf)
 {
-	const char   code_id          = 'C';
 	const double 
-		max_fit_interval          = 6*3600,           // maximum fit interval, seconds
-		anomaly_precision         = 1.0/0xe000000000, // radians, roughly 1e-12
-		orbit_radius_squared_min  = 841e12,           //  m^2
-		orbit_radius_squared_max  = 900e12,           //  m^2
-		orbital_speed_squared_min = 1.2e7,            // (m/s)^2
-		orbital_speed_squared_max = 1.5e7;            // (m/s)^2
-	const int max_iterations      = 32;
+		radius_squared_min    = 812e12,           //  m^2,    approx. (28.5e6)^2
+		radius_squared_max    = 930e12,           //  m^2,    approx. (30.5e6)^2
+		 speed_squared_min    =  11e6,            // (m/s)^2, approx. ( 3.3e3)^2
+		 speed_squared_max    =  15e6,            // (m/s)^2, approx. ( 3.9e3)^2
+		max_fit_interval      = 6*3600,           // maximum fit interval, seconds
+		anomaly_precision     = 1.0/0xe000000000; // threshold to stop Kepler's equation iterations, radians, roughly 1e-12
+	const int  max_iterations = 32;               // threshold to stop Kepler's equation iterations
+	const char code_id        = 'C';
 
 	// ephemeris as in Table 60 of Galileo OS SIS ICD Issue 1.2 (November 2015) p. 46
 	// (!) toc fit intervals only less than 24 hours supported yet
@@ -1248,7 +1253,7 @@ void pony_gnss_sat_pos_vel_clock_gal_single_receiver(pony_gnss *gnss, double *al
 		sat->x[0] =  x*cut + y*sut;
 		sat->x[1] = -x*sut + y*cut;
 		sat->x[2] =  z;
-		if (orbit_radius_squared_min < R && R < orbit_radius_squared_max)
+		if (radius_squared_min < R && R < radius_squared_max)
 			sat->x_valid = 1;
 
 		// SV clock correction as in Section 5.1.4 of Galileo OS SIS ICD, Issue 1.2 (November 2015), p. 47
@@ -1301,7 +1306,7 @@ void pony_gnss_sat_pos_vel_clock_gal_single_receiver(pony_gnss *gnss, double *al
 		sat->v[1] = v[1] - (pony->gnss_const.gal.u - Omdot)*sat->x[0];
 		sat->v[2] = v[2];
 
-		if (orbital_speed_squared_min < R && R < orbital_speed_squared_max)
+		if (speed_squared_min < R && R < speed_squared_max)
 			sat->v_valid = 1;
 		else
 			sat->v_valid = 0;
@@ -1309,18 +1314,29 @@ void pony_gnss_sat_pos_vel_clock_gal_single_receiver(pony_gnss *gnss, double *al
 
 }
 
+
 	// single-receiver satellite calculations for BeiDou
 void pony_gnss_sat_pos_vel_clock_bds_single_receiver(pony_gnss *gnss, double *allSOW, double *allA, double *alln, double *allE, double **alla)
 {
-	const char code_id            = 'C';
-	const double 		          
-		max_fit_interval          = 6*3600,           // maximum fit interval, seconds
-		anomaly_precision         = 1.0/0xe000000000, // radians, roughly 1e-12
-		orbit_radius_squared_min  = 756e12,           //  m^2
-		orbit_radius_squared_max  = 812e12,           //  m^2
-		orbital_speed_squared_min = 1.2e7,            // (m/s)^2
-		orbital_speed_squared_max = 1.5e7;            // (m/s)^2
-	const int max_iterations      = 32;
+	enum orbit_type                    {    meo,       igso,   orbits};
+		// nominal radius                28.0e6      42.0e6    m
+		// nominal speed                  3.8e3       3.1e3    m/s
+								     
+	const double 		                    
+		radius_squared_min[orbits]   = { 729e12,    1681e12  },     
+		//                            ~(27.0e6)^2 ~(41.0e6)^2  m^2
+		radius_squared_max[orbits]   = { 841e12,    1849e12  },
+		//                            ~(29.0e6)^2 ~(43.0e6)^2  m^2
+		 speed_squared_min[orbits]   = {  12e6 ,       8e6   },
+		//                            ~( 3.5e3)^2 ~( 2.8e3)^2 (m/s)^2
+		 speed_squared_max[orbits]   = {  17e6 ,      12e6   },
+		//                            ~( 4.1e3)^2 ~( 3.4e3)^2 (m/s)^2
+		       inclination_threshold = 0.75,             // threshold to distinct between MEO/IGSO and GEO orbits, radians, roughly 43 deg
+		radius_square_root_threshold = 5632,             // threshold to distinct between MEO and IGSO/GEO orbits, sqrt(m), roughly sqrt(32e6)
+		max_fit_interval             = 6*3600,           // maximum fit interval, seconds
+		anomaly_precision            = 1.0/0xe000000000; // threshold to stop Kepler's equation iterations,        radians, roughly 1e-12
+	const int  max_iterations        = 32;               // threshold to stop Kepler's equation iterations
+	const char code_id               = 'C';
 
 	// ephemeris as in Sections 5.2.4.3-5.2.4.6, 5.2.4.8-5.2.4.10 of BeiDou SIS ICD OSS Version 2.1 (November 2016) p. 28,
 	// (!) toc fit intervals only less than 24 hours supported yet
@@ -1348,7 +1364,7 @@ void pony_gnss_sat_pos_vel_clock_bds_single_receiver(pony_gnss *gnss, double *al
 	double
 		nuk_dot, duk_dot, drk_dot, dik_dot;
 
-	size_t i, s;
+	size_t i, s, orbit;
 	double sqrt1e2, sinE, one_ecosE, cos2Phi, sin2Phi, cu, su, cOm, sOm, ci, si, R, dx, ut, cut, sut, vr, vu, v0[3], v[3];
 	pony_gnss_sat *sat; // current satellite
 
@@ -1411,8 +1427,15 @@ void pony_gnss_sat_pos_vel_clock_bds_single_receiver(pony_gnss *gnss, double *al
 		SOW			= pony_gnss_sat_round(sat->eph[33]);
 		AODC		= pony_gnss_sat_round(sat->eph[34]); // Age of Data, Clock, not analyzed yet
 
-		if (SatH1) {
-				// drop all flags and skip calculations if SV is not OK
+		// check orbit type
+		orbit = orbits; // set invalid
+		if (i0 > inclination_threshold && sqrtA < radius_square_root_threshold)
+			orbit = meo;
+		if (i0 > inclination_threshold && sqrtA > radius_square_root_threshold)
+			orbit = igso;
+
+		if (SatH1 || orbit >= orbits) {
+				// drop all flags and skip calculations if SV is not OK, or the orbit is undefined
 				sat->eph_valid		= 0;
 				sat->t_em_valid		= 0;
 				sat->x_valid		= 0;
@@ -1517,7 +1540,7 @@ void pony_gnss_sat_pos_vel_clock_bds_single_receiver(pony_gnss *gnss, double *al
 		sat->x[0] =  xk*cut + yk*sut;
 		sat->x[1] = -xk*sut + yk*cut;
 		sat->x[2] =  zk;
-		if (orbit_radius_squared_min < R && R < orbit_radius_squared_max)
+		if (radius_squared_min[orbit] < R && R < radius_squared_max[orbit])
 			sat->x_valid = 1;
 
 		// SV clock correction as in Section 5.2.4.10 of BeiDou SIS ICD OSS Version 2.1 (November 2016) p. 29
@@ -1570,7 +1593,7 @@ void pony_gnss_sat_pos_vel_clock_bds_single_receiver(pony_gnss *gnss, double *al
 		sat->v[1] = v[1] - (pony->gnss_const.bds.u - Omdot)*sat->x[0];
 		sat->v[2] = v[2];
 
-		if (orbital_speed_squared_min < R && R < orbital_speed_squared_max)
+		if (speed_squared_min[orbit] < R && R < speed_squared_max[orbit])
 			sat->v_valid = 1;
 		else
 			sat->v_valid = 0;
