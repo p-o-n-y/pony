@@ -1,4 +1,4 @@
-// Dec-2020
+// Aug-2021
 /*	pony_gnss_io_rinex 
 	
 	pony plugins for GNSS RINEX input/output:
@@ -48,10 +48,10 @@ char   pony_gnss_io_rinex_eph_file_header_parse_iono_corr(pony_gnss *gnss,  char
 char   pony_gnss_io_rinex_eph_file_header_parse_iono_corr_line(double *iono,  char *buf, const size_t len, const size_t field_count);
 char   pony_gnss_io_rinex_eph_file_header_parse_time_corr(pony_gnss *gnss,  char *buf, const size_t len);
 void   pony_gnss_io_rinex_eph_file_header_parse_time_corr_line(double *clock_corr, char *time_sys, char *valid,  char *buf, const size_t len);
-char   pony_gnss_io_rinex_file_header_parse_leap_sec(pony_gnss *gnss,  char *buf, const size_t len);
 void   pony_gnss_io_rinex_eph_file_records_read(pony_gnss_sat *sat, pony_time_epoch *epoch, FILE *fp, char *buf, double *eph, unsigned int *sn, const size_t sys, const size_t maxsat, const size_t maxeph);
 char   pony_gnss_io_rinex_eph_file_parse_record_header(double *eph, char *buf, const size_t len);
 size_t pony_gnss_io_rinex_eph_file_parse_record_lines(double *eph,  FILE *fp, char *buf, const size_t lines);
+char   pony_gnss_io_rinex_file_header_parse_leap_sec(pony_gnss *gnss,  char *buf, const size_t len, char bds_only);
 
 	// service routines
 void   pony_gnss_io_rinex_free_null(void **ptr); // free memory with NULL-check and NULL-assignment
@@ -601,33 +601,33 @@ char pony_gnss_io_rinex_v3_obs_file_header_read(pony_gnss *gnss, FILE *fp, char 
 	enum system_id          {gps, glo, gal, bds, sys_count};
 
 	const char   sys_id[] = {'G', 'R', 'E', 'C'}; 
-	const size_t label_offset = 61, label_len = 20;
+	const size_t label_offset = 61, label_len = 20, type_offset = 20, sys_offset = 40;
 
-	// required token - version and type
-	const char rinex_version_type_label[] = "RINEX VERSION / TYPE";
+	// required label - version and type
+	const char  rinex_version_type_label[] = "RINEX VERSION / TYPE";
 	const float rinex_version_range[] = {3.02f, 3.04f};
 	const float rinex_version_prec = 0.001f;
-	const char rinex_type_token = 'O';
+	const char  rinex_type_token = 'O';
 
-	// required token - system & observation types
+	// required label - system & observation types
 	const char rinex_sys_obstypes_label[] = "SYS / # / OBS TYPES";
-	// required token - time of 1st observation
+	// required label - time of 1st observation
 	const char rinex_TOFO_label[] = "TIME OF FIRST OBS";
-	// required token - end of header
+	// required label - end of header
 	const char rinex_EOH_label[] = "END OF HEADER"  ;
 
 	const size_t tokens_required = 4;
 
-	// optional token - glonass slot frequencies
-	const char rinex_glo_freq_slot[] = "GLONASS SLOT / FRQ #";
-	// optional token - leap seconds
-	const char rinex_leap_sec[] = "LEAP SECONDS";
+	// optional label - glonass slot frequencies
+	const char rinex_glo_freq_slot_label[] = "GLONASS SLOT / FRQ #";
+	// optional label - leap seconds
+	const char rinex_leap_sec_label[] = "LEAP SECONDS";
 
 	size_t tokens_found = 0;
 	float version;
 	size_t i, sys, maxsat, *obs_count = NULL;
 	int scanned;
-	char current_sys = 0, sys_obstypes_found = 0, glo_freq_slot_found = 0, flag, (**obs_types)[4] = NULL; 
+	char rinex_type_sys, current_sys = 0, sys_obstypes_found = 0, glo_freq_slot_found = 0, flag, (**obs_types)[4] = NULL; 
 	pony_gnss_sat *sat = NULL;
 
 
@@ -635,9 +635,9 @@ char pony_gnss_io_rinex_v3_obs_file_header_read(pony_gnss *gnss, FILE *fp, char 
 	if (fp == NULL || feof(fp))
 		return 0;
 
-	// check tokens
+	// check starting label
+	rinex_type_sys = 0;
 	while ( !feof(fp) ) {
-
 		// read a new string
 		fgets(buf, PONY_GNSS_IO_RINEX_BUFFER_SIZE, fp);
 		for (i = 0; buf[i] >= ' '; i++); buf[i] = '\0';		// set end of line on the first non-printable character
@@ -646,7 +646,7 @@ char pony_gnss_io_rinex_v3_obs_file_header_read(pony_gnss *gnss, FILE *fp, char 
 		// check if a starting token is found
 		if ( pony_gnss_io_rinex_find_token(rinex_version_type_label,buf+label_offset-1,label_len) ) {
 			printf("\n\t\t%s",buf);
-			if (sscanf(buf,"%f %s",&version,buf) < 2) {
+			if (sscanf(buf,"%f",&version) < 1) {
 				printf("\n\t\terror: RINEX header line %s not parsed from %s", rinex_version_type_label, buf);
 				return 0;
 			}
@@ -654,15 +654,16 @@ char pony_gnss_io_rinex_v3_obs_file_header_read(pony_gnss *gnss, FILE *fp, char 
 				printf("\n\t\terror: RINEX version out of range: header contains %f, must be from %f to %f", version, rinex_version_range[0], rinex_version_range[1]);
 				return 0;
 			}
-			if (buf[0] != rinex_type_token) {
-				printf("\n\t\terror: RINEX observation file type incorrect: %s, must start with '%c'", buf, rinex_type_token);
+			if (buf[type_offset] != rinex_type_token) {
+				printf("\n\t\terror: RINEX observation file type incorrect: %s, must start with '%c'", buf + type_offset, rinex_type_token);
 				return 0;
 			}
+			rinex_type_sys = buf[sys_offset];
 			tokens_found++;
 			break;
 		}
 	}
-
+	// check other labels
 	current_sys = 0;
 	flag = 0;
 	while ( !feof(fp) ) {
@@ -740,7 +741,7 @@ char pony_gnss_io_rinex_v3_obs_file_header_read(pony_gnss *gnss, FILE *fp, char 
 		}
 
 		// check if a token is found
-		if ( pony_gnss_io_rinex_find_token(rinex_glo_freq_slot,buf+label_offset-1,label_len) && gnss->glo != NULL) {
+		if ( pony_gnss_io_rinex_find_token(rinex_glo_freq_slot_label,buf+label_offset-1,label_len) && gnss->glo != NULL) {
 			printf("\n\t\t%s",buf);
 			if (!glo_freq_slot_found) {
 				if ( !pony_gnss_io_rinex_obs_file_header_parse_glo_slot_frq(gnss->glo,  buf, label_offset-1, 0) )
@@ -771,11 +772,9 @@ char pony_gnss_io_rinex_v3_obs_file_header_read(pony_gnss *gnss, FILE *fp, char 
 		}
 
 		// check if a token is found
-		gnss->leap_sec = 18; // default value as for 2019-DEC
-		gnss->leap_sec_valid = 1;
-		if ( pony_gnss_io_rinex_find_token(rinex_leap_sec,buf+label_offset-1,label_len) ) {
+		if ( pony_gnss_io_rinex_find_token(rinex_leap_sec_label,buf+label_offset-1,label_len) ) {
 			printf("\n\t\t%s",buf);
-			if ( !pony_gnss_io_rinex_file_header_parse_leap_sec(gnss, buf, label_offset-1) )
+			if ( !pony_gnss_io_rinex_file_header_parse_leap_sec(gnss, buf, label_offset-1, rinex_type_sys == sys_id[bds]) )
 				printf("\n\t\twarning: leap seconds not parsed from '%s'",buf);
 			continue;
 		}
@@ -1039,39 +1038,62 @@ int pony_gnss_io_rinex_v3_obs_file_record_read_parse_entry(char *buf, const size
 	// ephemeris file header
 char pony_gnss_io_rinex_eph_file_header_read(pony_gnss *gnss, FILE *fp, char *buf) {
 
-	const size_t label_offset = 61, label_len = 20;
+	enum system_id          {gps, glo, gal, bds, sys_count};
 
-	// mandatory tokens
-	const char rinex_version_type_token[] = "RINEX VERSION / TYPE";
-	const char rinex_type_token[] = "N:";
-	const char rinex_EOH_token [] = "END OF HEADER"  ;
+	const char   sys_id[] = {'G', 'R', 'E', 'C'}; 
+	const size_t label_offset = 61, label_len = 20, type_offset = 20, sys_offset = 40;
+
+	// mandatory label: RINEX version and type
+	const char  rinex_version_type_label[] = "RINEX VERSION / TYPE";
+	const float rinex_version_range[] = {2.10f, 3.04f};
+	const float rinex_version_prec = 0.001f;
+	const char  rinex_type_token = 'N';
+	// mandatory label: end of header
+	const char rinex_EOH_label [] = "END OF HEADER"  ;
+	// mandatory labels count
 	const size_t tokens_required = 2;
-	// optional tokens
-	const char rinex_iono_corr_token[] = "IONOSPHERIC CORR";
-	const char rinex_time_corr_token[] = "TIME SYSTEM CORR";
-	const char rinex_leap_sec_token[] = "LEAP SECONDS";
+	// optional labels
+	const char rinex_iono_corr_label[] = "IONOSPHERIC CORR";
+	const char rinex_time_corr_label[] = "TIME SYSTEM CORR";
+	const char rinex_leap_sec_label[] = "LEAP SECONDS";
 	
+	float version;
+	char  rinex_type_sys;
 	size_t i, tokens_found = 0;
+
 
 	if ( feof(fp) )
 		return 0;
 
-	// check starting token
+	// check starting label
 	while ( !feof(fp) ) {
-
-		fgets(buf, PONY_GNSS_IO_RINEX_BUFFER_SIZE-1, fp);
+		// read a new string
+		fgets(buf, PONY_GNSS_IO_RINEX_BUFFER_SIZE, fp);
 		for (i = 0; buf[i] >= ' '; i++); buf[i] = '\0';		// set end of line on the first non-printable character
 		if (i < label_offset) continue;						// check if buffer contains enough characters to proceed
 
-		if ( pony_gnss_io_rinex_find_token(rinex_version_type_token,buf+label_offset-1,label_len) && pony_gnss_io_rinex_find_token(rinex_type_token,buf,label_offset-1) ) {
-			printf("\n\t%s",buf);
+		// check if a starting token is found
+		if ( pony_gnss_io_rinex_find_token(rinex_version_type_label,buf+label_offset-1,label_len) ) {
+			printf("\n\t\t%s",buf);
+			if (sscanf(buf,"%f",&version) < 1) {
+				printf("\n\t\terror: RINEX header line %s not parsed from %s", rinex_version_type_label, buf);
+				return 0;
+			}
+			if (version+rinex_version_prec < rinex_version_range[0] || rinex_version_range[1] < version-rinex_version_prec) {
+				printf("\n\t\terror: RINEX version out of range: header contains %f, must be from %f to %f", version, rinex_version_range[0], rinex_version_range[1]);
+				return 0;
+			}
+			if (buf[type_offset] != rinex_type_token) {
+				printf("\n\t\terror: RINEX observation file type incorrect: %s, must start with '%c'", buf + type_offset, rinex_type_token);
+				return 0;
+			}
+			rinex_type_sys = buf[sys_offset];
 			tokens_found++;
 			break;
 		}
-
 	}
 
-	// check other tokens
+	// check other labels
 	while ( !feof(fp) ) {
 
 		fgets(buf, PONY_GNSS_IO_RINEX_BUFFER_SIZE-1, fp);
@@ -1079,7 +1101,7 @@ char pony_gnss_io_rinex_eph_file_header_read(pony_gnss *gnss, FILE *fp, char *bu
 		if (i < label_offset) continue;						// check if buffer contains enough characters to proceed
 
 		// check ionospheric correction
-		if ( pony_gnss_io_rinex_find_token(rinex_iono_corr_token,buf+label_offset-1,label_len) ) {
+		if ( pony_gnss_io_rinex_find_token(rinex_iono_corr_label,buf+label_offset-1,label_len) ) {
 			printf("\n\t%s",buf);
 			if ( !pony_gnss_io_rinex_eph_file_header_parse_iono_corr(gnss, buf, label_offset-1) )
 				printf("\n\t\twarning: ionospheric correction not parsed from '%s'",buf);
@@ -1087,7 +1109,7 @@ char pony_gnss_io_rinex_eph_file_header_read(pony_gnss *gnss, FILE *fp, char *bu
 		}
 
 		// check time system correction
-		if ( pony_gnss_io_rinex_find_token(rinex_time_corr_token,buf+label_offset-1,label_len) ) {
+		if ( pony_gnss_io_rinex_find_token(rinex_time_corr_label,buf+label_offset-1,label_len) ) {
 			printf("\n\t%s",buf);
 			if ( !pony_gnss_io_rinex_eph_file_header_parse_time_corr(gnss, buf, label_offset-1) )
 				printf("\n\t\twarning: time system correction not parsed from '%s'",buf);
@@ -1095,15 +1117,15 @@ char pony_gnss_io_rinex_eph_file_header_read(pony_gnss *gnss, FILE *fp, char *bu
 		}
 
 		// check leap seconds
-		if ( pony_gnss_io_rinex_find_token(rinex_leap_sec_token,buf+label_offset-1,label_len) ) {
+		if ( pony_gnss_io_rinex_find_token(rinex_leap_sec_label,buf+label_offset-1,label_len) ) {
 			printf("\n\t%s",buf);
-			if ( !pony_gnss_io_rinex_file_header_parse_leap_sec(gnss, buf, label_offset-1) )
+			if ( !pony_gnss_io_rinex_file_header_parse_leap_sec(gnss, buf, label_offset-1, rinex_type_sys == sys_id[bds]) )
 				printf("\n\t\twarning: leap seconds not parsed from '%s'",buf);
 			continue;
 		}
 
 		// check end of header
-		if ( pony_gnss_io_rinex_find_token(rinex_EOH_token,buf+label_offset-1,label_len) ) {
+		if ( pony_gnss_io_rinex_find_token(rinex_EOH_label,buf+label_offset-1,label_len) ) {
 			printf("\n\t%s",buf);
 			tokens_found++;   
 			break;
@@ -1235,28 +1257,54 @@ void pony_gnss_io_rinex_eph_file_header_parse_time_corr_line(double *clock_corr,
 }
 
 	// file header leap seconds
-char pony_gnss_io_rinex_file_header_parse_leap_sec(pony_gnss *gnss,  char *buf, const size_t len) {
+char pony_gnss_io_rinex_file_header_parse_leap_sec(pony_gnss *gnss,  char *buf, const size_t len, char bds_only) {
 
-	const size_t field_width = 6; // only the first value is being parsed
+	enum format {cur_leap_sec = 0, future_past_leap_sec = 6, week = 12, day = 18, time_id = 24, end}; // format according to RINEX Version 3.03 Table A2 & Table A5 "LEAP SECONDS"
 
-	size_t n;
+	const char gps_id[] = {'G','P','S'}, // GPS time system identifier according to RINEX Version 3.03 Table A2 & Table A5 "LEAP SECONDS"
+	           bds_id[] = {'B','D','S'}; // BDS time system identifier according to RINEX Version 3.03 Table A2 & Table A5 "LEAP SECONDS"
+
+	size_t i, n;
 	int scanned;
 	char c;
 
+
+	// check string length
 	for (n = 0; n < len && buf[n]; n++);
-	if (field_width > n)
+	if (n < future_past_leap_sec) // no room for current leap second field
 		return 0;
-
-	c = buf[field_width];
-	buf[field_width] = '\0';
-
-	scanned = sscanf( buf, "%d", &(gnss->leap_sec) );
-	if (scanned == 1 && gnss->leap_sec > 0)
+	// parse current leap seconds
+	c = buf[future_past_leap_sec];    // store character after the end of the field
+	buf[future_past_leap_sec] = '\0'; // limit parsing to the beginning of the next field
+	scanned = sscanf(buf+cur_leap_sec, "%d", &(gnss->leap_sec) );
+	buf[future_past_leap_sec] = c;    // restore replaced character
+	if (scanned == 1 && gnss->leap_sec > 0) // check if the value is parsed and valid
 		gnss->leap_sec_valid = 1;
-	else
+	else {
+		gnss->leap_sec_valid = 0;
 		return 0;
-
-	buf[field_width] = c;
+	}
+	// check for GPS system id
+	if (n >= time_id + sizeof(gps_id)) {
+		for (i = 0; i < sizeof(gps_id); i++)
+			if (buf[time_id+i] != gps_id[i])
+				break; // no GPS time system id detected
+		if (i >= sizeof(gps_id)) // GPS time system id detected
+			return 1;
+	}
+	// check for BDS system id
+	if (n >= time_id + sizeof(bds_id)) {
+		for (i = 0; i < sizeof(bds_id); i++)
+			if (buf[time_id+i] != bds_id[i])
+				break; // no BDS time system id detected
+		if (i >= sizeof(bds_id)) {// BDS time system id detected
+			gnss->leap_sec += (int)(pony->gnss_const.bds.leap_sec);
+			return 1;
+		}
+	}
+	// system id is blank (see Note 2 for Table A2 & Table A5 "LEAP SECONDS" in RINEX Version 3.03)
+	if (bds_only)
+		gnss->leap_sec += (int)(pony->gnss_const.bds.leap_sec);
 
 	return 1;
 }

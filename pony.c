@@ -1,4 +1,4 @@
-// Dec-2020
+// Aug-2021
 // PONY core source code
 
 #include <stdlib.h>
@@ -222,13 +222,15 @@ char pony_init_sol(pony_sol* sol, char* settings, const size_t len)
 
 	// pos & vel
 	for (i = 0; i < 3; i++) {
-		sol->x[i]   = 0;
+		sol->  x[i] = 0;
 		sol->llh[i] = 0;
-		sol->v[i]   = 0;
+		sol->  v[i] = 0;
 	}
-	sol->x_valid    = 0;
-	sol->llh_valid  = 0;
-	sol->v_valid    = 0;
+	sol->  x_valid = 0;
+	sol->llh_valid = 0;
+	sol->  v_valid = 0;
+	sol->  x_std = -1; // stdev undefined
+	sol->  v_std = -1; // stdev undefined
 
 	// attitude
 	for (i = 0; i < 4; i++)
@@ -370,22 +372,52 @@ void pony_free_imu(void)
 		return value:
 			1
 	*/
-char pony_init_gnss_settings(pony_gnss* gnss)
+void pony_init_gnss_settings(pony_gnss* gnss)
 {
 	size_t i;
 
+	// locate settings within gnss group in configuration: outside all subgroups, either before or after all of them
 	pony_locatecfggroup("", gnss->cfg, gnss->cfglength, &(gnss->cfg_settings), &(gnss->settings_length));
+	// mask for the sine of GNSS satellite elevation angle
+	gnss->settings.sinEl_mask     =   0;
+	// default stdev values
+	gnss->settings.   code_sigma  =  20;
+	gnss->settings.  phase_sigma  =   0.01;
+	gnss->settings.doppler_sigma  =   0.5;
+	// antenna position
+	for (i = 0; i < 3; i++)			 
+		gnss->settings.ant_pos[i] =   0;
+	gnss->settings.ant_pos_tol    =  -1;
+}
 
-	gnss->settings.sinEl_mask     = 0;
-	gnss->settings.code_sigma     = 20;
-	gnss->settings.phase_sigma    = 0.01;
-	gnss->settings.doppler_sigma  = 0.5;
-	for (i = 0; i < 3; i++)
-		gnss->settings.ant_pos[i] = 0;
-	gnss->settings.ant_pos_tol    = -1;
-	gnss->settings.leap_sec_def   = 0;
+	/*
+		initialize GNSS leap seconds from the configuration string
+		input:
+			pony_gnss* gnss ---  pointer to a GNSS structure
+	*/
+void pony_init_gnss_leap_sec(pony_gnss* gnss)
+{
+	const char leap_sec_token[] = "leap_sec";
 
-	return 1;
+	char* cfg_ptr;
+
+	if (gnss == NULL)
+		return;
+
+	// default values
+	gnss->leap_sec       = 0;
+	gnss->leap_sec_valid = 0;
+	// check if the configuration is provided in GNSS data
+	if (gnss->cfg_settings == NULL || gnss->settings_length == 0)
+		return;
+	// look for leap seconds in configuration
+	cfg_ptr = pony_locate_token(leap_sec_token, gnss->cfg_settings, gnss->settings_length, '=');
+	if (cfg_ptr != NULL)
+		gnss->leap_sec = atoi(cfg_ptr);
+	else
+		return;
+	// check leap seconds
+	gnss->leap_sec_valid = (gnss->leap_sec >= 0) ? 1 : 0;
 }
 
 	/*
@@ -829,8 +861,9 @@ void pony_init_gnss_const()
 	*/
 char pony_init_gnss(pony_gnss* gnss)
 {
-	// memory allocation limitations
+	// memory allocation limits
 	enum system_id                   {gps, glo, gal, bds};
+
 	const size_t   max_sat_count[] = {36,  36,  36,  64 },
 	               max_eph_count[] = {36,  24,  36,  36 };
 
@@ -848,7 +881,7 @@ char pony_init_gnss(pony_gnss* gnss)
 		if (gnss->gps == NULL)
 			return 0;
 		
-		gnss->gps->cfg = groupptr;
+		gnss->gps->cfg       = groupptr;
 		gnss->gps->cfglength = grouplen;
 
 		if (!pony_init_gnss_gps(gnss->gps, max_sat_count[gps], max_eph_count[gps]))
@@ -863,7 +896,7 @@ char pony_init_gnss(pony_gnss* gnss)
 		if (gnss->glo == NULL)
 			return 0;
 		
-		gnss->glo->cfg = groupptr;
+		gnss->glo->cfg       = groupptr;
 		gnss->glo->cfglength = grouplen;
 
 		if (!pony_init_gnss_glo(gnss->glo, max_sat_count[glo], max_eph_count[glo]))
@@ -878,7 +911,7 @@ char pony_init_gnss(pony_gnss* gnss)
 		if (gnss->gal == NULL)
 			return 0;
 		
-		gnss->gal->cfg = groupptr;
+		gnss->gal->cfg       = groupptr;
 		gnss->gal->cfglength = grouplen;
 
 		if (!pony_init_gnss_gal(gnss->gal, max_sat_count[gal], max_eph_count[gal]))
@@ -893,7 +926,7 @@ char pony_init_gnss(pony_gnss* gnss)
 		if (gnss->bds == NULL)
 			return 0;
 		
-		gnss->bds->cfg = groupptr;
+		gnss->bds->cfg       = groupptr;
 		gnss->bds->cfglength = grouplen;
 
 		if (!pony_init_gnss_bds(gnss->bds, max_sat_count[bds], max_eph_count[bds]))
@@ -910,8 +943,8 @@ char pony_init_gnss(pony_gnss* gnss)
 	// gnss epoch
 	pony_init_epoch(&(gnss->epoch));
 
-	gnss->leap_sec = 0;
-	gnss->leap_sec_valid = 0;
+	// leap seconds
+	pony_init_gnss_leap_sec(gnss);
 
 	return 1;
 }
@@ -972,9 +1005,9 @@ char pony_init_air(pony_air* air)
 	air->speed = 0;
 	
 	// stdev 
-	air->alt_std   = -1; // undefined
-	air->vv_std    = -1; // undefined
-	air->speed_std = -1; // undefined
+	air->alt_std   = 30.0; // barometric altitude stdev
+	air->vv_std    =  0.5; // barometric altitude trend stdev
+	air->speed_std =  1.5; // airspeed measurement stdev
 	
 	// validity flags
 	air->alt_valid   = 0;
@@ -1573,6 +1606,9 @@ char* pony_locate_token(const char* token, char* src, const size_t len, const ch
 	const char quote = '"', brace_open = '{', brace_close = '}', blank = ' ';
 
 	size_t i, j, k, n, len1;
+
+	if (token == NULL || src == NULL) // nothing to do
+		return NULL;
 
 	for (n = 0; token[n]; n++); // determine token length
 	if (n == 0) // invalid token
@@ -2241,7 +2277,7 @@ void pony_linal_msq2T_u(double* res, double* v, const size_t n, const size_t m)
 		/* 
 			multiply a transposed regular matrix by itself, storing upper part of the result lined up in one-dimensional array of n(n+1)/2 x 1 
 			input:
-				double* v         --- pointer to a regular n x m matrix
+				double* v         --- pointer to a regular m x n matrix
 				const size_t m, n --- dimensions
 			output:
 				double* res       --- pointer to an upper-triangular n x n matrix
@@ -2357,7 +2393,7 @@ void pony_linal_chol(double* S, double* P, const size_t n)
 				double*      h       --- pointer to a linear measurement model matrix, so that z = h*x + r
 				double       sigma   --- measurement error a priori standard deviation, so that sigma = sqrt(E[r^2])
 				double       k_sigma --- confidence coefficient, 3 for 3-sigma (99.7%), 2 for 2-sigma (95%), etc.
-				const size_t m       --- state vector size
+				const size_t n       --- state vector size
 			return value:
 				1 if measurement residual magnitude lies below the predicted covariance level, 
 				  i.e. |z - h*x| < k_sigma*sqrt(h*S*S^T*h^T + sigma^2)

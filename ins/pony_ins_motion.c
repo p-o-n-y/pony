@@ -1,4 +1,4 @@
-// Dec-2020
+// Aug-2021
 /*	pony_ins_motion
 	
 	pony plugins for ins position and velocity algorithms:
@@ -17,6 +17,11 @@
 		vertical velocity to zero, or to an external reference like
 		altitude/rate derived from air data system and/or gnss, etc.
 		Recommended when using normal gravity model and/or long navigation timeframe.
+		
+	- pony_ins_motion_size_effect
+		Compensates for accelerometer cluster size effect, i.e. the spatial separation 
+		between accelerometer proof masses, also known as "accelerometer lever arm compensation".
+		Recommended only for high-grade systems on dynamically maneuvering carriers.
 */
 
 #include <stdlib.h>
@@ -31,8 +36,9 @@
 #endif
 
 // service functions
-double pony_ins_motion_parse_double(const char *token, char *src, const size_t len, double range[2], const double default_value);
-void   pony_ins_motion_flip_sol_over_pole(pony_sol *sol);
+double pony_ins_motion_parse_double(const char* token, char* src, const size_t len, double range[2], const double default_value);
+char   pony_ins_motion_parse_double_2array(double* arr, const size_t outer_size, const size_t inner_size, const char* token, char *src, const size_t len, double range[2], double default_value);
+void   pony_ins_motion_flip_sol_over_pole(pony_sol* sol);
 
 /* pony_ins_motion_euler - pony plugin
 	
@@ -134,13 +140,13 @@ void pony_ins_motion_euler(void) {
 		pony->imu->sol.llh_valid = 0;		
 		// parse parameters from configuration	
 		pony->imu->sol.llh[0] = // starting longitude
-			pony_ins_motion_parse_double(lon_token, pony->imu->cfg,pony->imu->cfglength, (double *)lon_range,0)
+			pony_ins_motion_parse_double(lon_token, pony->imu->cfg,pony->imu->cfglength, (double*)lon_range,0)
 			/pony->imu_const.rad2deg; // degrees to radians
 		pony->imu->sol.llh[1] = // starting latitude
-			pony_ins_motion_parse_double(lat_token, pony->imu->cfg,pony->imu->cfglength, (double *)lat_range,0)
+			pony_ins_motion_parse_double(lat_token, pony->imu->cfg,pony->imu->cfglength, (double*)lat_range,0)
 			/pony->imu_const.rad2deg; // degrees to radians
 		pony->imu->sol.llh[2] = // starting altitude
-			pony_ins_motion_parse_double(alt_token, pony->imu->cfg,pony->imu->cfglength, (double *)alt_range,0);
+			pony_ins_motion_parse_double(alt_token, pony->imu->cfg,pony->imu->cfglength, (double*)alt_range,0);
 		// raise coordinates validity flag
 		pony->imu->sol.llh_valid = 1;
 		// zero velocity at start
@@ -158,6 +164,7 @@ void pony_ins_motion_euler(void) {
 
 	else						// main cycle
 	{
+
 		// check for crucial data initialized
 		if (   !pony->imu->sol.  v_valid 
 			|| !pony->imu->sol.llh_valid 
@@ -177,9 +184,9 @@ void pony_ins_motion_euler(void) {
 		cphi = cos(pony->imu->sol.llh[1]);
 		e2s2 = pony->imu_const.e2*sphi*sphi;
 		e4s4 = e2s2*e2s2;					
-		Re_h = pony->imu_const.a*(1 + e2s2/2 + 3*e4s4/8);	                                        // Taylor expansion within 0.5 m, not altitude-adjusted
+		Re_h = pony->imu_const.a*(1 + e2s2/2 + 3*e4s4/8);                                            // Taylor expansion within 0.5 m, not altitude-adjusted
 		Rn_h = Re_h*(1 - pony->imu_const.e2)*(1 + e2s2 + e4s4 + e2s2*e4s4) + pony->imu->sol.llh[2]; // Taylor expansion within 0.5 m
-		Re_h += pony->imu->sol.llh[2];						                                        // adjust for altitude
+		Re_h += pony->imu->sol.llh[2];                                                               // adjust for altitude
 		// drop validity flags
 		pony->imu->W_valid       = 0;
 		pony->imu->sol.llh_valid = 0;
@@ -219,13 +226,13 @@ void pony_ins_motion_euler(void) {
 		pony->imu->sol.v_valid = 1;
 		// coordinates
 		if (cphi < eps) { // check for Earth pole proximity
-			pony->imu->sol.llh[2] += pony->imu->sol.v[2]				*dt;
+			pony->imu->sol.llh[2] += pony->imu->sol.v[2]            *dt;
 			pony->imu->sol.llh_valid = 0; // drop validity
 		}
 		else {
-			pony->imu->sol.llh[0] += pony->imu->sol.v[0]/(Re_h*cphi)	*dt;
-			pony->imu->sol.llh[1] += pony->imu->sol.v[1]/ Rn_h			*dt;
-			pony->imu->sol.llh[2] += pony->imu->sol.v[2]				*dt;
+			pony->imu->sol.llh[0] += pony->imu->sol.v[0]/(Re_h*cphi)*dt;
+			pony->imu->sol.llh[1] += pony->imu->sol.v[1]/ Rn_h      *dt;
+			pony->imu->sol.llh[2] += pony->imu->sol.v[2]            *dt;
 			// flip latitude if crossed a pole
 			if (pony->imu->sol.llh[1] < -pony->imu_const.pi/2) { // South pole
 				pony->imu->sol.llh[1] = -pony->imu_const.pi - pony->imu->sol.llh[1];
@@ -242,6 +249,7 @@ void pony_ins_motion_euler(void) {
 				pony->imu->sol.llh[0] -= 2*pony->imu_const.pi;
 			pony->imu->sol.llh_valid = 1;
 		}
+
 	}
 
 }
@@ -297,21 +305,26 @@ void pony_ins_motion_vertical_damping(void) {
 		sqrt2   = 1.4142135623730951;                  // sqrt(2)
 
 	static double 
-		t0           = -1, // previous time
-		vvs          =  0, // vertical velocity stdev
-		air_alt_last =  0; // previous value of air altitude
+		t0            = -1, // previous time
+		t0_air        = -1, // previous time, air  data
+		t0_gnss       = -1, // previous time, gnss data
+		vvs           =  0, // vertical velocity stdev
+		 air_alt_last =  0, // previous value of air altitude
+		gnss_alt_last =  0; // previous value of air altitude
 
 	double 
-		dt,	  // time step
-		x,    // inertial altitude
-		v,    // inertial vertical velocity
-		z,    // reference information
-		s,    // reference information a priori stdev
-		h[2], // model coefficients
-		y[2], // algorithm state vector
-		S[3], // upper-triangular part of cobariance Cholesky factorization
-		K[2], // Kalman gain
-		w;    // weight
+		dt,	     // time step
+		dt_air,  // time step, air  data
+		dt_gnss, // time step, gnss data
+		x,       // inertial altitude
+		v,       // inertial vertical velocity
+		z,       // reference information
+		s,       // reference information a priori stdev
+		h[2],    // model coefficients
+		y[2],    // algorithm state vector
+		S[3],    // upper-triangular part of cobariance Cholesky factorization
+		K[2],    // Kalman gain
+		w;       // weight
 
 
 	// check if imu data has been initialized
@@ -334,6 +347,7 @@ void pony_ins_motion_vertical_damping(void) {
 	}
 	else						// main cycle
 	{
+
 		// time variables
 		if (t0 < 0) {
 			t0 = pony->imu->t;
@@ -345,6 +359,7 @@ void pony_ins_motion_vertical_damping(void) {
 		t0 = pony->imu->t;
 		if (dt <= 0)
 			return;
+
 		// estimation init 
 		if (pony->imu->sol.llh_valid) x = pony->imu->sol.llh[2]; else x = 0;
 		if (pony->imu->sol.  v_valid) v = pony->imu->sol.  v[2]; else v = 0;
@@ -357,31 +372,78 @@ void pony_ins_motion_vertical_damping(void) {
 			h[0] = 0, h[1] = 1;
 			pony_linal_kalman_update(y,S,K, z,h,s, 2);
 		}
+
 		// check for air data
 		if (pony->air != NULL) {
-			if (pony->air->alt_valid && pony->imu->sol.llh_valid) { // altitude data present
-				// altitude
-				s = sqrt2*( (pony->air->alt_std > 0) ? (pony->air->alt_std) : vvs );
-				z = pony->air->alt + air_alt_last; // decorrelated with velocity information
-				h[0] = 2, h[1] = -dt;
-				pony_linal_kalman_update(y,S,K, z,h,s, 2);
-				// altitude rate of change
-				z = pony->air->alt - air_alt_last; // decorrelated with altitude information
-				h[0] = 0, h[1] = dt;
-				pony_linal_kalman_update(y,S,K, z,h,s, 2);
-				air_alt_last = pony->air->alt;
+			// time handling
+			if (pony->air->alt_valid || pony->air->vv_valid) {
+				if (t0_air < 0 && pony->air->alt_valid) {
+					t0_air       = pony->imu->t;
+					air_alt_last = pony->air->alt;
+				}
+				else {
+					dt_air = pony->imu->t - t0_air;
+					t0_air = pony->imu->t;
+				}
 			}
-			if (pony->air->vv_valid && pony->imu->sol.v_valid) { // vertical velocity data present
-				z = pony->air->vv - pony->imu->sol.v[2];
-				s = (pony->air-> vv_std > 0) ? (pony->air-> vv_std) : vvs;
-				pony_linal_kalman_update(y,S,K, z,h,s, 2);
+			// vertical channel update
+			if (t0_air > 0 && dt_air > 0) {
+				if (pony->air->alt_valid && pony->imu->sol.llh_valid) { // altitude data present
+					// altitude
+					s = sqrt2*( (pony->air->alt_std > 0) ? (pony->air->alt_std) : vvs );
+					z = pony->air->alt + air_alt_last; // decorrelated with velocity information
+					h[0] = 2, h[1] = -dt_air;
+					pony_linal_kalman_update(y,S,K, z,h,s, 2);
+					// altitude rate of change
+					z = pony->air->alt - air_alt_last; // decorrelated with altitude information
+					h[0] = 0, h[1] = dt_air;
+					pony_linal_kalman_update(y,S,K, z,h,s, 2);
+					air_alt_last = pony->air->alt;
+				}
+				if (pony->air->vv_valid && pony->imu->sol.v_valid) { // vertical velocity data present
+					z = pony->air->vv - pony->imu->sol.v[2];
+					s = (pony->air-> vv_std > 0) ? (pony->air-> vv_std) : vvs;
+					h[0] = 0, h[1] = 1;
+					pony_linal_kalman_update(y,S,K, z,h,s, 2);
+				}
 			}
 		}
 
 		// check for gnss data
-		//
-		// TBD
-		//
+		if (pony->gnss != NULL) {
+			// time handling
+			if (pony->gnss->sol.llh_valid || pony->gnss->sol.v_valid) {
+				if (t0_gnss < 0 && pony->gnss->sol.llh_valid) {
+					t0_gnss       = pony->imu->t;
+					gnss_alt_last = pony->gnss->sol.llh[2];
+				}
+				else {
+					dt_gnss = pony->imu->t - t0_gnss;
+					t0_gnss = pony->imu->t;
+				}
+			}
+			// vertical channel update
+			if (t0_gnss > 0 && dt_gnss > 0) {
+				if (pony->gnss->sol.llh_valid && pony->imu->sol.llh_valid) { // altitude data present
+					// altitude
+					s = sqrt2*( (pony->gnss->sol.x_std > 0) ? (pony->gnss->sol.x_std) : pony->gnss->settings.code_sigma );
+					z = pony->gnss->sol.llh[2] + gnss_alt_last; // decorrelated with velocity information
+					h[0] = 2, h[1] = -dt_gnss;
+					pony_linal_kalman_update(y,S,K, z,h,s, 2);
+					// altitude rate of change
+					z = pony->gnss->sol.llh[2] - gnss_alt_last; // decorrelated with altitude information
+					h[0] = 0, h[1] = dt_gnss;
+					pony_linal_kalman_update(y,S,K, z,h,s, 2);
+					gnss_alt_last = pony->gnss->sol.llh[2];
+				}
+				if (pony->gnss->sol.v_valid && pony->imu->sol.v_valid) { // vertical velocity data present
+					z = pony->gnss->sol.v[2] - pony->imu->sol.v[2];
+					s = (pony->gnss->sol.v_std > 0) ? (pony->gnss->sol.v_std) : pony->gnss->settings.doppler_sigma;
+					h[0] = 0, h[1] = 1;
+					pony_linal_kalman_update(y,S,K, z,h,s, 2);
+				}
+			}
+		}
 
 		// vertical channel correction
 		s = sqrt(S[0]*S[0] + S[1]*S[1]);  // altitude stdev estimate
@@ -399,30 +461,203 @@ void pony_ins_motion_vertical_damping(void) {
 
 }
 
+/* pony_ins_motion_size_effect - pony plugin
+	
+	Compensates for accelerometer cluster size effect, i.e. the spatial separation 
+	between accelerometer proof masses, also known as "accelerometer lever arm compensation".
+	Uses angular rate and computed angular acceleration, taken as rate increment over the time step.
+	Recommended only for high-grade systems on dynamically maneuvering carriers.
+
+	description:
+	    
+		f''x = f'x - [-(wy^2+wz^2)rxx + (wx wy)rxy + (wx wz)rxz + (dwy/dt)rxz - dwz/dt)rxy]
+		f''y = f'y - [ (wy wx)ryx - (wz^2+wx^2)ryy + (wy wz)ryz + (dwz/dt)ryx - dwx/dt)ryz]
+		f''z = f'z - [ (wz wx)rzx + (wz wy)rzy - (wx^2+wy^2)rzz + (dwx/dt)rzy - dwy/dt)rzx]
+		    
+		where
+
+		f   - specific force
+		w   - angular rate (omega)
+		rij - i-th accelerometer proof mass coordinate along j-th instrumental axis
+		
+	uses:
+		pony->imu->t
+		pony->imu->f
+		pony->imu->f_valid
+		pony->imu->w
+		pony->imu->w_valid
+
+	changes:
+		pony->imu->f
+
+	cfg parameters:
+		{imu: accel_pos} - accelerometer proof mass coordinates in instrumental frame, in meters
+			type :   three floating point arrays of three numbers each, enclosed in nested square brackets
+			range:   -1..+1
+			default: [[0 0 0],[0 0 0],[0 0 0]]
+			example: {imu: accel_pos = [[0 +0.022 -0.041] [-0.006 0 +0.023] [+0.022 -0.002 0]]}
+			note:    either character from 0x01 to 0x20 (space), and also 0x2c (comma ',') and 0x3b (semicolon ';') may serve as separator
+*/
+void pony_ins_motion_size_effect(void) {
+
+	const char 
+		accel_pos_token[] = "accel_pos"; // accelerometer proof mass coordinates parameter name in configuration
+	const double 
+		pos_range[]       = {-1, +1},    // accelerometer proof mass coordinates range
+		eps               = 1.0/0x4000;  // 2^-14, smallest positive normal number in IEEE754 half-precision format
+									     
+	static double 					     
+		t0    = -1,                      // previous time
+		w0[3] = {0,0,0},                 // previous angular rate to calculate acceleration
+		r[]   = {0,0,0, 0,0,0, 0,0,0};   // accelerometer proof mass coordinates (lever arm coordinates)
+
+	double 
+		dt,              // time step
+		 w[3],           // angular rate permuted
+		dw[3];           // computed angular acceleration
+	size_t i, j, i1, i2; // common index variables
+
+
+	// check if imu data has been initialized
+	if (pony->imu == NULL)
+		return;
+
+	if (pony->mode == 0) {		// init
+
+		// parse parameters from configuration	
+		pony_ins_motion_parse_double_2array(r,3,3, accel_pos_token, pony->imu->cfg,pony->imu->cfglength, (double*)pos_range,0);
+		// zero angular acceleration and previous gyroscope measurements at start
+		for (i = 0; i < 3; i++)
+			dw[i] = 0;
+		// reset previous time
+		t0 = -1;
+
+	}
+
+	else if (pony->mode < 0) {	// termination
+		// do nothing
+	}
+
+	else						// main cycle
+	{
+
+		// check for inertial data initialized
+		if (0
+			|| !pony->imu->f_valid 
+			|| !pony->imu->w_valid)
+			return;
+		// time variables
+		if (t0 < 0) { // first touch
+			t0 = pony->imu->t;
+			for (i = 0; i < 3; i++)
+				w0[i] = pony->imu->w[i];
+			return;
+		}
+		dt = pony->imu->t - t0;
+		t0 = pony->imu->t;
+		if (dt < eps)
+			return; // do nothing if no proper time increment detected
+		// angular acceleration
+		for (i = 0; i < 3; i++) {
+			dw[i] = (pony->imu->w[i] - w0[i])/dt;
+			w0[i] =  pony->imu->w[i];
+		}
+		// size effect compensation
+		for (i = 0, j = 0; i < 3; i++, j += 3) {
+			i1 = (i+1)%3;
+			i2 = (i+2)%3;
+			w[0] = pony->imu->w[i ];
+			w[1] = pony->imu->w[i1];
+			w[2] = pony->imu->w[i2];
+			pony->imu->f[i] -= -(w[1]*w[1] + w[2]*w[2])*r[j+i] + w[0]*w[1]*r[j+i1] + w[0]*w[2]*r[j+i2] + dw[i1]*r[j+i2] - dw[i2]*r[j+i1];
+		}
+
+	}
+
+}
+
 
 
 
 
 // service functions
-double pony_ins_motion_parse_double(const char *token, char *src, const size_t len, double *range, const double default_value) {
+double pony_ins_motion_parse_double(const char* token, char* src, const size_t len, double* range, const double default_value) {
 
-	char   *cfg_ptr; // pointer to a substring
-	double  val;     // value
+	char*  src_ptr; // pointer to a substring
+	double val;     // value
 
 	// ensure variable to be initialized
 	val = default_value;
 	// parse token from src
-	cfg_ptr = pony_locate_token(token, src, len, '=');
-	if (cfg_ptr != NULL)
-		val = atof(cfg_ptr);
+	src_ptr = pony_locate_token(token, src, len, '=');
+	if (src_ptr != NULL)
+		val = atof(src_ptr);
 	// if not found or out of range, set to default
-	if ( cfg_ptr == NULL || (range != NULL && (range[0] > range[1] || val < range[0] || range[1] < val)) )
+	if ( src_ptr == NULL || (range != NULL && (range[0] > range[1] || val < range[0] || range[1] < val)) )
 		val = default_value;
 	return val;
 
 }
 
-void pony_ins_motion_flip_sol_over_pole(pony_sol *sol) {
+char pony_ins_motion_parse_double_2array(double* arr, const size_t outer_size, const size_t inner_size, const char* token, char *src, const size_t len, double* range, double default_value)
+{
+	const char
+		brc_open  = '[',
+		brc_close = ']',
+		space     = ' ',
+		comma     = ',',
+		semicol   = ';';
+
+	char*  src_ptr;
+	double val;
+	size_t i, j, k, k0;
+
+	// parse token from src
+	src_ptr = pony_locate_token(token, src, len, '=');
+	if (src_ptr == NULL)
+		return 0;
+	// go through until a bracket opens
+	for (i = src_ptr - src; i < len && src[i] > 0 && src[i] <= space; i++); // next printable character
+	if (i >= len || src[i] != brc_open) // no opening bracket
+		return 0;
+	// iterate over outer array size
+	for (j = 0, k0 = 0; j < outer_size; j++, k0 += inner_size) {
+		for (i++; i < len && src[i] > 0 && (src[i] <= space || src[i] == comma || src[i] == semicol); i++); // next printable character that is not a separator
+		if (i >= len || src[i] != brc_open) // no opening bracket
+			return 0;
+		// parse inner values
+		for (k = 0; k < inner_size; k++) {
+			for (i++; i < len && src[i] > 0 && (src[i] <= space || src[i] == comma || src[i] == semicol); i++); // next printable character that is not a separator
+			if (i >= len || src[i] == 0) // end of source string before all values have been parsed
+				return 0;
+			// ensure that value is initialized
+			val = default_value;
+			val = atof(src+i);
+			// if out of range, set to default
+			if (range != NULL && (range[0] > range[1] || val < range[0] || range[1] < val))
+				val = default_value;
+			// assign to array
+			arr[k0 + k] = val;
+			// skip until a separator appears
+			for (; i < len && src[i] > space && src[i] != comma && src[i] != semicol && src[i] != brc_close; i++); // next separator or closing bracket
+			if (i >= len || src[i] == 0) // end of source string before all values have been parsed
+				return 0;
+		}
+		// go through until a bracket closes
+		for (; i < len && src[i] > 0 && src[i] != brc_close; i++);
+		if (i >= len || src[i] == 0) // end of source string before the array has been parsed
+				return 0;
+	}
+	// go through until a bracket closes
+	for (i++; i < len && src[i] > 0 && src[i] != brc_close; i++);
+	if (i >= len || src[i] == 0) // end of source string before the array has been parsed
+		return 0;
+	else
+		return 1; // closing bracket found
+
+}
+
+void pony_ins_motion_flip_sol_over_pole(pony_sol* sol) {
 
 	size_t i;
 

@@ -1,4 +1,4 @@
-// Dec-2020
+// Aug-2021
 /*	pony_gnss_sat 
 	
 	pony plugins for GNSS satellite-related calculations:
@@ -1427,13 +1427,14 @@ void pony_gnss_sat_pos_vel_clock_bds_single_receiver(pony_gnss *gnss, double *al
 		SOW			= pony_gnss_sat_round(sat->eph[33]);
 		AODC		= pony_gnss_sat_round(sat->eph[34]); // Age of Data, Clock, not analyzed yet
 
-		// check orbit type
+		// select orbit type
 		orbit = orbits; // set invalid
 		if (i0 > inclination_threshold && sqrtA < radius_square_root_threshold)
 			orbit = meo;
 		if (i0 > inclination_threshold && sqrtA > radius_square_root_threshold)
 			orbit = igso;
 
+		// check SV health and orbit type
 		if (SatH1 || orbit >= orbits) {
 				// drop all flags and skip calculations if SV is not OK, or the orbit is undefined
 				sat->eph_valid		= 0;

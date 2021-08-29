@@ -1,4 +1,4 @@
-// Dec-2020
+// Aug-2021
 /*	pony_gnss_sol 
 	
 	pony plugins that provide GNSS navigation solutions:
@@ -210,7 +210,7 @@ void pony_gnss_sol_check_elevation_mask(void) {
 		
 		for (r = 0; r < pony->gnss_count; r++)
 			if (pony->gnss[r].cfg != NULL) {
-				// parse alignment duration from configuration string
+				// parse elevation angle mask from configuration string
 				cfg_ptr = pony_locate_token(elev_mask_token, pony->gnss[r].cfg_settings, pony->gnss[r].settings_length, '=');
 				if (cfg_ptr != NULL)
 					pony->gnss[r].settings.sinEl_mask = atof(cfg_ptr);		

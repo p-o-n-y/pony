@@ -1,4 +1,4 @@
-// Dec-2020
+// Aug-2021
 /*	pony_ins_attitude
 	
 	pony plugins for ins angular rate integration:
@@ -94,16 +94,16 @@ void pony_ins_attitude_rodrigues(void) {
 		// identity quaternion
 		for (i = 1, pony->imu->sol.q[0] = 1; i < 4; i++)
 			pony->imu->sol.q[i] = 0;
-		pony->imu->sol.  q_valid = 1;
+		pony->imu->sol.  q_valid = 0;
 		// identity attitude matrix
 		for (i = 0; i < 9; i++)
 			L[i] = ((i%4) == 0) ? 1 : 0; // for 3x3 matrix, each 4-th element is diagonal
-		pony->imu->sol.  L_valid = 1;
+		pony->imu->sol.  L_valid = 0;
 		// attitude angles for identity matrix
 		pony->imu->sol.rpy[0] = -pony->imu_const.pi/2;	// roll             -90 deg
 		pony->imu->sol.rpy[1] =  0;						// pitch              0 deg
 		pony->imu->sol.rpy[2] = +pony->imu_const.pi/2;	// yaw=true heading +90 deg
-		pony->imu->sol.rpy_valid = 1;
+		pony->imu->sol.rpy_valid = 0;
 		// reset previous time
 		t0 = -1;
 

@@ -1,4 +1,4 @@
-// Dec-2020
+// Aug-2021
 /*	pony_gnss_sol
 	
 	pony plugins that provide GNSS navigation solutions:

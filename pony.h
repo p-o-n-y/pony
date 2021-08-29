@@ -1,4 +1,4 @@
-// Dec-2020
+// Aug-2021
 // PONY core header file
 
 #ifndef PONY_H_
@@ -306,7 +306,7 @@ typedef struct {
 	pony_gnss_bds*     bds;             // BeiDou constellation data pointer
 
 	pony_time_epoch    epoch;           // current GNSS time epoch
-	int                leap_sec;        // current number of leap seconds (for UTC by default, but may also be used for BDS leap second for BDS-only processing)
+	int                leap_sec;        // current number of leap seconds (for GPS by default)
 	char               leap_sec_valid;  // validity flag (0/1)
 
 	pony_sol           sol;             // current GNSS solution
