@@ -1,4 +1,4 @@
-// Aug-2021
+// Jun-2022
 /*	pony_ins_gravity 
 	
 	pony plugins for gravity model calculations:
@@ -228,15 +228,15 @@ void pony_ins_gravity_normal(void) {
 		sinlat  = sin(  lat);
 		sin2lat = sin(2*lat);
 		cos2lat = cos(2*lat);
-		h_a = h/pony->imu_const.a;
+		h_a = h/(pony->imu_const.a + h);
 		// Eastern component - zero for normal gravity
 		pony->imu->g[0] = 0;
 		// Northern deflection with altitude above ellipsoid from plumb line curvature, as in (5-34), Physical Geodesy, W.Heiskanen H.Moritz, 1993, p. 196
-		pony->imu->g[1] = -pony->imu_const.fg*sin2lat*h_a;
+		pony->imu->g[1] = -pony->imu_const.ge*pony->imu_const.fg*sin2lat*h_a;
 		// vertical component, as from section 3 of Geodetic Reference System 80 by H. Moritz (GRS-80)
 		pony->imu->g[2] = -pony->imu_const.ge*
 			(1 + pony->imu_const.fg*sinlat*sinlat - f4_4*sin2lat*sin2lat)*
-			(1 - 2*(1 + f*cos2lat + m)*h_a);
+			(1 - 2*(1 + f*cos2lat + m)*h_a + h_a*h_a);
 		// validity flag up
 		pony->imu->g_valid = 1;
 

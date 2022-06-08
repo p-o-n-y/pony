@@ -1,4 +1,4 @@
-// Aug-2021
+// Jun-2022
 /*	pony_ins_alignment 
 	
 	pony plugins for ins initial alignment (initial attitude matrix determination):
@@ -216,10 +216,10 @@ void pony_ins_alignment_rotating(void) {
 	const char   
 		t1_token[] = "alignment"; // alignment duration parameter name in configuration
 	const double 
-		t1_default = 900,         // default alignment duration
+		t1_default = 300,         // default alignment duration
 		v_std      = 1,           // velocity integral standard deviation
-		S0         = 9e9,         // starting covariances
-		q2_std     = 9;           // Earth rotation axis ort variance, rad^2/Hz
+		S0         = 6e6,         // starting covariances
+		q2_std     = 3e3;         // Earth rotation axis ort variance, rad^2/Hz
 	const size_t 
 		m      = 3;	              // approximation coefficient count
 
@@ -346,7 +346,7 @@ void pony_ins_alignment_rotating(void) {
 		if (dt <= 0) return; // invalid increment, aborting
 		t_prev  = pony->imu->t;
 		t_shift = pony->imu->t - t0;
-		q2 = q2_std/dt;
+		q2 = q2_std*dt;
 		// Earth rotation angle
 		 ut = pony->imu_const.u*t_shift;
 		sut = sin(ut);
@@ -372,10 +372,10 @@ void pony_ins_alignment_rotating(void) {
 		// transition to instrumental frame (fza = Azz0*fz0) and normalization
 		pony_linal_mmul(fza , Azz0, fz0 , 3, 3, 1);
 		n = pony_linal_vnorm(fza,3);                    // n = |fza|
-		if (n > 0) for (i = 0; i < 3; i++) fza[i] /= n; // normalization
+		if (n > 0) for (i = 0; i < 3; i++) fza[i] /= n; // normalize
 		pony_linal_mmul(fz0, Azz0, fz0a0, 3, 3, 1);
 		n = pony_linal_vnorm(fz0,3);                    // n = |fz0|
-		if (n > 0) for (i = 0; i < 3; i++) fz0[i] /= n; // normalization
+		if (n > 0) for (i = 0; i < 3; i++) fz0[i] /= n; // normalize
 		// estimating Earth rotation axis ort
 		C[0] =        - sut;
 		C[1] = slt*(1 - cut);
@@ -385,8 +385,16 @@ void pony_ins_alignment_rotating(void) {
 			hy[(i+0)%3] = (fza[(i+1)%3]*fza[(i+1)%3] + fza[(i+2)%3]*fza[(i+2)%3])*C[1];
 			hy[(i+1)%3] =  fza[(i+2)%3]*C[0]         - fza[(i+0)%3]*fza[(i+1)%3] *C[1];
 			hy[(i+2)%3] = -fza[(i+1)%3]*C[0]         - fza[(i+0)%3]*fza[(i+2)%3] *C[1];
-			pony_linal_kalman_update(y,Sy,Ky, (fz0[i]-fza[i]*C[2])*sin(ut/2),hy,1, 3); // update estimate using z = [fza0 - fza*C_33], z = H*y + r, M[r^2] = 1
+			pony_linal_kalman_update(y,Sy,Ky, fz0[i]-fza[i]*C[2],hy,1, 3); // update estimate using z = [fza0 - fza*C_33], z = H*y + r, M[r^2] = 1
 		}
+		// debug output, if necessary
+		//for (i = 0; i < 3 && i < pony->sol.metrics_count; i++)
+		//	pony->sol.metrics[i] = y[i]; // estimate
+		//for (i = 3, k = 0; i < pony->sol.metrics_count && i < 2*3; i++) {
+		//	for (pony->sol.metrics[i] = Sy[k]*Sy[k], k++, j = i-3+1; j < 3; j++, k++)
+		//		pony->sol.metrics[i] += Sy[k]*Sy[k];           // covariance
+		//	pony->sol.metrics[i] = sqrt(pony->sol.metrics[i]); // covariance square root
+		//}
 		// Kalman prediction step, identity transition, diagonal system noise covariance
 		pony_linal_kalman_predict_I_qI(Sy,q2,3); // P = S*S^T, P_ii = P_ii + q^2, S = chol(P)
 		// renew attitude matrix: L = [ (w x f)/|w x f| , (f x (w x f))/(|f||w x f|) , f/|f| ]
@@ -470,9 +478,9 @@ void pony_ins_alignment_rotating_rpy(void) {
 	const char   
 		t1_token[] = "alignment"; // alignment duration parameter name in configuration
 	const double 
-		t1_default = 900,         // default alignment duration
+		t1_default = 300,         // default alignment duration
 		v_std      = 1,           // velocity integral standard deviation
-		S0         = 9e9;         // starting covariances
+		S0         = 6e6;         // starting covariances
 	const size_t 
 		m      = 3;	              // approximation coefficient count
 

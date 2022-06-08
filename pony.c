@@ -1,4 +1,4 @@
-// Aug-2021
+// Jun-2022
 // PONY core source code
 
 #include <stdlib.h>
@@ -49,6 +49,51 @@ pony_struct* pony = &pony_bus;
 
 
 // service subroutines
+	/*
+		allocate memory with size validation and NULL-assignment
+		input:
+			void**       ptr            --- pointer to a pointer to the desired memory block
+			const int    specified size --- specified array size to be validated
+			size_t*      actual_size    --- pointer to store actual (validated and allocated) array size, provided non-NULL pointer
+			const size_t element_size   --- size of each array element, e.g. sizeof(double)
+			const size_t default_size   --- default array size if validation fails
+			const size_t max_size       --- maximum allowed array size
+		return value:
+			1 if successful
+			0 otherwise (ptr==NULL or memory allocation failed)
+	 */
+char pony_alloc_null(void** ptr, const int specified_size, size_t* actual_size, const size_t element_size, const size_t default_size, const size_t max_size)
+{
+	size_t size;
+	char   res;
+
+	// defaults
+	size = 0;
+	res  = 0;
+	if (ptr != NULL) {
+		// validate size
+		if      (specified_size >  max_size)
+			size = max_size;
+		else if (specified_size >= 0       )
+			size = specified_size;
+		else
+			size = default_size;
+		// allocate memory
+		if (size > 0) // if nonzero size requested
+			*ptr = calloc(size, element_size);
+		else           // if no elements required
+			*ptr = NULL;
+		// verify
+		if (size == 0 || *ptr != NULL)
+			res = 1;
+	}
+	// store size
+	if (actual_size != NULL)
+		*actual_size = size;
+
+	return res;
+}
+
 	/*
 		free memory with pointer NULL-check and NULL-assignment
 		input:
@@ -135,7 +180,7 @@ char pony_locatecfggroup(const char* groupname, char* cfgstr, const size_t cfgle
 
 				// check if the group is the one that has been requested
 				group_found = 1;
-				for (j = 0; cfgstr[i] && groupname[j] && i < cfglen; i++, j++) {
+				for (j = 0; i < cfglen && cfgstr[i] && groupname[j]; i++, j++) {
 					if (cfgstr[i] != groupname[j]) {
 						group_found = 0;
 						break;
@@ -217,9 +262,12 @@ char pony_init_sol(pony_sol* sol, char* settings, const size_t len)
 	const char metrics_count_token[] = "metrics_count"; // token to look for in settings
 
 	size_t i;
-	int val;
-	char *cfgptr;
+	int    size;
+	char*  cfgptr;
 
+	// validate
+	if (sol == NULL)
+		return 0;
 	// pos & vel
 	for (i = 0; i < 3; i++) {
 		sol->  x[i] = 0;
@@ -231,7 +279,6 @@ char pony_init_sol(pony_sol* sol, char* settings, const size_t len)
 	sol->  v_valid = 0;
 	sol->  x_std = -1; // stdev undefined
 	sol->  v_std = -1; // stdev undefined
-
 	// attitude
 	for (i = 0; i < 4; i++)
 		sol->q[i]   = 0; // quaternion
@@ -242,34 +289,15 @@ char pony_init_sol(pony_sol* sol, char* settings, const size_t len)
 	for (i = 0; i < 3; i++)
 		sol->rpy[i] = 0; // attitude angles
 	sol->rpy_valid  = 0;
-	
 	// clock
 	sol->dt         = 0;
 	sol->dt_valid   = 0;
-
 	// metrics
-	val = -1;
+	size = -1;
 	cfgptr = pony_locate_token(metrics_count_token, settings, len, '='); // try to find number of metrics in settings string
-	if (cfgptr != NULL)     // if token found
-		val = atoi(cfgptr); // parse the number
-	
-	if (val < 0)
-		sol->metrics_count = metrics_count_default;
-	else
-		sol->metrics_count = (val<metrics_count_limit) ? ((size_t)val) : metrics_count_limit;
-
-	if (sol->metrics_count == 0) { // if no metrics required
-		sol->metrics = NULL;
-	} 
-	else {                        // if nonzero number of metrics requested
-		sol->metrics = (double*)calloc(sol->metrics_count, sizeof(double));
-		if (sol->metrics == NULL) {
-			sol->metrics_count = 0;
-			return 0;
-		}
-	}
-
-	return 1;
+	if (cfgptr != NULL)      // if token found
+		size = atoi(cfgptr); // parse the number
+	return pony_alloc_null((void**)(&(sol->metrics)), size, &(sol->metrics_count), sizeof(double), metrics_count_default, metrics_count_limit);
 }
 
 	/*
@@ -279,6 +307,10 @@ char pony_init_sol(pony_sol* sol, char* settings, const size_t len)
 	*/
 void pony_free_sol(pony_sol* sol)
 {
+	// validate
+	if (sol == NULL)
+		return;
+
 	pony_free_null((void**)(&(sol->metrics)));
 }
 
@@ -293,35 +325,53 @@ void pony_free_sol(pony_sol* sol)
 void pony_init_imu_const()
 {
 	pony->imu_const.pi      = 3.14159265358979323846264338327950288; // pi with maximum quad-precision floating point digits as in IEEE 754-2008 (binary128)
-	pony->imu_const.rad2deg	= 180/pony->imu_const.pi;                // 180/pi
+	pony->imu_const.pi2     = pony->imu_const.pi*2;                  // pi x 2
+	pony->imu_const.pi_2    = pony->imu_const.pi/2;                  // pi / 2
+	pony->imu_const.rad2deg = 180/pony->imu_const.pi;                // 180/pi
 	
 	// Earth parameters as in Section 4 of GRS-80 by H. Moritz, Journal of Geodesy (2000) 74 (1): pp. 128-162
-	pony->imu_const.u       = 7.292115e-5;                           // Earth rotation rate, rad/s
-	pony->imu_const.a       = 6378137.0;                             // Earth ellipsoid semi-major axis, m
-	pony->imu_const.e2      = 6.6943800229e-3;                       // Earth ellipsoid first eccentricity squared
-	pony->imu_const.ge      = 9.7803267715;                          // Earth normal gravity at the equator, m/s^2
-	pony->imu_const.fg      = 5.302440112e-3;                        // Earth normal gravity flattening
+	pony->imu_const.u       = 7.292115e-5;                           // Earth's rotation rate, rad/s
+	pony->imu_const.a       = 6378137.0;                             // Earth's ellipsoid semi-major axis, m
+	pony->imu_const.mu      = 3986005e8;                             // Earth's geocentric gravitational constant (including the atmosphere)
+	pony->imu_const.J2      = 1.08263e-3;                            // Earth's dynamical form factor 
+	pony->imu_const.e2      = 6.6943800229e-3;                       // Earth's ellipsoid first eccentricity squared
+	pony->imu_const.ge      = 9.7803267715;                          // Earth's normal gravity at the equator, m/s^2
+	pony->imu_const.fg      = 5.302440112e-3;                        // Earth's normal gravity flattening
 }
 	
 	/*
 		initialize IMU structure
 		input:
-			pony_imu* imu ---  pointer to a IMU structure
+			pony_imu*   imu      --- pointer to an IMU structure
 		return value:
 			1 if successful
 			0 otherwise
 	*/
 char pony_init_imu(pony_imu* imu)
 {
-	size_t i;
+	const size_t
+	temp_count_default = 3,   // default number of additional temperature sensors
+	temp_count_limit   = 255; // maximum number of additional temperature sensors
 
+	const char metrics_count_token[] = "temp_count"; // token to look for in settings
+
+	size_t i;
+	int    size;
+	char*  cfgptr;
+
+
+	// validate
+	if (imu == NULL)
+		return 0;
 	// validity flags
 	imu-> w_valid = 0;
 	imu-> f_valid = 0;
 	imu->Tw_valid = 0;
 	imu->Tf_valid = 0;
 	imu-> W_valid = 0;
+	imu-> g_valid = 0;
 	imu->t = 0;
+	// zero parameters
 	for (i = 0; i < 3; i++) {
 		imu->w [i] = 0; // gyroscopes
 		imu->f [i] = 0; // accelerometers
@@ -333,11 +383,16 @@ char pony_init_imu(pony_imu* imu)
 	imu->g[0] = 0;
 	imu->g[1] = 0;
 	imu->g[2] = -pony->imu_const.ge*(1 + pony->imu_const.fg/2); // middle value
-	// drop the solution
+	// init solution data
 	if (!pony_init_sol(&(imu->sol), imu->cfg, imu->cfglength))
 		return 0;
-
-	return 1;
+	// init additional temperature sensors
+	size = -1;
+	cfgptr = pony_locate_token(metrics_count_token, imu->cfg, imu->cfglength, '='); // try to find number of additional temperature sensors in configuration string
+	if (cfgptr != NULL)      // if token found
+		size = atoi(cfgptr); // parse the number
+	imu->T_valid = 0;
+	return pony_alloc_null((void**)(&(imu->T)), size, &(imu->T_count), sizeof(double), temp_count_default, temp_count_limit);
 }
 
 	/*
@@ -345,16 +400,16 @@ char pony_init_imu(pony_imu* imu)
 	*/
 void pony_free_imu(void)
 {
+	// validate
 	if (pony->imu == NULL)
 		return;
-	
 	// configuration
 	pony->imu->cfg = NULL;
 	pony->imu->cfglength = 0;
-	
 	// solution
 	pony_free_sol(&(pony->imu->sol));
-	
+	// application-specific additional temperature sensors
+	pony_free_null((void**)(&(pony->imu->T)));
 	// pony_imu structure
 	free((void*)(pony->imu));
 	pony->imu = NULL;
@@ -1150,7 +1205,7 @@ char pony_add_plugin(void(*newplugin)(void))
 {
 	pony_plugin* reallocated_pointer;
 
-	if (pony->core.plugin_count + 1 >= UINT_MAX)
+	if (pony->core.plugin_count + 1 >= (size_t)UINT_MAX)
 		return 0;
 
 	reallocated_pointer = (pony_plugin*)realloc((void*)(pony->core.plugins), (pony->core.plugin_count + 1)*sizeof(pony_plugin));
@@ -1333,28 +1388,38 @@ char pony_init(char* cfg)
 	*/
 char pony_step(void)
 {
+	long int prev_mode; // 0 = init, <0 terminate, >0 normal operation, for unwanted side-effects protection
 	size_t i;
 
 	// loop through plugin execution list
 	for (pony->core.current_plugin_id = 0; pony->core.current_plugin_id < pony->core.plugin_count; pony->core.current_plugin_id++) {
 		i = pony->core.current_plugin_id;
 
-		if (pony->mode <= 0                                                                                    // init/termination mode
+		prev_mode = pony->mode;
+
+		if (pony->mode <= 0                                                                                    // init/termination mode (every plugin)
 			|| (pony->core.plugins[i].cycle > 0 && pony->core.plugins[i].tick == pony->core.plugins[i].shift)) // or the scheduled tick has come
 			pony->core.plugins[i].func();                                                                      // execute the current plugin
+
+		// unwanted side-effects protection
+		if (0
+			|| (prev_mode == 0 && pony->mode >  0 && i+1 != pony->core.plugin_count) // premature end of initialization
+			|| (prev_mode <  0 && pony->mode >= 0)                                   // premature end of termination
+			)
+			pony->mode = prev_mode;                                                  // disable mode change
 
 		pony->core.plugins[i].tick++;                                  // current tick increment
 		if (pony->core.plugins[i].tick >= pony->core.plugins[i].cycle) // check to stay within the cycle
 			pony->core.plugins[i].tick = 0;                            // reset tick
 
-		if (pony->core.exit_plugin_id == i)	{     // if termination was initiated by the current plugin on the previous loop
-			pony->core.exit_plugin_id = UINT_MAX; // set to default
-			pony->core.host_termination = 0;      // set to default
-			pony_free();                          // free memory
+		if (pony->core.exit_plugin_id == i) { // if termination was initiated by the current plugin on the previous loop
+			pony->core.exit_plugin_id = (size_t)UINT_MAX; // set to default
+			pony->core.host_termination = 0;              // set to default
+			pony_free();                                  // free memory
 			break;
 		}
 
-		if ((pony->mode < 0 || pony->core.host_termination == 1) && pony->core.exit_plugin_id == UINT_MAX) { // if termination was initiated by the current plugin on the current loop
+		if ((pony->mode < 0 || pony->core.host_termination == 1) && pony->core.exit_plugin_id == (size_t)UINT_MAX) { // if termination was initiated by the current plugin on the current loop
 			if (pony->mode > 0)
 				pony->mode = -1;               // set mode to -1 for external termination cases
 
@@ -1367,7 +1432,7 @@ char pony_step(void)
 		pony->mode = 1;  // set operation mode to regular operation
 
 	// success if either staying in regular operation mode, or a termination properly detected
-	return (pony->mode >= 0) || (pony->core.exit_plugin_id < UINT_MAX);
+	return (pony->mode >= 0) || (pony->core.exit_plugin_id < (size_t)UINT_MAX);
 }
 
 	/*
@@ -1397,7 +1462,7 @@ char pony_terminate(void)
 		input:
 			plugin --- pointer to a plugin function to remove from execution list
 		return value:
-			1 if number of plugin instances found, limited to 255
+			number of plugin instances found, limited to 127
 			0 if no instances found, or memory reallocation somehow failed
 	*/
 char pony_remove_plugin(void(*plugin)(void))
@@ -1419,7 +1484,7 @@ char pony_remove_plugin(void(*plugin)(void))
 		pony->core.plugins[j].shift = 0;
 		pony->core.plugins[j].tick  = 0;
 		pony->core.plugin_count--;
-		if (flag < 0xff)
+		if (flag < 0x7f)
 			flag++;
 	}
 
@@ -1683,15 +1748,28 @@ int pony_time_epochs_compare(pony_time_epoch* date1, pony_time_epoch* date2)
 	*/
 long pony_time_days_between_dates(pony_time_epoch epoch_from, pony_time_epoch epoch_to)
 {
-	if (epoch_to.M < 3)
-		epoch_to.Y--, epoch_to.M += 12;
-	if (epoch_from.M < 3)
-		epoch_from.Y--, epoch_from.M += 12;
+	enum gregorian_calendar_constants {
+		leap_yr_short_cycle =   4, // years
+		leap_yr_med_cycle   = 100, // years
+		leap_yr_long_cycle  = 400, // years
+		feb      =  2,             // month
+		yr_len_m = 12,			   // months
+		days_of_yr_approx_1_num = 153, // days per month x 5 \.
+		days_of_yr_approx_0_num = 457, // days x 5           |-- these parameters approximate days passed since March, 1st, for the current year: floor([153*m-457]/5), m = 3,4,..,14
+		days_of_yr_approx_denom =   5, // denominator        /.
+		yr_len_d        = 365};    // days
+
+	// move February to the end of year, so that all leap days occur at the end
+	if (epoch_to  .M <= feb)
+		epoch_to  .Y--, epoch_to  .M += yr_len_m;
+	if (epoch_from.M <= feb)
+		epoch_from.Y--, epoch_from.M += yr_len_m;
+	// calculate difference between two Rata Die day numbers
 	return
-		(epoch_to.Y - epoch_from.Y)*365 +
-		(epoch_to.Y/4 - epoch_to.Y/100 + epoch_to.Y/400 + (153*epoch_to.M - 457)/5) -
-		(epoch_from.Y/4	- epoch_from.Y/100 + epoch_from.Y/400 + (153*epoch_from.M - 457)/5) +
-		(epoch_to.D - epoch_from.D);
+		(epoch_to  .Y - epoch_from.Y)*yr_len_d +                                                                                                                                                           // full years
+		(epoch_to  .Y/leap_yr_short_cycle - epoch_to  .Y/leap_yr_med_cycle + epoch_to  .Y/leap_yr_long_cycle + (days_of_yr_approx_1_num*epoch_to  .M - days_of_yr_approx_0_num)/days_of_yr_approx_denom) - // leap days 
+		(epoch_from.Y/leap_yr_short_cycle - epoch_from.Y/leap_yr_med_cycle + epoch_from.Y/leap_yr_long_cycle + (days_of_yr_approx_1_num*epoch_from.M - days_of_yr_approx_0_num)/days_of_yr_approx_denom) + // and current year
+		(epoch_to.D - epoch_from.D);                                                                                                                                                                       // remaining days
 	// original Rata Die calculation:
 	// (365*epoch_to.  Y + epoch_to.  Y/4 - epoch_to  .Y/100 + epoch_to  .Y/400 + (153*epoch_to  .M - 457)/5 + epoch_to  .D - 306) - 
 	// (365*epoch_from.Y + epoch_from.Y/4 - epoch_from.Y/100 + epoch_from.Y/400 + (153*epoch_from.M - 457)/5 + epoch_from.D - 306);
@@ -1770,13 +1848,13 @@ char pony_time_epoch2gps(unsigned int* week, double* sec, pony_time_epoch* epoch
 {
 	const pony_time_epoch base = {1980,1,6,0,0,0.0};
 
-	unsigned int days;
+	long int days;
 
 	if (epoch == NULL || (week == NULL && sec == NULL) || epoch->M <= 0 || epoch->D <= 0)
 		return 0; // invalid input
 
 	days = pony_time_days_between_dates(base, *epoch);
-	if (days < 0)
+	if (days < 0) // the date happens to be before GPS time has started
 		return 0;
 	if (week != NULL)
 		*week = days/7;
@@ -1796,13 +1874,13 @@ char pony_time_epoch2gps(unsigned int* week, double* sec, pony_time_epoch* epoch
 		/*
 			calculate dot product
 			input:
-				double* u      --- pointer to the first vector
-				double* v      --- pointer to the second vector
-				const size_t n --- dimension
+				const double* u --- pointer to the first vector
+				const double* v --- pointer to the second vector
+				const size_t  n --- dimension
 			return value:
 				dot product u^T*v
 		*/	
-double pony_linal_dot(double* u, double* v, const size_t n)
+double pony_linal_dot(const double* u, const double* v, const size_t n)
 {
 	double res;
 	size_t i;
@@ -1816,12 +1894,12 @@ double pony_linal_dot(double* u, double* v, const size_t n)
 		/*
 			calculate l_2 vector norm
 			input:
-				double* u      --- pointer to a vector
-				const size_t n --- dimension
+				const double* u --- pointer to a vector
+				const size_t  n --- dimension
 			return value:
 				l_2 vector norm, i.e. sqrt(u^T*u)
 		*/
-double pony_linal_vnorm(double* u, const size_t n)
+double pony_linal_vnorm(const double* u, const size_t n)
 {
 	return sqrt(pony_linal_dot(u, u, n));
 }
@@ -1829,13 +1907,13 @@ double pony_linal_vnorm(double* u, const size_t n)
 		/*
 			calculate cross product for 3x1 vectors
 			input:
-				double* u --- pointer to the first 3x1 vector
-				double* v --- pointer to the second 3x1 vector
+				const double* u --- pointer to the first 3x1 vector
+				const double* v --- pointer to the second 3x1 vector
 
 			output:
-				double* res --- pointer to a cross product
+				double* res     --- pointer to a cross product
 		*/
-void pony_linal_cross3x1(double* res, double* u, double* v)
+void pony_linal_cross3x1(double* res, const double* u, const double* v)
 {
 	res[0] = u[1]*v[2] - u[2]*v[1];
 	res[1] = u[2]*v[0] - u[0]*v[2];
@@ -1845,14 +1923,14 @@ void pony_linal_cross3x1(double* res, double* u, double* v)
 		/*
 			multiply two matrices 
 			input:
-				double* a             --- pointer to the first n x n1 matrix 
-				double* b             --- pointer to the second n1 x m matrix
-				const size_t n, n1, m --- dimensions
+				const double* a        --- pointer to the first n x n1 matrix 
+				const double* b        --- pointer to the second n1 x m matrix
+				const size_t  n, n1, m --- dimensions
 			output:
-				double* res --- pointer to a n x m matrix, 
-				                res = a*b
+				double* res            --- pointer to a n x m matrix, 
+				                           res = a*b
 		*/
-void pony_linal_mmul(double* res, double* a, double* b, const size_t n, const size_t n1, const size_t m)
+void pony_linal_mmul(double* res, const double* a, const double* b, const size_t n, const size_t n1, const size_t m)
 {
 	size_t i, j, k, k0, ka, kb, p;
 
@@ -1870,14 +1948,14 @@ void pony_linal_mmul(double* res, double* a, double* b, const size_t n, const si
 		/*
 			multiply two matrices (first matrix is transposed)
 			input:
-				double* a             --- pointer to the first n x m matrix 
-				double* b             --- pointer to the second n x n1 matrix 
-				const size_t n, n1, m --- dimensions
+				const double* a        --- pointer to the first n x m matrix 
+				const double* b        --- pointer to the second n x n1 matrix 
+				const size_t  n, n1, m --- dimensions
 			output:
-				double* res --- pointer to a m x n1 matrix,
-				                res = a^T*b
+				double* res            --- pointer to a m x n1 matrix,
+				                           res = a^T*b
 		*/
-void pony_linal_mmul1T(double* res, double* a, double* b, const size_t n, const size_t m, const size_t n1)
+void pony_linal_mmul1T(double* res, const double* a, const double* b, const size_t n, const size_t m, const size_t n1)
 {
 	size_t i, j, k, ka, kb, p;
 
@@ -1895,14 +1973,14 @@ void pony_linal_mmul1T(double* res, double* a, double* b, const size_t n, const 
 		/*
 			multiply two matrices (second matrix is transposed)
 			input:
-				double* a             --- pointer to the first n x m matrix 
-				double* b             --- pointer to the second n1 x m matrix 
+				const double* a       --- pointer to the first n x m matrix 
+				const double* b       --- pointer to the second n1 x m matrix 
 				const size_t n, n1, m --- dimensions
 			output:
-				double* res --- pointer to a n x n1 matrix,
-				                res = a*b^T
+				double* res           --- pointer to a n x n1 matrix,
+				                          res = a*b^T
 		*/
-void pony_linal_mmul2T(double* res, double* a, double* b, const size_t n, const size_t m, const size_t n1)
+void pony_linal_mmul2T(double* res, const double* a, const double* b, const size_t n, const size_t m, const size_t n1)
 {
 	size_t i, j, k, k0, ka, kb, p;
 
@@ -1920,13 +1998,13 @@ void pony_linal_mmul2T(double* res, double* a, double* b, const size_t n, const 
 		/*
 			multiply 4x1 quaternions
 			input:
-				double* q --- pointer to the first 4x1 quaternion
-				double* r --- pointer to the second 4x1 quaternion
+				const double* q --- pointer to the first  4x1 quaternion
+				const double* r --- pointer to the second 4x1 quaternion
 			output:
-				double* res --- pointer to a 4x1 quaternion, 
+				double* res     --- pointer to a 4x1 quaternion, 
 				                res = q x r, with res0, q0, r0 being scalar parts
 		*/
-void pony_linal_qmul(double* res, double* q, double* r)
+void pony_linal_qmul(double* res, const double* q, const double* r)
 {
 	res[0] = q[0]*r[0] - q[1]*r[1] - q[2]*r[2] - q[3]*r[3];
 	res[1] = q[0]*r[1] + q[1]*r[0] + q[2]*r[3] - q[3]*r[2];
@@ -1938,11 +2016,11 @@ void pony_linal_qmul(double* res, double* q, double* r)
 		/*
 			calculate quaternion q corresponding to 3x3 attitude matrix R
 			input:
-				double* R --- pointer to a 3x3 attitude matrix
+				const double* R --- pointer to a 3x3 attitude matrix
 			output:
-				double* q --- pointer to a quaternion with q0 being scalar part
+				double* q       --- pointer to a 4x1 quaternion with q0 being scalar part
 		*/
-void pony_linal_mat2quat(double* q, double* R)
+void pony_linal_mat2quat(double* q, const double* R)
 {
 	size_t i;
 	double _q4;
@@ -1992,11 +2070,11 @@ void pony_linal_mat2quat(double* q, double* R)
 		/*
 			calculate 3x3 attitude matrix R corresponding to quaternion q
 			input:
-				double* q --- pointer to a quaternion (with q0 being scalar part)
+				const double* q --- pointer to a 4x1 quaternion (with q0 being scalar part)
 			output:
-				double* R --- pointer to a 3x3 attitude matrix
+				double* R       --- pointer to a 3x3 attitude matrix
 		*/
-void pony_linal_quat2mat(double* R, double* q)
+void pony_linal_quat2mat(double* R, const double* q)
 {
 	double q11, q22, q33, q10, q20, q30, q12, q23, q31;
 
@@ -2020,11 +2098,11 @@ void pony_linal_quat2mat(double* R, double* q)
 		/*
 			calculate 3x3 transition matrix R from E-N-U corresponding to roll, pitch and yaw
 			input:
-				double* rpy --- pointer to a roll, pitch and yaw (radians, airborne frame: X longitudinal, Z right-wing)
+				const double* rpy --- pointer to a roll, pitch and yaw (radians, airborne frame: X longitudinal, Y normal, Z right-wing)
 			output:
-				double* R --- pointer to a 3x3 transition matrix R from E-N-U
+				double* R         --- pointer to a 3x3 transition matrix R from E-N-U
 		*/
-void pony_linal_rpy2mat(double* R, double* rpy)
+void pony_linal_rpy2mat(double* R, const double* rpy)
 {
 	double sr, cr, sp, cp, sy, cy;
 
@@ -2040,11 +2118,11 @@ void pony_linal_rpy2mat(double* R, double* rpy)
 		/*
 			calculate roll, pitch and yaw corresponding to 3x3 transition matrix R from E-N-U
 			input:
-				double* R --- pointer to a 3x3 transition matrix R from E-N-U
+				const double* R --- pointer to a 3x3 transition matrix R from E-N-U
 			output:
-				double* rpy --- pointer to a roll, pitch and yaw (radians, airborne frame: X longitudinal, Z right-wing)
+				double* rpy     --- pointer to a roll, pitch and yaw (radians, airborne frame: X longitudinal, Z right-wing)
 		*/
-void pony_linal_mat2rpy(double* rpy, double* R)
+void pony_linal_mat2rpy(double* rpy, const double* R)
 {
 	const double pi2 = 6.283185307179586476925286766559005768; // pi*2, IEEE-754 quadruple precision
 	double dp, dm;
@@ -2072,13 +2150,14 @@ void pony_linal_mat2rpy(double* rpy, double* R)
 		/*
 			calculate 3x3 rotation matrix R for 3x1 Euler vector e via Rodrigues' formula
 			input:
-				double* e --- pointer to a 3x1 Euler vector
+				const double* e --- pointer to a 3x1 Euler vector
 			output:
-				double* R --- pointer to a 3x3 rotation matrix,
-				              R = E + sin|e|/|e|*[e,] + (1-cos|e|)/|e|^2*[e,]^2
+				double* R       --- pointer to a 3x3 rotation matrix,
+				                    R = E + sin|e|/|e|*[e,] + (1-cos|e|)/|e|^2*[e,]^2
 		*/
-void pony_linal_eul2mat(double* R, double* e)
+void pony_linal_eul2mat(double* R, const double* e)
 {
+	const size_t taylor_deg = 10;  // yields expansion error of 2^-105, which falls below IEEE 754-2008 quad precision rounding error when multiplied by an argument less than 2^-8
 	const double eps = 1.0/0x0100; // 2^-8, guaranteed non-zero value in IEEE754 half-precision format
 
 	double
@@ -2098,10 +2177,9 @@ void pony_linal_eul2mat(double* R, double* e)
 		c = (1 - cos(e0))/e02;
 	}
 	else {
-		// Taylor expansion for sin(x)/x, (1-cos(x))/x^2 up to 10-th degree terms (only even powers in each series)
-		// having the order of 2^-105, they fall below IEEE 754-2008 quad precision rounding error when multiplied by an argument less than 2^-8
+		// Taylor expansion for sin(x)/x, (1-cos(x))/x^2 up to the defined degree (only even powers in each series)
 		s = 1, c = 1/2.;
-		for (i = 2, ps = -e02/6, pc = -e02/24; i < 10 && ps != 0.0; i += 2, ps *= -e02/(i*(i+1.0)), pc *= -e02/((i+1.0)*(i+2.0)))
+		for (i = 2, ps = -e02/6, pc = -e02/24; i < taylor_deg && ps != 0.0; i += 2, ps *= -e02/(i*(i+1.0)), pc *= -e02/((i+1.0)*(i+2.0)))
 			s += ps, c += pc;
 	}
 
@@ -2109,6 +2187,45 @@ void pony_linal_eul2mat(double* R, double* e)
 	R[0] =  1 - (e2 + e3)*c;      R[1] =  e[2]*s + e[0]*e[1]*c; R[2] = -e[1]*s + e[2]*e[0]*c;
 	R[3] = -e[2]*s + e[0]*e[1]*c; R[4] =  1 - (e3 + e1)*c;      R[5] =  e[0]*s + e[1]*e[2]*c;
 	R[6] =  e[1]*s + e[2]*e[0]*c; R[7] = -e[0]*s + e[1]*e[2]*c; R[8] =  1 - (e1 + e2)*c;
+}
+
+		/*
+			calculate quaternion q for 3x1 Euler vector e
+			input:
+				const double* e --- pointer to a 3x1 Euler vector
+			output:
+				double* q       --- pointer to a 4x1 quaternion with q0 being scalar part
+		*/
+void pony_linal_eul2quat(double* q, const double* e  )
+{
+	const size_t taylor_deg = 12;  // yields expansion error of 2^-124, which falls below IEEE 754-2008 quad precision rounding error
+	const double eps = 1.0/0x0100; // 2^-8, guaranteed non-zero value in IEEE754 half-precision format
+
+	double
+		e0, e02,    // |e|, |e|^2
+		s, c,       // sin|e|/|e|, (1 - cos|e|)/|e|^2
+		ps, pc;     // Taylor expansion terms
+	unsigned char i;
+
+	// e[i]^2, |e|^2, |e|
+	e02 = (e[0]*e[0] + e[1]*e[1] + e[2]*e[2])/4;
+	e0  = sqrt(e02);
+	// sin|e/2|/|e/2|, cos|e/2|
+	if (e0 > eps) {
+		s = sin(e0)/e0;
+		c = cos(e0);
+	}
+	else {
+		// Taylor expansion for sin(x)/x, cos(x) up to the defined degree (only even powers in each series)
+		s = 1, c = 1;
+		for (i = 2, ps = -e02/6, pc = -e02/24; i < taylor_deg && ps != 0.0; i += 2, ps *= -e02/(i*(i+1.0)), pc *= -e02/((i+1.0)*(i+2.0)))
+			s += ps, c += pc;
+	}
+
+	// normalized quaternion
+	q[0] = c;
+	for (i = 0; i < 3; i++)
+		q[1+i] = e[i]*s/2;
 }
 
 	// routines for n x n upper-triangular matrices lined up in one-dimensional array
@@ -2119,8 +2236,8 @@ void pony_linal_eul2mat(double* R, double* e)
 				                      i,j = 0,1,...,n-1
 				const size_t n    --- upper-triangular matrix dimension
 			output:
-				size_t* k --- pointer to an index in one-dimensional array,
-				              k = 0,1,...,[n*(n+1)/2]-1
+				size_t* k         --- pointer to an index in one-dimensional array,
+				                      k = 0,1,...,[n*(n+1)/2]-1
 		*/
 void pony_linal_u_ij2k(size_t* k, const size_t i, const size_t j, const size_t n)
 {
@@ -2130,9 +2247,9 @@ void pony_linal_u_ij2k(size_t* k, const size_t i, const size_t j, const size_t n
 		/*
 			convert index for upper-triangular matrix lined up in one-dimensional array: k -> (i,j)
 			input:
-				const size_t k --- index in one-dimensional array,
-				                   k = 0,1,...,[n(n+1)/2]-1
-				const size_t n --- upper-triangular matrix dimension
+				const size_t  k    --- index in one-dimensional array,
+				                       k = 0,1,...,[n(n+1)/2]-1
+				const size_t  n    --- upper-triangular matrix dimension
 			output:
 				const size_t* i, j --- pointers to a row and column indexes in upper-triangular matrix,
 				                       i,j = 0,1,...,n-1
@@ -2140,10 +2257,10 @@ void pony_linal_u_ij2k(size_t* k, const size_t i, const size_t j, const size_t n
 		*/
 void pony_linal_u_k2ij(size_t* i, size_t* j, const size_t k, const size_t n)
 {
-	double onehalf_plus_n = 0.5+n;
+	float onehalf_plus_n = 0.5F + (float)n;
 	size_t i0;
 
-	i0 = (size_t)(floor(onehalf_plus_n - sqrt(onehalf_plus_n*onehalf_plus_n - 2.0*k)) + 0.5);
+	i0 = (size_t)(floor(onehalf_plus_n - sqrt(onehalf_plus_n*onehalf_plus_n - 2.0F*(float)k)) + 0.5F);
 	if (i != NULL)
 		*i = i0;
 	if (j != NULL)
@@ -2153,12 +2270,12 @@ void pony_linal_u_k2ij(size_t* i, size_t* j, const size_t k, const size_t n)
 		/*
 			fill the diagonal with array elements
 			input:
-				double* u      --- pointer to an upper-triangular n x n matrix
-				                   lined up in one-dimensional array of n(n+1)/2 x 1
-				double* d      --- pointer to an array of n diagonal elements
-				const size_t n --- dimension
+				double* u       --- pointer to an upper-triangular n x n matrix
+				                    lined up in one-dimensional array of n(n+1)/2 x 1
+				const double* d --- pointer to an array of n diagonal elements
+				const size_t n  --- dimension
 		*/
-void pony_linal_diag2u(double* u, double* d, const size_t n)
+void pony_linal_diag2u(double* u, const double* d, const size_t n)
 {
 	size_t i, k;
 
@@ -2169,17 +2286,17 @@ void pony_linal_diag2u(double* u, double* d, const size_t n)
 		/*
 			multiply upper-triangular matrix lined up in one-dimensional array by a regular matrix
 			input:
-				double*      u    --- pointer to an upper-triangular n x n matrix
-				                      lined up in one-dimensional array of n(n+1)/2 x 1
-				double*      v    --- pointer to a regular n x m matrix
-				const size_t n, m --- dimensions
+				const double* u    --- pointer to an upper-triangular n x n matrix
+				                       lined up in one-dimensional array of n(n+1)/2 x 1
+				const double* v    --- pointer to a regular n x m matrix
+				const size_t  n, m --- dimensions
 			output:
-				double* res --- pointer to n x m matrix,
-				                res = U*V
+				double* res        --- pointer to n x m matrix,
+				                       res = U*V
 			note:
 				overwriting input (double* res = double* v) is allowed
 		*/
-void pony_linal_u_mul(double* res, double* u, double* v, const size_t n, const size_t m)
+void pony_linal_u_mul(double* res, const double* u, const double* v, const size_t n, const size_t m)
 {
 	size_t i, j, k, p, p0, mn;
 
@@ -2196,17 +2313,17 @@ void pony_linal_u_mul(double* res, double* u, double* v, const size_t n, const s
 		/*
 			multiply transposed upper-triangular matrix lined up in one-dimensional array of n(n+1)/2 x 1, by a regular matrix
 			input:
-				double*      u   --- pointer to an upper-triangular matrix 
-				                     lined up in one-dimensional array of n(n+1)/2 x 1
-				double*      v   --- pointer to a regular n x m matrix
-				const size_t n,m --- dimensions
+				const double* u   --- pointer to an upper-triangular matrix 
+				                      lined up in one-dimensional array of n(n+1)/2 x 1
+				const double* v   --- pointer to a regular n x m matrix
+				const size_t  n,m --- dimensions
 			output:
-				double* res --- pointer to a regular n x m matrix,
-				                res = U^T*V
+				double* res       --- pointer to a regular n x m matrix,
+				                      res = U^T*V
 			note:
 				overwriting input (double* res = double* v) is allowed
 		*/
-void pony_linal_uT_mul(double* res, double* u, double* v, const size_t n, const size_t m)
+void pony_linal_uT_mul(double* res, const double* u, const double* v, const size_t n, const size_t m)
 {
 	size_t i, j, k, k0, l, r, r0, ni;
 
@@ -2223,17 +2340,17 @@ void pony_linal_uT_mul(double* res, double* u, double* v, const size_t n, const 
 		/*
 			multiply a regular matrix by upper-triangular matrix lined up in one-dimensional array of n(n+1)/2 x 1
 			input:
-				double*      v    --- pointer to a regular m x n matrix
-				double*      u    --- pointer to an upper-triangular n x n matrix
-				                      lined up in one-dimensional array of n(n+1)/2 x 1
-				const size_t m, n --- dimensions
+				const double* v    --- pointer to a regular m x n matrix
+				const double* u    --- pointer to an upper-triangular n x n matrix
+				                       lined up in one-dimensional array of n(n+1)/2 x 1
+				const size_t  m, n --- dimensions
 			output:
-				double* res --- pointer to m x n matrix,
-				                res = V*U
+				double* res        --- pointer to m x n matrix,
+				                       res = V*U
 			note:
 				overwriting input (double* res = double* v) is allowed
 		*/
-void pony_linal_mul_u(double* res, double* v, double* u, const size_t m, const size_t n)
+void pony_linal_mul_u(double* res, const double* v, const double* u, const size_t m, const size_t n)
 {
 	size_t 
 		i, j, k, k0, r, r0, 
@@ -2254,17 +2371,42 @@ void pony_linal_mul_u(double* res, double* v, double* u, const size_t m, const s
 	}		
 }
 
+		/*
+			multiply a regular matrix by transposed upper-triangular matrix lined up in one-dimensional array of n(n+1)/2 x 1
+			input:
+				const double* v    --- pointer to a regular m x n matrix
+				const double* u    --- pointer to an upper-triangular n x n matrix
+				                       lined up in one-dimensional array of n(n+1)/2 x 1
+				const size_t  m, n --- dimensions
+			output:
+				double* res        --- pointer to m x n matrix,
+				                       res = V*U^T
+			note:
+				overwriting input (double* res = double* v) is allowed
+		*/
+void pony_linal_mul_uT(double* res, const double* v, const double* u, const size_t m, const size_t n)
+{
+	size_t i, j, ij, k, k0, p, n1;
+
+	for (j = 0, k0 = 0, n1 = n; j < n; j++, k0 += n1, n1--)
+		for (i = 0, ij = j; i < m; i++, ij +=n) {
+			res[ij] = v[ij]*u[k0];
+			for (k = k0+1, p = 1; p < n1; p++, k++)
+				res[ij] += v[ij+p]*u[k];
+		}
+}
+
 		/* 
 			multiply a regular matrix by itself transposed, storing upper part of the result lined up in one-dimensional array of n(n+1)/2 x 1 
 			input:
-				double* v         --- pointer to a regular n x m matrix
-				const size_t n, m --- dimensions
+				const double* v    --- pointer to a regular n x m matrix
+				const size_t  n, m --- dimensions
 			output:
-				double* res       --- pointer to an upper-triangular n x n matrix
-				                      lined up in one-dimensional array of n(n+1)/2 x 1
-				                      res = v*v^T
+				double* res        --- pointer to an upper-triangular n x n matrix
+				                       lined up in one-dimensional array of n(n+1)/2 x 1
+				                       res = v*v^T
 		*/
-void pony_linal_msq2T_u(double* res, double* v, const size_t n, const size_t m)
+void pony_linal_msq2T_u(double* res, const double* v, const size_t n, const size_t m)
 {
 	size_t i, i1, j, k, im, i1m;
 
@@ -2277,14 +2419,14 @@ void pony_linal_msq2T_u(double* res, double* v, const size_t n, const size_t m)
 		/* 
 			multiply a transposed regular matrix by itself, storing upper part of the result lined up in one-dimensional array of n(n+1)/2 x 1 
 			input:
-				double* v         --- pointer to a regular m x n matrix
-				const size_t m, n --- dimensions
+				const double* v    --- pointer to a regular m x n matrix
+				const size_t  m, n --- dimensions
 			output:
-				double* res       --- pointer to an upper-triangular n x n matrix
-				                      lined up in one-dimensional array of n(n+1)/2 x 1
-				                      res = v^T*v
+				double* res        --- pointer to an upper-triangular n x n matrix
+				                       lined up in one-dimensional array of n(n+1)/2 x 1
+				                       res = v^T*v
 		*/
-void pony_linal_msq1T_u(double* res, double* v, const size_t m, const size_t n)
+void pony_linal_msq1T_u(double* res, const double* v, const size_t m, const size_t n)
 {
 	size_t j, j1, i, k, mn;
 
@@ -2298,17 +2440,17 @@ void pony_linal_msq1T_u(double* res, double* v, const size_t m, const size_t n)
 		/*
 			invert upper-triangular matrix lined up in one-dimensional array of m(m+1)/2 x 1
 			input:
-				double* u      --- pointer to an upper-triangular matrix
-				                   lined up in one-dimensional array of n(n+1)/2 x 1
-				const size_t n --- dimension
+				const double* u --- pointer to an upper-triangular matrix
+				                    lined up in one-dimensional array of n(n+1)/2 x 1
+				const size_t  n --- dimension
 			output:
-				double* res --- pointer to an upper-triangular matrix
-				                lined up in one-dimensional array of n(n+1)/2 x 1,
-				                res = U^-1
+				double* res     --- pointer to an upper-triangular matrix
+				                    lined up in one-dimensional array of n(n+1)/2 x 1,
+				                    res = U^-1
 			note:
 				overwriting input (double* res = double* u) is allowed
 		*/
-void pony_linal_u_inv(double* res, double* u, const size_t n)
+void pony_linal_u_inv(double* res, const double* u, const size_t n)
 {
 	size_t i, j, k, k0, p, q, p0, r;
 	double s;
@@ -2325,46 +2467,70 @@ void pony_linal_u_inv(double* res, double* u, const size_t n)
 }
 
 		/*
-			calculate square (with transposition) of upper-triangular matrix lined up in one-dimensional array of n(n+1)/2 x 1
+			calculate square (with right transposition) of upper-triangular matrix lined up in one-dimensional array of n(n+1)/2 x 1
 			input:
-				double* u      --- pointer to an upper-triangular matrix 
-				                   lined up in one-dimensional array of n(n+1)/2 x 1
-				const size_t n --- dimension
+				const double* u --- pointer to an upper-triangular matrix 
+				                    lined up in one-dimensional array of n(n+1)/2 x 1
+				const size_t  n --- dimension
 			output:
-				double* res --- pointer to a symmetric matrix
-				                lined up in one-dimensional array of n(n+1)/2 x 1,
-				                res = U*U^T
+				double* res     --- pointer to a symmetric matrix
+				                    lined up in one-dimensional array of n(n+1)/2 x 1,
+				                    res = U*U^T
 			note:
 				overwriting input (double* res = double* u) is allowed
 		*/
-void pony_linal_uuT(double* res, double* u, const size_t n)
+void pony_linal_uuT(double* res, const double* u, const size_t n)
 {
-	size_t i, j, k, p, q, r;
+	size_t i, j, k, k0, k1, m, m1, p;
 
-	for (i = 0, k = 0; i < n; i++) {
-		for (j = i; j < n; j++, k++) {
-			pony_linal_u_ij2k(&p, j, j, n);
-			res[k] = u[k]*u[p];
-			for (q = k+1, p++, r = j+1; r < n; q++, p++, r++)
-				res[k] += u[q]*u[p];
+	for (i = 0, k0 = 0; i < n; i++)
+		for (j = 0, m = n-i, k1 = k0; j < m; j++, k0++) {
+			res[k0] = u[k0]*u[k1];
+			for (k = k0+1, k1++, p = 1, m1 = m-j; p < m1; p++, k++, k1++)
+				res[k0] += u[k]*u[k1];
 		}
-	}
+}
+
+		/*
+			calculate square (with left transposition) of upper-triangular matrix lined up in one-dimensional array of n(n+1)/2 x 1
+			input:
+				const double* u --- pointer to an upper-triangular matrix 
+				                    lined up in one-dimensional array of n(n+1)/2 x 1
+				const size_t  n --- dimension
+			output:
+				double* res     --- pointer to a symmetric matrix
+				                    lined up in one-dimensional array of n(n+1)/2 x 1,
+				                    res = U^T*U
+			note:
+				overwriting input (double* res = double* u) is allowed
+		*/
+void pony_linal_uTu(double* res, const double* u, const size_t n)
+{
+	size_t i, j, k, k0, k1, p;
+
+	for (i = 0, k0 = n*(n+1)/2-1; i < n; i++)
+		for (j = 0; j <= i; j++, k0--) {
+			k1 = k0 - (i-j);
+			res[k0] = u[k0]*u[k1];
+			for (p = i+1, k = k0-p, k1 -= p; p < n; p++, k -= p, k1 -= p)
+				res[k0] += u[k]*u[k1];
+		}
 }
 
 		/*
 			calculate Cholesky upper-triangular factorization P = S*S^T,
 			where P is symmetric positive-definite matrix
 			input:
-				double*      P --- pointer to an upper-triangular part of symmetric n x n positive-definite matrix R
-				                   lined in one-dimensional array n(n+1)/2 x 1
-				const size_t n --- dimension
+				const double* P --- pointer to an upper-triangular part of symmetric n x n positive-definite matrix R
+				                    lined in one-dimensional array n(n+1)/2 x 1
+				const size_t  n --- dimension
 			output:
-				double* S --- pointer to an upper-triangular part of a Cholesky factor S
-				              lined in one-dimensional array n(n+1)/2 x 1
+				double* S       --- pointer to an upper-triangular part of a Cholesky factor S
+				                    lined in one-dimensional array n(n+1)/2 x 1
 			note:
 				overwriting input (double* P = double* S) is allowed
 		*/
-void pony_linal_chol(double* S, double* P, const size_t n)
+void pony_linal_chol(double* S, const double* P, const size_t n)
 {
 	size_t i, j, k, k0, p, q, p0;
 	double s;

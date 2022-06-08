@@ -1,4 +1,4 @@
-// Aug-2021
+// Jun-2022
 /*	pony_gnss_sat 
 	
 	pony plugins for GNSS satellite-related calculations:
@@ -1023,7 +1023,7 @@ void pony_gnss_sat_glo_motion_rk4_step(double *x, double *v, double *a,  double 
 	// equations of satellite motion as in ICD GLONASS Edition 5.1 2008
 void pony_gnss_sat_glo_motion_ode_fun(double *dy,  double *y, double *a) 
 {
-	double r, r3, r2, mu_r3, J02x3_2xa2_r2, z2_r2x5, w2;
+	double r, r3, r2, mu_r3, J02x3_2xa2_r2, z2_r2x5, u2;
 	size_t i;
 
 	for (i = 0, r = 0; i < 3; i++) {
@@ -1037,10 +1037,10 @@ void pony_gnss_sat_glo_motion_ode_fun(double *dy,  double *y, double *a)
 	mu_r3 = pony->gnss_const.glo.mu/r3;																	// mu/r^3
 	J02x3_2xa2_r2 = 1.5*pony->gnss_const.glo.J02*pony->gnss_const.glo.a*pony->gnss_const.glo.a/r2;		// 3/2*J02*mu*a^2/r^5
 	z2_r2x5 = 5*y[2]*y[2]/r2;																			// 5*z^2/r^2
-	w2 = pony->gnss_const.glo.u*pony->gnss_const.glo.u;													// w^2
+	u2 = pony->gnss_const.glo.u*pony->gnss_const.glo.u;													// u^2
 
-	dy[3] = (-mu_r3*(1 + J02x3_2xa2_r2*(1-z2_r2x5)) + w2)*y[0] + 2*pony->gnss_const.glo.u*y[4]	+ a[0];	// -mu/r^3*x - 3/2*J02*mu*a^2/r^5*x*(1-5*z^2/r^2) + w^2*x + 2*w*Vy + ddx
-	dy[4] = (-mu_r3*(1 + J02x3_2xa2_r2*(1-z2_r2x5)) + w2)*y[1] - 2*pony->gnss_const.glo.u*y[3]	+ a[1];	// -mu/r^3*y - 3/2*J02*mu*a^2/r^5*y*(1-5*z^2/r^2) + w^2*y - 2*w*Vx + ddy
+	dy[3] = (-mu_r3*(1 + J02x3_2xa2_r2*(1-z2_r2x5)) + u2)*y[0] + 2*pony->gnss_const.glo.u*y[4]	+ a[0];	// -mu/r^3*x - 3/2*J02*mu*a^2/r^5*x*(1-5*z^2/r^2) + u^2*x + 2*u*Vy + ddx
+	dy[4] = (-mu_r3*(1 + J02x3_2xa2_r2*(1-z2_r2x5)) + u2)*y[1] - 2*pony->gnss_const.glo.u*y[3]	+ a[1];	// -mu/r^3*y - 3/2*J02*mu*a^2/r^5*y*(1-5*z^2/r^2) + u^2*y - 2*u*Vx + ddy
 	dy[5] = (-mu_r3*(1 + J02x3_2xa2_r2*(3-z2_r2x5))     )*y[2]									+ a[2];	// -mu/r^3*z - 3/2*J02*mu*a^2/r^5*z*(3-5*z^2/r^2)                  + ddz
 
 }

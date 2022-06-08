@@ -1,4 +1,4 @@
-// Aug-2021
+// Jun-2022
 /*	pony_ins_attitude
 	
 	pony plugins for ins angular rate integration:
@@ -68,13 +68,20 @@
 */
 void pony_ins_attitude_rodrigues(void) {
 
-	static double t0 = -1; // previous time
-	static double 		   
-		 C[9],             // intermediate matrix
-		*L;                // pointer to attitude matrix in solution
+	const char 
+		  W_valid = 0x4,
+		rpy_valid = 0x7; // roll, pitch, true heading
+
+	static double 
+		 t0   = -1,                    // previous time   
+		 C[9] = {0,0,0, 0,0,0, 0,0,0}, // intermediate matrix
+		 lon0 = 0,                     // previous longitude to keep navigation frame aligned to East and North directions
+		*L;                            // pointer to attitude matrix in solution
+	static char lon0_valid = 0;        // previous longitude validity flag
 
 	double 
 		   dt,	           // time step
+		   dlon,           // longitude increment since previous step
 		   a[3];           // Euler rotation vector
 	size_t i;              // common index variable
 
@@ -85,10 +92,6 @@ void pony_ins_attitude_rodrigues(void) {
 
 	if (pony->mode == 0) {		// init
 
-		// drop validity flags
-		pony->imu->sol.  q_valid = 0;
-		pony->imu->sol.  L_valid = 0;
-		pony->imu->sol.rpy_valid = 0;
 		// set matrix pointer to imu->sol
 		L = pony->imu->sol.L;	
 		// identity quaternion
@@ -100,12 +103,14 @@ void pony_ins_attitude_rodrigues(void) {
 			L[i] = ((i%4) == 0) ? 1 : 0; // for 3x3 matrix, each 4-th element is diagonal
 		pony->imu->sol.  L_valid = 0;
 		// attitude angles for identity matrix
-		pony->imu->sol.rpy[0] = -pony->imu_const.pi/2;	// roll             -90 deg
+		pony->imu->sol.rpy[0] = -pony->imu_const.pi_2;	// roll             -90 deg
 		pony->imu->sol.rpy[1] =  0;						// pitch              0 deg
-		pony->imu->sol.rpy[2] = +pony->imu_const.pi/2;	// yaw=true heading +90 deg
+		pony->imu->sol.rpy[2] = +pony->imu_const.pi_2;	// yaw=true heading +90 deg
 		pony->imu->sol.rpy_valid = 0;
-		// reset previous time
-		t0 = -1;
+		// reset previous time and longitude
+		t0         = -1;
+		lon0       =  0;
+		lon0_valid =  0;
 
 	}
 
@@ -120,32 +125,50 @@ void pony_ins_attitude_rodrigues(void) {
 		// time variables
 		if (t0 < 0) { // first touch
 			t0 = pony->imu->t;
+			if (pony->imu->sol.llh_valid) {
+				lon0 = pony->imu->sol.llh[0]; // track longitude to keep navigation frame aligned to East and North
+				lon0_valid = 1;
+			}
 			return;
 		}
 		dt = pony->imu->t - t0;
 		t0 = pony->imu->t;
-		// a = w*dt
+		// a = w*dt --- for proper rotation
 		for (i = 0; i < 3; i++)
 			a[i] = pony->imu->w[i]*dt;
 		// L = (E + [a x]*sin(a)/|a| + [a x]^2*(1-cos(a))/|a|^2)*L
-		pony_linal_eul2mat(C,a);  // C <- A = E + [a x]*sin(a)/|a| + [a x]^2*(1-cos(a))/|a|^2
-		for (i = 0; i < 3; i++) { // L = A*L
+		pony_linal_eul2mat(C,a); // C <- A = E + [a x]*sin(a)/|a| + [a x]^2*(1-cos(a))/|a|^2
+		for (i = 0; i < 3; i++) { //      L = A*L
 			a[0] = L[0+i], a[1] = L[3+i], a[2] = L[6+i];
 			L[0+i] = C[0]*a[0] + C[1]*a[1] + C[2]*a[2];
 			L[3+i] = C[3]*a[0] + C[4]*a[1] + C[5]*a[2];
 			L[6+i] = C[6]*a[0] + C[7]*a[1] + C[8]*a[2];
 		}
-		// a <- c = (W + u)*dt
+		// a <- c = (W + u)*dt --- for navigation frame rotation
 		for (i = 0; i < 3; i++)
-			a[i] = pony->imu->W_valid ? pony->imu->W[i] : 0;
+			a[i] = (pony->imu->W_valid & (0x1<<i)) ? pony->imu->W[i] : 0; // check each validity flag separately, when W_valid is a bitfield
 		if (pony->imu->sol.llh_valid) {
+			// ENU navigation frame
+			if (lon0_valid) {
+				dlon = pony->imu->sol.llh[0] - lon0;
+				lon0 = pony->imu->sol.llh[0];
+				while (dlon > +pony->imu_const.pi) dlon -= pony->imu_const.pi2;
+				while (dlon < -pony->imu_const.pi) dlon += pony->imu_const.pi2;
+			}
+			else
+				dlon = 0;
+			dlon *= sin(pony->imu->sol.llh[1]);
+			pony->imu->W[2] = dlon/dt;          // rotate navigation frame in azimuth to keep it aligned to East and North
+			pony->imu->W_valid |= W_valid;      // add up component validity
+			a[2] = pony->imu->W[2];
+			// Earth rotation
 			a[1] += pony->imu_const.u*cos(pony->imu->sol.llh[1]);
 			a[2] += pony->imu_const.u*sin(pony->imu->sol.llh[1]);
 		}
 		for (i = 0; i < 3; i++)
 			a[i] *= dt;
 		// L = L*(E + [c x]*sin(c)/|c| + [c x]^2*(1-cos(c))/|c|^2)^T
-		pony_linal_eul2mat(C,a);     // C = E + [c x]*sin(c)/|c| + [c x]^2*(1-cos(c))/|c|^2
+		pony_linal_eul2mat(C,a);    // C = E + [c x]*sin(c)/|c| + [c x]^2*(1-cos(c))/|c|^2
 		for (i = 0; i < 9; i += 3) { // L = L*C^T
 			a[0] = L[i+0], a[1] = L[i+1], a[2] = L[i+2];
 			L[i+0] = a[0]*C[0] + a[1]*C[1] + a[2]*C[2];
@@ -157,7 +180,7 @@ void pony_ins_attitude_rodrigues(void) {
 		pony->imu->sol.q_valid   = 1;
 		// renew angles
 		pony_linal_mat2rpy(pony->imu->sol.rpy,L);
-		pony->imu->sol.rpy_valid = 1;
+		pony->imu->sol.rpy_valid = rpy_valid;
 
 	}
 

@@ -1,4 +1,4 @@
-// Aug-2021
+// Jun-2022
 // PONY core header file
 
 #ifndef PONY_H_
@@ -7,7 +7,7 @@
 #include <stddef.h>
 
 // PONY core declarations
-#define PONY_BUS_VERSION 12 // current bus version
+#define PONY_BUS_VERSION 17 // current bus version
 
 
 
@@ -30,14 +30,14 @@ typedef struct {
 // navigation solution structure
 typedef struct {
 	double  x[3];          // cartesian coordinates, meters
-	char    x_valid;       // validity flag (0/1), or a number of valid measurements used
+	char    x_valid;       // validity flag (0/1), or a number of valid measurements used, or a bitfield
 	double  x_std;         // coordinate RMS ("standard") deviation estimate, meters
 						   
 	double  llh[3];        // geodetic coordinates: longitude (rad), latitude (rad), height (meters)
-	char    llh_valid;     // validity flag (0/1), or a number of valid measurements used
+	char    llh_valid;     // validity flag (0/1), or a number of valid measurements used, or a bitfield
 						   
 	double  v[3];          // relative-to-Earth velocity vector coordinates in local-level geodetic cartesian frame, meters per second
-	char    v_valid;       // validity flag (0/1), or a number of valid measurements used
+	char    v_valid;       // validity flag (0/1), or a number of valid measurements used, or a bitfield
 	double  v_std;         // velocity RMS ("standard") deviation estimate, meters per second
 						   
 	double  q[4];          // attitude quaternion, relative to local-level geodetic cartesian frame
@@ -46,8 +46,8 @@ typedef struct {
 	double  L[9];          // attitude matrix for the transition from local-level geodetic cartesian frame, row-wise: L[0] = L_11, L[1] = L_12, ..., L[8] = L[33]
 	char    L_valid;       // validity flag (0/1), or a number of valid measurements used
 						   
-	double  rpy[3];        // attitude angles relative to local-level geodetic cartesian frame: roll (rad), pitch (rad), yaw (rad)
-	char    rpy_valid;     // validity flag (0/1), or a number of valid measurements used
+	double  rpy[4];        // attitude angles relative to local-level geodetic cartesian frame: roll (rad), pitch (rad), yaw (rad), optional gyroscope heading (rad) or other azimuth angle
+	char    rpy_valid;     // validity flag (0/1), or a number of valid measurements used, or a bitfield
 						   
 	double  dt;            // clock bias
 	char    dt_valid;      // validity flag (0/1), or a number of valid measurements used
@@ -64,11 +64,15 @@ typedef struct {
 	// inertial navigation constants
 typedef struct {
 	double
-		pi,      // pi
+		pi,      // pi, mathematical constant, circumference to diameter ratio in flat Euclidean space
+		pi2,     // pi x 2
+		pi_2,    // pi / 2
 		rad2deg, // 180/pi
 		// Earth parameters as in GRS-80 by H. Moritz, Journal of Geodesy (2000) 74 (1): pp. 128-162
 		u,       // Earth rotation rate, rad/s
 		a,       // Earth ellipsoid semi-major axis, m
+		mu,      // Earth geocentric gravitational constant (including the atmosphere)
+		J2,      // Earth's dynamical form factor
 		e2,      // Earth ellipsoid first eccentricity squared
 		ge,      // Earth normal gravity at the equator, m/s^2
 		fg;      // Earth normal gravity flattening
@@ -76,30 +80,34 @@ typedef struct {
 
 	// inertial measurement unit
 typedef struct {
-	char*  cfg;       // pointer to IMU configuration substring
-	size_t cfglength; // IMU configuration substring length
+	char*    cfg;       // pointer to IMU configuration substring
+	size_t   cfglength; // IMU configuration substring length
 
-	double t;         // measurement update time (as per IMU clock), used to calculate time step when needed
+	double   t;         // measurement update time (as per IMU clock), used to calculate time step when needed
 
-	double w[3];      // up to 3 gyroscope measurements
-	char   w_valid;   // validity flag (0/1), or a number of valid components
+	double   w [3];     // up to 3 gyroscope measurements
+	char     w_valid;   // validity flag (0/1), or a number of valid components, or a bitfield
 
-	double f[3];      // up to 3 accelerometer measurements
-	char   f_valid;   // validity flag (0/1), or a number of valid components
+	double   f [3];     // up to 3 accelerometer measurements
+	char     f_valid;   // validity flag (0/1), or a number of valid components, or a bitfield
 
-	double Tw[3];      // temperature of gyroscopes 
-	char   Tw_valid;   // validity flag (0/1), or a number of valid components
+	double   Tw[3];     // up to 3 temperature sensor measurements of gyroscopes
+	char     Tw_valid;  // validity flag (0/1), or a number of valid components, or a bitfield
 
-	double Tf[3];      // temperature of accelerometers
-	char   Tf_valid;   // validity flag (0/1), or a number of valid components
+	double   Tf[3];     // up to 3 temperature sensor measurements of accelerometers
+	char     Tf_valid;  // validity flag (0/1), or a number of valid components, or a bitfield
 
-	double W[3];      // angular velocity of the local level reference frame
-	char   W_valid;   // validity flag (0/1), or a number of valid components
+	double*  T;         // application-specific additional temperature sensor measurements
+	size_t   T_count;   // number of application-specific additional temperature sensors, given in cfg ("temp_count = ..."), 3 by default, 255 max
+	char     T_valid;   // validity flag (0/1), or a number of valid components, or a bitfield
 
-	double g[3];      // current gravity acceleration vector
-	char   g_valid;   // validity flag (0/1), or a number of valid components
+	double   W [3];     // angular velocity of the local level reference frame
+	char     W_valid;   // validity flag (0/1), or a number of valid components
 
-	pony_sol sol;     // inertial solution
+	double   g [3];     // current gravity acceleration vector
+	char     g_valid;   // validity flag (0/1), or a number of valid components
+
+	pony_sol sol;       // inertial solution
 } pony_imu;
 
 
@@ -414,7 +422,7 @@ typedef struct {
 	pony_ref*       ref;             // reference data subsystem pointer
 
 	double          t;               // system time (as per main clock for integrated systems)
-	int             mode;            // operation mode: 0 - init, <0 termination, >0 normal operation
+	long int        mode;            // operation mode: 0 - init, <0 termination, >0 normal operation, long int to allow using as a bit word
 	pony_sol        sol;             // navigation solution (hybrid/integrated, etc.)
 } pony_struct;
 
@@ -443,38 +451,41 @@ char pony_time_epoch2gps         (unsigned int* week, double* sec, pony_time_epo
 
 // linear algebra functions
 	// conventional operations
-double pony_linal_dot     (double* u, double* v, const size_t n                                              ); // calculate dot product
-double pony_linal_vnorm   (double* u, const size_t n                                                         ); // calculate l_2 vector norm, i.e. sqrt(u^T*u)
-void   pony_linal_cross3x1(double* res, double* u, double* v                                                 ); // calculate cross product for 3x1 vectors
-void   pony_linal_mmul    (double* res, double* a, double* b, const size_t n, const size_t n1, const size_t m); // multiply two matrices:                        res = a*b,   where a is n x n1, b is n1 x m, res is n x m
-void   pony_linal_mmul1T  (double* res, double* a, double* b, const size_t n, const size_t m, const size_t n1); // multiply two matrices ( first is transposed): res = a^T*b, where a is n x m,  b is n x n1, res is m x n1
-void   pony_linal_mmul2T  (double* res, double* a, double* b, const size_t n, const size_t m, const size_t n1); // multiply two matrices (second is transposed): res = a*b^T, where a is n x m,  b is n1 x m, res is n x n1
-void   pony_linal_qmul    (double* res, double* q, double* r                                                 ); // multiply 4x1 quaternions:                     res = q x r, with res0, q0, r0 being scalar parts
+double pony_linal_dot     (const double* u,   const double* v,                  const size_t n                                 ); // calculate dot product
+double pony_linal_vnorm   (const double* u,                                     const size_t n                                 ); // calculate l_2 vector norm, i.e. sqrt(u^T*u)
+void   pony_linal_cross3x1(      double* res, const double* u, const double* v                                                 ); // calculate cross product for 3x1 vectors
+void   pony_linal_mmul    (      double* res, const double* a, const double* b, const size_t n, const size_t n1, const size_t m); // multiply two matrices:                        res = a*b,   where a is n x n1, b is n1 x m, res is n x m
+void   pony_linal_mmul1T  (      double* res, const double* a, const double* b, const size_t n, const size_t m, const size_t n1); // multiply two matrices ( first is transposed): res = a^T*b, where a is n x m,  b is n x n1, res is m x n1
+void   pony_linal_mmul2T  (      double* res, const double* a, const double* b, const size_t n, const size_t m, const size_t n1); // multiply two matrices (second is transposed): res = a*b^T, where a is n x m,  b is n1 x m, res is n x n1
+void   pony_linal_qmul    (      double* res, const double* q, const double* r                                                 ); // multiply 4x1 quaternions:                     res = q x r, with res0, q0, r0 being scalar parts
 	
 	// space rotation representation
-void pony_linal_mat2quat(double* q, double* R  ); // calculate quaternion q (with q0 being scalar part) corresponding to 3x3 attitude matrix R
-void pony_linal_quat2mat(double* R, double* q  ); // calculate 3x3 attitude matrix R corresponding to quaternion q (with q0 being scalar part)
-void pony_linal_rpy2mat (double* R, double* rpy); // calculate 3x3 transition matrix R from E-N-U corresponding to roll, pitch and yaw (radians, airborne frame: X longitudinal, Z right-wing)
-void pony_linal_mat2rpy (double* rpy, double* R); // calculate roll, pitch and yaw (radians, airborne frame: X longitudinal, Z right-wing) corresponding to 3x3 transition matrix R from E-N-U
-void pony_linal_eul2mat (double* R, double* e  ); // calculate 3x3 rotation matrix R for 3x1 Euler vector e via Rodrigues' formula: R = E + sin|e|/|e|*[e,] + (1-cos|e|)/|e|^2*[e,]^2 
+void pony_linal_mat2quat(double* q,   const double* R  ); // calculate quaternion q (with q0 being scalar part) corresponding to 3x3 attitude matrix R
+void pony_linal_quat2mat(double* R,   const double* q  ); // calculate 3x3 attitude matrix R corresponding to quaternion q (with q0 being scalar part)
+void pony_linal_rpy2mat (double* R,   const double* rpy); // calculate 3x3 transition matrix R from E-N-U corresponding to roll, pitch and yaw (radians, airborne frame: X longitudinal, Z right-wing)
+void pony_linal_mat2rpy (double* rpy, const double* R  ); // calculate roll, pitch and yaw (radians, airborne frame: X longitudinal, Z right-wing) corresponding to 3x3 transition matrix R from E-N-U
+void pony_linal_eul2mat (double* R,   const double* e  ); // calculate 3x3 rotation matrix R for 3x1 Euler vector e via Rodrigues' formula: R = E + sin|e|/|e|*[e,] + (1-cos|e|)/|e|^2*[e,]^2 
+void pony_linal_eul2quat(double* q,   const double* e  ); // calculate quaternion q (with q0 being scalar part) for 3x1 Euler vector e 
 	
 	// routines for n x n upper-triangular matrices U lined up in one-dimensional array u
 		// element manipulations
 void pony_linal_u_ij2k(size_t* k, const size_t i, const size_t j, const size_t n); // convert index for upper-triangular matrix lined up in one-dimensional array: (i,j) ->  k
 void pony_linal_u_k2ij(size_t* i, size_t* j, const size_t k,      const size_t n); // convert index for upper-triangular matrix lined up in one-dimensional array:  k    -> (i,j)
-void pony_linal_diag2u(double* u, double* d,                      const size_t n); // fill the diagonal with array elements
+void pony_linal_diag2u(double* u, const double* d,                const size_t n); // fill the diagonal with array elements
 
 		// conventional matrix operations
-void pony_linal_u_mul  (double* res, double* u, double* v, const size_t n, const size_t m); // multiply upper-triangular matrix lined up in one-dimensional array of n(n+1)/2 x 1 by a regular matrix:             res = U*v
-void pony_linal_uT_mul (double* res, double* u, double* v, const size_t n, const size_t m); // multiply transposed upper-triangular matrix lined up in one-dimensional array of n(n+1)/2 x 1, by a regular matrix: res = U^T*v
-void pony_linal_mul_u  (double* res, double* v, double* u, const size_t m, const size_t n); // multiply a regular matrix by upper-triangular matrix lined up in one-dimensional array of n(n+1)/2 x 1:             res = v*U
-void pony_linal_msq2T_u(double* res, double* v,            const size_t n, const size_t m); // multiply a regular matrix by itself transposed, storing upper part of the result lined up in one-dimensional array: res = v*v^T
-void pony_linal_msq1T_u(double* res, double* v,            const size_t m, const size_t n); // multiply a transposed regular matrix by itself, storing upper part of the result lined up in one-dimensional array: res = v^T*v
-void pony_linal_u_inv  (double* res, double* u,                            const size_t n); // invert upper-triangular matrix lined up in one-dimensional array of n(n+1)/2 x 1:                                   res = U^-1
-void pony_linal_uuT    (double* res, double* u,                            const size_t n); // calculate square (with transposition) of upper-triangular matrix lined up in one-dimensional array of n(n+1)/2 x 1: res = U*U^T
+void pony_linal_u_mul  (double* res, const double* u, const double* v, const size_t n, const size_t m); // multiply upper-triangular matrix lined up in one-dimensional array of n(n+1)/2 x 1 by a regular matrix:             res = U*v
+void pony_linal_uT_mul (double* res, const double* u, const double* v, const size_t n, const size_t m); // multiply transposed upper-triangular matrix lined up in one-dimensional array of n(n+1)/2 x 1, by a regular matrix: res = U^T*v
+void pony_linal_mul_u  (double* res, const double* v, const double* u, const size_t m, const size_t n); // multiply a regular matrix by upper-triangular matrix lined up in one-dimensional array of n(n+1)/2 x 1:             res = v*U
+void pony_linal_mul_uT (double* res, const double* v, const double* u, const size_t m, const size_t n); // multiply a regular matrix by transposed upper-triangular matrix lined up in one-dimensional array of n(n+1)/2 x 1:  res = v*U^T
+void pony_linal_msq2T_u(double* res, const double* v,                  const size_t n, const size_t m); // multiply a regular matrix by itself transposed, storing upper part of the result lined up in one-dimensional array: res = v*v^T
+void pony_linal_msq1T_u(double* res, const double* v,                  const size_t m, const size_t n); // multiply a transposed regular matrix by itself, storing upper part of the result lined up in one-dimensional array: res = v^T*v
+void pony_linal_u_inv  (double* res, const double* u,                                  const size_t n); // invert upper-triangular matrix lined up in one-dimensional array of n(n+1)/2 x 1:                                   res = U^-1
+void pony_linal_uuT    (double* res, const double* u,                                  const size_t n); // calculate square (with right transposition) of upper-triangular matrix lined up in one-dimensional array of n(n+1)/2 x 1: res = U*U^T
+void pony_linal_uTu    (double* res, const double* u,                                  const size_t n); // calculate square (with left  transposition) of upper-triangular matrix lined up in one-dimensional array of n(n+1)/2 x 1: res = U^T*U
 
 	// matrix factorizations
-void pony_linal_chol(double* S, double* P, const size_t n); // calculate Cholesky upper-triangular factorization P = S*S^T, where P is symmetric positive-definite matrix
+void pony_linal_chol(double* S, const double* P, const size_t n); // calculate Cholesky upper-triangular factorization P = S*S^T, where P is symmetric positive-definite matrix
 
 	// square root Kalman filtering
 char   pony_linal_check_measurement_residual(double* x, double* S, double z, double* h, double sigma, double k_sigma, const size_t n); // check measurement residual magnitude against predicted covariance level

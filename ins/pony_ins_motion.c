@@ -1,13 +1,14 @@
-// Aug-2021
+// Jun-2022
 /*	pony_ins_motion
 	
 	pony plugins for ins position and velocity algorithms:
 	
 	- pony_ins_motion_euler
-		Numerically integrates Newton's second Law in local level navigation frame 
+		Numerically integrates Newton's second Law in local level navigation frame
 		using modified Euler's method (with midpoint for attitude matrix) over the Earth reference ellipsoid. 
-		Updates velocity and geographical coordinates. 
-		Not suitable near the Earth's poles, at outer-space altitudes, and/or over-Mach velocities.
+		Updates velocity and geographical coordinates.
+		At the Earth's poles, transforms to azimuth wandering reference frame.
+		Not suitable at outer-space altitudes, and/or over-Mach velocities.
 		
 	- (planned) pony_ins_motion_sculling
 		Planned for future development
@@ -30,7 +31,7 @@
 #include "../pony.h"
 
 // pony bus version check
-#define PONY_INS_MOTION_BUS_VERSION_REQUIRED 8
+#define PONY_INS_MOTION_BUS_VERSION_REQUIRED 17
 #if PONY_BUS_VERSION < PONY_INS_MOTION_BUS_VERSION_REQUIRED
 	#error "pony bus version check failed, consider fetching the latest version"
 #endif
@@ -38,20 +39,21 @@
 // service functions
 double pony_ins_motion_parse_double(const char* token, char* src, const size_t len, double range[2], const double default_value);
 char   pony_ins_motion_parse_double_2array(double* arr, const size_t outer_size, const size_t inner_size, const char* token, char *src, const size_t len, double range[2], double default_value);
-void   pony_ins_motion_flip_sol_over_pole(pony_sol* sol);
+double pony_ins_motion_sign(double x) {return (x > 0) ? +1.0 : (x < 0 ? -1.0 : 0.0);}
 
 /* pony_ins_motion_euler - pony plugin
 	
 	Numerically integrates Newton's second Law in local level navigation frame 
 	using modified Euler's method (with midpoint for attitude matrix) over the Earth reference ellipsoid. 
 	Updates velocity and geographical coordinates. 
-	Not suitable near the Earth's poles, at outer-space altitudes, and/or over-Mach velocities.
+	At the Earth's poles, transforms to azimuth wandering reference frame.
+	Not suitable at outer-space altitudes, and/or over-Mach velocities.
 
 	description:
 	    
-		V  (t+dt) = V  (t) + dt*([(W + 2u) x]*V (t) +  L^T(t+dt/2)*f + g)
-		lon(t+dt) = lon(t) + dt*              Ve(t)/((Re + alt(t))*cos(lat(t)))
-		lat(t+dt) = lat(t) + dt*              Vn(t)/( Rn + alt(t))
+		V  (t+dt) = V  (t) + dt*([(W + 2u) x]*V (t) +  L^T(t+dt/2)*f + g) // via azimuth wandering reference frame
+		lon(t+dt) = lon(t) + dt*              Ve(t)/((Re + alt(t))*cos(lat(t))) (1)
+		lat(t+dt) = lat(t) + dt*              Vn(t)/( Rn + alt(t))              (1)
 		alt(t+dt) = alt(t) + dt*              Vu(t)              
 		    
 		where
@@ -61,7 +63,7 @@ void   pony_ins_motion_flip_sol_over_pole(pony_sol* sol);
 		Rn, Re are curvature radii
 		L is attitude matrix
 
-		do not use at the Earth's poles
+		(1) near the Earth's poles, special geometrical derivations are used
 		
 	uses:
 		pony->imu->t
@@ -85,6 +87,8 @@ void   pony_ins_motion_flip_sol_over_pole(pony_sol* sol);
 		pony->imu->sol.v_valid
 		pony->imu->sol.llh
 		pony->imu->sol.llh_valid
+		pony->imu->W
+		pony->imu->W_valid
 
 	cfg parameters:
 		{imu: lon} - starting longitude, degrees
@@ -105,28 +109,44 @@ void   pony_ins_motion_flip_sol_over_pole(pony_sol* sol);
 */
 void pony_ins_motion_euler(void) {
 
+	enum {E, N, U, dim, dim2 = dim*dim, hdim = N+1, hdim2 = hdim*hdim};
+
 	const char 
 		lon_token[] = "lon",        // starting longitude parameter name in configuration
 		lat_token[] = "lat",        // starting latitude  parameter name in configuration
 		alt_token[] = "alt";        // starting altitude  parameter name in configuration
-
 	const double 
 		lon_range[] = {-180, +180},	// longitude range, 0 by default
 		lat_range[] = { -90,  +90},	// latitude  range, 0 by default
 		alt_range[] = {-20e3,50e3},	// altitude  range, 0 by default
 		eps = 1.0/0x0100;			// 2^-8, guaranteed non-zero value in IEEE754 half-precision format
+	const char W_valid = 0x07;      // component-wise bitfield: three components
 
-	static double t0  = -1;         // previous time
+	static double 
+		*v   = NULL, // shortcuts
+		*llh = NULL, 
+		*W   = NULL, 
+		*L   = NULL,
+		chi  =  0,   // azimuth angle, its sine and cosine
+		schi =  0,
+		cchi =  1,
+		t0   = -1;   // previous time
 
-	double dt;                      // time step
 	double
-		sphi, cphi,	                // sine and cosine of latitude
-		Rn_h, Re_h,	                // south-to-north and east-to-west curvature radii, altitude-adjusted
-		e2s2, e4s4,	                // e^2*sin(phi)^2, (e^2*sin(phi)^2)^2
-		dvrel[3],	                // proper acceleration in navigation frame
-		dvcor[3],	                // Coriolis acceleration in navigation frame
-		C_2[9];                     // intermediate matrix/vector for modified Euler component
-	size_t i, j;                    // common index variables
+		Wx[dim], ux[dim], // navigation frame and the Earth's angular velocity vectors in azimuth wandering reference frame
+		dx[dim], Vx[dim], // coordinate increments and relative velocity vector in azimuth wandering reference frame
+		fx[dim], gx[dim], // proper and gravity acceleration vectors in azimuth wandering reference frame
+		dvrel[dim],       // proper acceleration in navigation frame
+		dvcor[dim],       // Coriolis acceleration in navigation frame
+		Cx[hdim2],        // azimuth rotation matrix
+		C_2[dim2],        // intermediate matrix/vector for modified Euler component
+		 phi, dlon,       // latitude and longitude increment
+		sphi, cphi,       // sine and cosine of latitude
+		Rn_h, Re_h,       // south-to-north and east-to-west curvature radii, altitude-adjusted
+		e2s2, e4s4,       // e^2*sin(phi)^2, (e^2*sin(phi)^2)^2
+		dt,               // time step
+		l0, l1;           // distances to pole at start and end of the time step
+	size_t i, j;          // common index variables
 
 
 	// check if imu data has been initialized
@@ -135,23 +155,26 @@ void pony_ins_motion_euler(void) {
 
 	if (pony->mode == 0) {		// init
 
+		// set shortcut pointers
+		llh = pony->imu->sol.llh;
+		v   = pony->imu->sol.v;
+		L   = pony->imu->sol.L;
+		W   = pony->imu->W;
 		// drop validity flags
 		pony->imu->sol.  v_valid = 0;
 		pony->imu->sol.llh_valid = 0;		
 		// parse parameters from configuration	
-		pony->imu->sol.llh[0] = // starting longitude
-			pony_ins_motion_parse_double(lon_token, pony->imu->cfg,pony->imu->cfglength, (double*)lon_range,0)
-			/pony->imu_const.rad2deg; // degrees to radians
-		pony->imu->sol.llh[1] = // starting latitude
-			pony_ins_motion_parse_double(lat_token, pony->imu->cfg,pony->imu->cfglength, (double*)lat_range,0)
-			/pony->imu_const.rad2deg; // degrees to radians
-		pony->imu->sol.llh[2] = // starting altitude
+		llh[E] = // starting longitude
+			pony_ins_motion_parse_double(lon_token, pony->imu->cfg,pony->imu->cfglength, (double*)lon_range,0)/pony->imu_const.rad2deg; // degrees to radians
+		llh[N] = // starting latitude
+			pony_ins_motion_parse_double(lat_token, pony->imu->cfg,pony->imu->cfglength, (double*)lat_range,0)/pony->imu_const.rad2deg; // degrees to radians
+		llh[U] = // starting altitude
 			pony_ins_motion_parse_double(alt_token, pony->imu->cfg,pony->imu->cfglength, (double*)alt_range,0);
 		// raise coordinates validity flag
 		pony->imu->sol.llh_valid = 1;
 		// zero velocity at start
-		for (i = 0; i < 3; i++)
-			pony->imu->sol.v[i] = 0;
+		for (i = 0; i < dim; i++)
+			v[i] = 0;
 		pony->imu->sol.v_valid = 1;
 		// reset previous time
 		t0 = -1;
@@ -174,81 +197,107 @@ void pony_ins_motion_euler(void) {
 			return;
 		// time variables
 		if (t0 < 0) { // first touch
-			t0 = pony->imu->t;
+			t0   = pony->imu->t;
+			chi  = 0;
+			schi = 0;
+			cchi = 1;
 			return;
 		}
-		dt = pony->imu->t - t0;
-		t0 = pony->imu->t;
+		dt  = pony->imu->t - t0;
+		t0  = pony->imu->t;
 		// ellipsoid geometry
-		sphi = sin(pony->imu->sol.llh[1]);
-		cphi = cos(pony->imu->sol.llh[1]);
+		 phi = llh[N];
+		sphi = sin(phi);
+		cphi = cos(phi);
 		e2s2 = pony->imu_const.e2*sphi*sphi;
 		e4s4 = e2s2*e2s2;					
-		Re_h = pony->imu_const.a*(1 + e2s2/2 + 3*e4s4/8);                                            // Taylor expansion within 0.5 m, not altitude-adjusted
-		Rn_h = Re_h*(1 - pony->imu_const.e2)*(1 + e2s2 + e4s4 + e2s2*e4s4) + pony->imu->sol.llh[2]; // Taylor expansion within 0.5 m
-		Re_h += pony->imu->sol.llh[2];                                                               // adjust for altitude
+		Re_h = pony->imu_const.a*(1 + e2s2/2 + 3*e4s4/8);                            // Taylor expansion within 0.5 m, not altitude-adjusted
+		Rn_h = Re_h*(1 - pony->imu_const.e2)*(1 + e2s2 + e4s4 + e2s2*e4s4) + llh[U]; // Taylor expansion within 0.5 m
+		Re_h += llh[U];                                                              // adjust for altitude
 		// drop validity flags
-		pony->imu->W_valid       = 0;
 		pony->imu->sol.llh_valid = 0;
 		pony->imu->sol.  v_valid = 0;
+		pony->imu->      W_valid = 0;
 		// angular rate of navigation frame relative to the Earth
-		pony->imu->W[0] = -pony->imu->sol.v[1]/Rn_h;
-		pony->imu->W[1] =  pony->imu->sol.v[0]/Re_h;	
+		W[E] = -v[N]/Rn_h;
+		W[N] =  v[E]/Re_h;	
+		// coordinates and navigation frame
+		for (i = 0; i < dim; i++)
+			dx[i] = v[i]*dt;
 		if (cphi < eps) { // check for Earth pole proximity
-			pony->imu->W[2] = 0;    // freeze
-			pony->imu->W_valid = 0; // drop validity
+			// solve triangle
+			l0 = (pony->imu_const.pi_2 - fabs(phi))*Rn_h; // distance to pole at start
+			l1 = l0 - pony_ins_motion_sign(phi)*dx[N];
+			l1 = sqrt(l1*l1 + dx[E]*dx[E]); // not less than |dx_E|, distance to pole at end
+			dlon = (l1 > 0) ? asin(dx[E]/l1) : 0.0;
+			llh[N] = pony_ins_motion_sign(phi)*(pony->imu_const.pi_2 - l1/Rn_h);
+			// navigation frame
+			W[U] = 0;    // freeze
+			pony->imu->W_valid = (W_valid & (~(0x01<<U))); // drop validity for the third component
 		}
 		else {
-			pony->imu->W[2] = pony->imu->sol.v[0]/Re_h*sphi/cphi;
-			pony->imu->W_valid = 1;
+			// coordinates
+			dlon = dx[E]/(Re_h*cphi);
+			llh[N] += dx[N]/Rn_h;
+			// navigation frame
+			W[U] = W[N]*sphi/cphi;
+			pony->imu->W_valid = W_valid;
 		}
+		llh[E] += dlon;
+		llh[U] += dx[U];
+		// adjust longitude into range
+		while (llh[E] < -pony->imu_const.pi) llh[E] += pony->imu_const.pi2;
+		while (llh[E] > +pony->imu_const.pi) llh[E] -= pony->imu_const.pi2;
+		pony->imu->sol.llh_valid = 1;
+		// Earth angular velocity vector
+		ux[0] = pony->imu_const.u*cphi*schi;
+		ux[1] = pony->imu_const.u*cphi*cchi;
+		ux[U] = pony->imu_const.u*sphi;
+		// azimuth rotation matrix
+		Cx[0*hdim + E] =  cchi; Cx[0*hdim + N] = schi;
+		Cx[1*hdim + E] = -schi; Cx[1*hdim + N] = cchi;
+		// angular velocity of azimuth wandering navigation frame
+		pony_linal_mmul(Wx, Cx, W, hdim, hdim, 1);
+		Wx[U] = 0;
 		// velocity
+		pony_linal_mmul(Vx, Cx, v, hdim, hdim, 1);
+		Vx[U] = v[U];
 			// Coriolis acceleration
-		dvrel[0] = pony->imu->W[0];
-		dvrel[1] = pony->imu->W[1] + 2*pony->imu_const.u*cphi;
-		dvrel[2] = pony->imu->W[2] + 2*pony->imu_const.u*sphi;
-		pony_linal_cross3x1(dvcor, pony->imu->sol.v, dvrel);
+		for (i = 0; i < dim; i++)
+			dvrel[i] = 2*ux[i] + Wx[i];
+		pony_linal_cross3x1(dvcor, Vx, dvrel);
 			// proper acceleration
 		if (pony->imu->w_valid) { // if able to calculate attitude mid-point using gyroscopes
-			for (i = 0; i < 3; i++)
+			for (i = 0; i < dim; i++)
 				dvrel[i] = pony->imu->w[i]*dt/2; // midpoint rotation Euler vector
 			pony_linal_eul2mat(C_2, dvrel); // midpoint attitude matrix factor
-			for (i = 0; i < 3; i++) // multiply C_2*f, store in the first row of C_2
-				for (j = 1, C_2[i] = C_2[i*3]*pony->imu->f[0]; j < 3; j++)
-					C_2[i] += C_2[i*3+j]*pony->imu->f[j];
-			pony_linal_mmul1T(dvrel, pony->imu->sol.L, C_2, 3, 3, 1); // dvrel = L^T(t+dt)*C_2(w*dt/2)*f
+			for (i = 0; i < dim; i++) // multiply C_2*f, store in the first row of C_2
+				for (j = 1, C_2[i] = C_2[i*dim]*pony->imu->f[0]; j < dim; j++)
+					C_2[i] += C_2[i*dim+j]*pony->imu->f[j];
+			pony_linal_mmul1T(dvrel, L, C_2, dim, dim, 1); // dvrel = L^T(t+dt)*C_2(w*dt/2)*f
 		}
 		else // otherwise, go on with only the current attitude matrix
-			pony_linal_mmul1T(dvrel, pony->imu->sol.L, pony->imu->f, 3, 3, 1);
+			pony_linal_mmul1T(dvrel, L, pony->imu->f, dim, dim, 1);
+			// to azimuth wandering navigation frame
+		pony_linal_mmul(fx, Cx, dvrel, hdim, hdim, 1);
+		fx[U] = dvrel[U];
+			// gravity acceleration
+		pony_linal_mmul(gx, Cx, pony->imu->g, hdim, hdim, 1);
+		gx[U] = pony->imu->g[U];
 			// velocity update
-		for (i = 0; i < 3; i++)
-			pony->imu->sol.v[i] += (dvcor[i] + dvrel[i] + pony->imu->g[i])*dt;
+		for (i = 0; i < dim; i++)
+			Vx[i] += (dvcor[i] + fx[i] + gx[i])*dt;
+		// update azimuth angle
+		chi -= dlon*sphi;
+		schi = sin(chi);
+		cchi = cos(chi);
+		// rotate back into new azimuth
+		Cx[0*hdim + E] =  cchi; Cx[0*hdim + N] = schi;
+		Cx[1*hdim + E] = -schi; Cx[1*hdim + N] = cchi;
+		pony_linal_mmul1T(v, Cx, Vx, hdim, hdim, 1);
+		v[U] = Vx[U];
+		// set validity
 		pony->imu->sol.v_valid = 1;
-		// coordinates
-		if (cphi < eps) { // check for Earth pole proximity
-			pony->imu->sol.llh[2] += pony->imu->sol.v[2]            *dt;
-			pony->imu->sol.llh_valid = 0; // drop validity
-		}
-		else {
-			pony->imu->sol.llh[0] += pony->imu->sol.v[0]/(Re_h*cphi)*dt;
-			pony->imu->sol.llh[1] += pony->imu->sol.v[1]/ Rn_h      *dt;
-			pony->imu->sol.llh[2] += pony->imu->sol.v[2]            *dt;
-			// flip latitude if crossed a pole
-			if (pony->imu->sol.llh[1] < -pony->imu_const.pi/2) { // South pole
-				pony->imu->sol.llh[1] = -pony->imu_const.pi - pony->imu->sol.llh[1];
-				pony_ins_motion_flip_sol_over_pole(&(pony->imu->sol));			
-			}
-			if (pony->imu->sol.llh[1] > +pony->imu_const.pi/2) { // North pole
-				pony->imu->sol.llh[1] = +pony->imu_const.pi - pony->imu->sol.llh[1];
-				pony_ins_motion_flip_sol_over_pole(&(pony->imu->sol));			
-			}
-			// adjust longitude into range
-			while (pony->imu->sol.llh[0] < -pony->imu_const.pi)
-				pony->imu->sol.llh[0] += 2*pony->imu_const.pi;
-			while (pony->imu->sol.llh[0] > +pony->imu_const.pi)
-				pony->imu->sol.llh[0] -= 2*pony->imu_const.pi;
-			pony->imu->sol.llh_valid = 1;
-		}
 
 	}
 
@@ -301,8 +350,10 @@ void pony_ins_motion_vertical_damping(void) {
 	const char vvs_token[] = "vertical_damping_stdev"; // vertical velocity stdev parameter name in configuration
 
 	const double 
-		vvs_def = (double)(0x100000),                  // 2^20, vertical velocity stdev default value
-		sqrt2   = 1.4142135623730951;                  // sqrt(2)
+		vvs_def = (double)(0x100000), // 2^20, vertical velocity stdev default value
+		sqrt2   = 1.4142135623730951, // sqrt(2)
+		s0_h    = 10,                 // a priori stdev for the current altitude   
+		s0_v    = 1;                  // a priori stdev for the current vertical velocity
 
 	static double 
 		t0            = -1, // previous time
@@ -311,6 +362,7 @@ void pony_ins_motion_vertical_damping(void) {
 		vvs           =  0, // vertical velocity stdev
 		 air_alt_last =  0, // previous value of air altitude
 		gnss_alt_last =  0; // previous value of air altitude
+		
 
 	double 
 		dt,	     // time step
@@ -334,7 +386,9 @@ void pony_ins_motion_vertical_damping(void) {
 	if (pony->mode == 0) {		// init
 
 		// reset time
-		t0 = -1;
+		t0      = -1;
+		t0_air  = -1;
+		t0_gnss = -1;
 		// parse vertical velocity stdev from configuration string
 		vvs = pony_ins_motion_parse_double(vvs_token, pony->imu->cfg, pony->imu->cfglength, NULL, vvs_def);
 		if (vvs < 0)
@@ -357,94 +411,82 @@ void pony_ins_motion_vertical_damping(void) {
 		}
 		dt = pony->imu->t - t0;
 		t0 = pony->imu->t;
-		if (dt <= 0)
+		if (dt < 0)
 			return;
 
 		// estimation init 
 		if (pony->imu->sol.llh_valid) x = pony->imu->sol.llh[2]; else x = 0;
 		if (pony->imu->sol.  v_valid) v = pony->imu->sol.  v[2]; else v = 0;
 		y[0] = x, y[1] = v;
-		S[0] = vvs_def*dt, S[1] = 0, S[2] = 1;
-		// zero vertical velocity
+		S[0] = s0_h, S[1] = 0, S[2] = s0_v;
+		// zero vertical velocity update
 		if (pony->imu->sol.v_valid) {
 			s = vvs;
 			z = 0.0;
 			h[0] = 0, h[1] = 1;
 			pony_linal_kalman_update(y,S,K, z,h,s, 2);
 		}
-
+		
 		// check for air data
-		if (pony->air != NULL) {
+		if (pony->air != NULL && (pony->air->alt_valid || pony->air->vv_valid)) {
 			// time handling
-			if (pony->air->alt_valid || pony->air->vv_valid) {
-				if (t0_air < 0 && pony->air->alt_valid) {
-					t0_air       = pony->imu->t;
-					air_alt_last = pony->air->alt;
-				}
-				else {
-					dt_air = pony->imu->t - t0_air;
-					t0_air = pony->imu->t;
-				}
+			if (t0_air < 0 && pony->air->alt_valid) {
+				air_alt_last = pony->air->alt;
+				dt_air       = 0; // vertical velocity will not be observable
 			}
+			else
+				dt_air = pony->imu->t - t0_air;
+			t0_air = pony->imu->t;
 			// vertical channel update
-			if (t0_air > 0 && dt_air > 0) {
-				if (pony->air->alt_valid && pony->imu->sol.llh_valid) { // altitude data present
-					// altitude
-					s = sqrt2*( (pony->air->alt_std > 0) ? (pony->air->alt_std) : vvs );
-					z = pony->air->alt + air_alt_last; // decorrelated with velocity information
-					h[0] = 2, h[1] = -dt_air;
-					pony_linal_kalman_update(y,S,K, z,h,s, 2);
-					// altitude rate of change
-					z = pony->air->alt - air_alt_last; // decorrelated with altitude information
-					h[0] = 0, h[1] = dt_air;
-					pony_linal_kalman_update(y,S,K, z,h,s, 2);
-					air_alt_last = pony->air->alt;
-				}
-				if (pony->air->vv_valid && pony->imu->sol.v_valid) { // vertical velocity data present
-					z = pony->air->vv - pony->imu->sol.v[2];
-					s = (pony->air-> vv_std > 0) ? (pony->air-> vv_std) : vvs;
-					h[0] = 0, h[1] = 1;
-					pony_linal_kalman_update(y,S,K, z,h,s, 2);
-				}
+			if (pony->air->alt_valid && pony->imu->sol.llh_valid) { // altitude data present
+				// altitude
+				s = sqrt2*( (pony->air->alt_std > 0) ? (pony->air->alt_std) : vvs );
+				z = pony->air->alt + air_alt_last; // decorrelated with velocity information
+				h[0] = 2, h[1] = -dt_air;
+				pony_linal_kalman_update(y,S,K, z,h,s, 2);
+				// altitude rate of change
+				z = pony->air->alt - air_alt_last; // decorrelated with altitude information
+				h[0] = 0, h[1] = dt_air;
+				pony_linal_kalman_update(y,S,K, z,h,s, 2);
+				air_alt_last = pony->air->alt;
+			}
+			if (pony->air->vv_valid && pony->imu->sol.v_valid) { // vertical velocity data present
+				z = pony->air->vv - pony->imu->sol.v[2];
+				s = (pony->air-> vv_std > 0) ? (pony->air-> vv_std) : vvs;
+				h[0] = 0, h[1] = 1;
+				pony_linal_kalman_update(y,S,K, z,h,s, 2);
 			}
 		}
-
 		// check for gnss data
-		if (pony->gnss != NULL) {
+		if (pony->gnss != NULL && (pony->gnss->sol.llh_valid || pony->gnss->sol.v_valid)) {
 			// time handling
-			if (pony->gnss->sol.llh_valid || pony->gnss->sol.v_valid) {
-				if (t0_gnss < 0 && pony->gnss->sol.llh_valid) {
-					t0_gnss       = pony->imu->t;
-					gnss_alt_last = pony->gnss->sol.llh[2];
-				}
-				else {
-					dt_gnss = pony->imu->t - t0_gnss;
-					t0_gnss = pony->imu->t;
-				}
+			if (t0_gnss < 0 && pony->gnss->sol.llh_valid) {
+				gnss_alt_last = pony->gnss->sol.llh[2];
+				dt_gnss       = 0; // vertical velocity will not be observable
 			}
+			else
+				dt_gnss = pony->imu->t - t0_gnss;
+			t0_gnss = pony->imu->t;
 			// vertical channel update
-			if (t0_gnss > 0 && dt_gnss > 0) {
-				if (pony->gnss->sol.llh_valid && pony->imu->sol.llh_valid) { // altitude data present
-					// altitude
-					s = sqrt2*( (pony->gnss->sol.x_std > 0) ? (pony->gnss->sol.x_std) : pony->gnss->settings.code_sigma );
-					z = pony->gnss->sol.llh[2] + gnss_alt_last; // decorrelated with velocity information
-					h[0] = 2, h[1] = -dt_gnss;
-					pony_linal_kalman_update(y,S,K, z,h,s, 2);
-					// altitude rate of change
-					z = pony->gnss->sol.llh[2] - gnss_alt_last; // decorrelated with altitude information
-					h[0] = 0, h[1] = dt_gnss;
-					pony_linal_kalman_update(y,S,K, z,h,s, 2);
-					gnss_alt_last = pony->gnss->sol.llh[2];
-				}
-				if (pony->gnss->sol.v_valid && pony->imu->sol.v_valid) { // vertical velocity data present
-					z = pony->gnss->sol.v[2] - pony->imu->sol.v[2];
-					s = (pony->gnss->sol.v_std > 0) ? (pony->gnss->sol.v_std) : pony->gnss->settings.doppler_sigma;
-					h[0] = 0, h[1] = 1;
-					pony_linal_kalman_update(y,S,K, z,h,s, 2);
-				}
+			if (pony->gnss->sol.llh_valid && pony->imu->sol.llh_valid) { // altitude data present
+				// altitude
+				s = sqrt2*( (pony->gnss->sol.x_std > 0) ? (pony->gnss->sol.x_std) : pony->gnss->settings.code_sigma );
+				z = pony->gnss->sol.llh[2] + gnss_alt_last; // decorrelated with velocity information
+				h[0] = 2, h[1] = -dt_gnss;
+				pony_linal_kalman_update(y,S,K, z,h,s, 2);
+				// altitude rate of change
+				z = pony->gnss->sol.llh[2] - gnss_alt_last; // decorrelated with altitude information
+				h[0] = 0, h[1] = dt_gnss;
+				pony_linal_kalman_update(y,S,K, z,h,s, 2);
+				gnss_alt_last = pony->gnss->sol.llh[2];
+			}
+			if (pony->gnss->sol.v_valid && pony->imu->sol.v_valid) { // vertical velocity data present
+				z = pony->gnss->sol.v[2] - pony->imu->sol.v[2];
+				s = (pony->gnss->sol.v_std > 0) ? (pony->gnss->sol.v_std) : pony->gnss->settings.doppler_sigma;
+				h[0] = 0, h[1] = 1;
+				pony_linal_kalman_update(y,S,K, z,h,s, 2);
 			}
 		}
-
 		// vertical channel correction
 		s = sqrt(S[0]*S[0] + S[1]*S[1]);  // altitude stdev estimate
 		w = s + S[2]*dt;                  // sum of altitude stdev and velocity contribution into stdev
@@ -455,7 +497,7 @@ void pony_ins_motion_vertical_damping(void) {
 			pony->imu->sol.  v[2] = y[1]; // replace vertical velocity by its estimated value
 		}
 		if (pony->imu->sol.llh_valid) 
-			pony->imu->sol.  v[2] += 2*S[2]*dt/w*(y[0]-x)/dt; // weighted correction to hold dx/dt = v
+			pony->imu->sol.  v[2] += 2*S[2]*dt/w*(y[0]-x); // weighted correction to hold dx/dt = v
 
 	}
 
@@ -630,9 +672,8 @@ char pony_ins_motion_parse_double_2array(double* arr, const size_t outer_size, c
 			for (i++; i < len && src[i] > 0 && (src[i] <= space || src[i] == comma || src[i] == semicol); i++); // next printable character that is not a separator
 			if (i >= len || src[i] == 0) // end of source string before all values have been parsed
 				return 0;
-			// ensure that value is initialized
-			val = default_value;
-			val = atof(src+i);
+			// parse value
+			val = atof(src + i);
 			// if out of range, set to default
 			if (range != NULL && (range[0] > range[1] || val < range[0] || range[1] < val))
 				val = default_value;
@@ -654,26 +695,5 @@ char pony_ins_motion_parse_double_2array(double* arr, const size_t outer_size, c
 		return 0;
 	else
 		return 1; // closing bracket found
-
-}
-
-void pony_ins_motion_flip_sol_over_pole(pony_sol* sol) {
-
-	size_t i;
-
-	// longitude
-	sol->llh[0] +=  pony->imu_const.pi;
-	// velocity
-	sol->v  [0]  = -sol->v[0];
-	sol->v  [1]  = -sol->v[1];
-	// attitude matrix
-	for (i = 0; i < 3; i++) {
-		sol->L[i*3+0] = -sol->L[i*3+0];
-		sol->L[i*3+1] = -sol->L[i*3+1];
-	}
-	// update quaternion
-	pony_linal_mat2quat(sol->q  ,sol->L);
-	// update angles
-	pony_linal_mat2rpy (sol->rpy,sol->L);
 
 }
