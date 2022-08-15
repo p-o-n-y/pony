@@ -1,4 +1,4 @@
-// Jun-2022
+// Aug-2022
 /*	pony_ins_attitude
 	
 	pony plugins for ins angular rate integration:

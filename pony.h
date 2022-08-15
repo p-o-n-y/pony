@@ -1,4 +1,4 @@
-// Jun-2022
+// Aug-2022
 // PONY core header file
 
 #ifndef PONY_H_
@@ -7,7 +7,7 @@
 #include <stddef.h>
 
 // PONY core declarations
-#define PONY_BUS_VERSION 17 // current bus version
+#define PONY_BUS_VERSION 18 // current bus version
 
 
 
@@ -413,6 +413,7 @@ typedef struct {
 
 	pony_imu_const  imu_const;       // inertial navigation constants, initialized independent of imu structure
 	pony_imu*       imu;             // inertial measurement unit data pointer
+	size_t          imu_count;       // number of imu instances
 
 	pony_gnss_const gnss_const;      // global navigation satellite system constants, initialized independent of gnss structure
 	pony_gnss*      gnss;            // global navigation satellite system data pointer

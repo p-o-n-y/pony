@@ -1,4 +1,4 @@
-// Jun-2022
+// Aug-2022
 // PONY core source code
 
 #include <stdlib.h>
@@ -398,21 +398,18 @@ char pony_init_imu(pony_imu* imu)
 	/*
 		free IMU memory
 	*/
-void pony_free_imu(void)
+void pony_free_imu(pony_imu* imu)
 {
 	// validate
-	if (pony->imu == NULL)
+	if (imu == NULL)
 		return;
 	// configuration
-	pony->imu->cfg = NULL;
-	pony->imu->cfglength = 0;
+	imu->cfg = NULL;
+	imu->cfglength = 0;
 	// solution
-	pony_free_sol(&(pony->imu->sol));
+	pony_free_sol(&(imu->sol));
 	// application-specific additional temperature sensors
-	pony_free_null((void**)(&(pony->imu->T)));
-	// pony_imu structure
-	free((void*)(pony->imu));
-	pony->imu = NULL;
+	pony_free_null((void**)(&(imu->T)));
 }
 
 
@@ -1147,7 +1144,7 @@ void pony_free_ref(void)
 	*/
 void pony_free()
 {
-	size_t r;
+	size_t i;
 
 	// core
 	pony_free_null((void**)(&(pony->core.plugins)));
@@ -1160,12 +1157,18 @@ void pony_free()
 	pony->settings_length = 0;
 
 	// imu
-	pony_free_imu();
+	if (pony->imu != NULL) {
+		for (i = 0; i < pony->imu_count; i++)
+			pony_free_imu(&(pony->imu[i]));
+		free((void*)(pony->imu));
+		pony->imu = NULL;
+	}
+	pony->imu_count = 0;
 
 	// gnss
 	if (pony->gnss != NULL) {
-		for (r = 0; r < pony->gnss_count; r++)
-			pony_free_gnss(&(pony->gnss[r]));
+		for (i = 0; i < pony->gnss_count; i++)
+			pony_free_gnss(&(pony->gnss[i]));
 		free((void*)(pony->gnss));
 		pony->gnss = NULL;
 	}
@@ -1236,15 +1239,21 @@ char pony_add_plugin(void(*newplugin)(void))
 	*/
 char pony_init(char* cfg)
 {
-	const size_t max_gnss_count = 10; // maximum number of gnss receiver data structures
+	const size_t 
+		max_imu_count  = 10, // maximum number of imu data structures
+		max_gnss_count = 10; // maximum number of gnss receiver data structures
 
-	char multi_gnss_token[] = "gnss[0]:";
-	const size_t multi_gnss_index_position = 5;
+	char 
+		multi_imu_token [] = "imu[0]:",
+		multi_gnss_token[] = "gnss[0]:";
+	const size_t 
+		multi_imu_index_position = 4,
+		multi_gnss_index_position = 5;
 
 	size_t grouplen;
 	char* cfgptr;
 
-	pony_gnss* reallocated_pointer;
+	void* reallocated_pointer;
 
 	size_t i;
 
@@ -1267,22 +1276,40 @@ char pony_init(char* cfg)
 	// imu init
 	pony_init_imu_const();
 	pony->imu = NULL;
-	if (pony_locatecfggroup("imu:", pony->cfg, pony->cfglength, &cfgptr, &grouplen)) { // if the group found in configuration
-		// try to allocate memory
-		pony->imu = (pony_imu*)calloc(1, sizeof(pony_imu));
-		if (pony->imu == NULL) {
-			pony_free();
-			return 0;
-		}
+	pony->imu_count = 0;
+	// multiple imu support
+	for (i = 0; i < max_imu_count; i++) {
+		multi_imu_token[multi_imu_index_position] = '0' + (char)i;
 
-		// set configuration pointer
-		pony->imu->cfg = cfgptr;
-		pony->imu->cfglength = grouplen;
+		if ((i == 0 && pony_locatecfggroup("imu:",          pony->cfg, pony->cfglength, &cfgptr, &grouplen)) ||
+			           pony_locatecfggroup(multi_imu_token, pony->cfg, pony->cfglength, &cfgptr, &grouplen)) {
+			if (i >= pony->imu_count) {
+				// try to allocate/reallocate memory
+				reallocated_pointer = realloc(pony->imu, sizeof(pony_imu)*(i+1));
+				if (reallocated_pointer == NULL) {
+					pony_free();
+					return 0;
+				}
+				else
+					pony->imu = (pony_imu*)reallocated_pointer;
+				// try to init new instances, except the i-th one
+				for (; pony->imu_count < i; pony->imu_count++) {
+					pony->imu[pony->imu_count].cfg = NULL;
+					pony->imu[pony->imu_count].cfglength = 0;
+					pony_init_imu(&(pony->imu[pony->imu_count]));
+				}
+				pony->imu_count = i+1;
+			}
 
-		// try to init
-		if (!pony_init_imu(pony->imu)) {
-			pony_free();
-			return 0;
+			// set configuration pointer
+			pony->imu[i].cfg       = cfgptr;
+			pony->imu[i].cfglength = grouplen;
+
+			// try to init
+			if (!pony_init_imu(&(pony->imu[i]))) {
+				pony_free();
+				return 0;
+			}
 		}
 	}
 
@@ -1290,21 +1317,21 @@ char pony_init(char* cfg)
 	pony_init_gnss_const();
 	pony->gnss = NULL;
 	pony->gnss_count = 0;
-	// multiple gnss mode support
+	// multiple gnss support
 	for (i = 0; i < max_gnss_count; i++) {
 		multi_gnss_token[multi_gnss_index_position] = '0' + (char)i;
 
-		if ((i == 0 && pony_locatecfggroup("gnss:", pony->cfg, pony->cfglength, &cfgptr, &grouplen)) ||
-		     pony_locatecfggroup(multi_gnss_token, pony->cfg, pony->cfglength, &cfgptr, &grouplen)) {
+		if ((i == 0 && pony_locatecfggroup("gnss:",          pony->cfg, pony->cfglength, &cfgptr, &grouplen)) ||
+		               pony_locatecfggroup(multi_gnss_token, pony->cfg, pony->cfglength, &cfgptr, &grouplen)) {
 			if (i >= pony->gnss_count) {
 				// try to allocate/reallocate memory
-				reallocated_pointer = (pony_gnss*)realloc(pony->gnss, sizeof(pony_gnss)*(i+1));
+				reallocated_pointer = realloc(pony->gnss, sizeof(pony_gnss)*(i+1));
 				if (reallocated_pointer == NULL) {
 					pony_free();
 					return 0;
 				}
 				else
-					pony->gnss = reallocated_pointer;
+					pony->gnss = (pony_gnss*)reallocated_pointer;
 				// try to init new instances, except the i-th one
 				for (; pony->gnss_count < i; pony->gnss_count++) {
 					pony->gnss[pony->gnss_count].cfg = NULL;
@@ -1315,7 +1342,7 @@ char pony_init(char* cfg)
 			}
 
 			// set configuration pointer
-			pony->gnss[i].cfg = cfgptr;
+			pony->gnss[i].cfg       = cfgptr;
 			pony->gnss[i].cfglength = grouplen;
 
 			// try to init

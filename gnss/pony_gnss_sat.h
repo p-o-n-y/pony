@@ -1,4 +1,4 @@
-// Jun-2022
+// Aug-2022
 /*	pony_gnss_sat
 	
 	pony plugins for GNSS satellite-related calculations:

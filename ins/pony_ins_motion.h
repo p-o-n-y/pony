@@ -1,4 +1,4 @@
-// Jun-2022
+// Aug-2022
 /*	pony_ins_motion
 	
 	pony plugins for ins position and velocity algorithms

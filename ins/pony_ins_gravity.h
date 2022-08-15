@@ -1,4 +1,4 @@
-// Jun-2022
+// Aug-2022
 /*	pony_ins_gravity 
 	
 	pony plugins for gravity model calculations:
