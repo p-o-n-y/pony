@@ -1,6 +1,6 @@
-// Aug-2022
-/*	pony_ins_alignment 
-	
+// Feb-2025
+/*	pony_ins_alignment
+
 	pony plugins for ins initial alignment (initial attitude matrix determination):
 */
 void pony_ins_alignment_static      (void); // conventional sensor output averaging on a static base

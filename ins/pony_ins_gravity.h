@@ -1,6 +1,6 @@
-// Aug-2022
-/*	pony_ins_gravity 
-	
+// Feb-2025
+/*	pony_ins_gravity
+
 	pony plugins for gravity model calculations:
 */
 void pony_ins_gravity_constant(void); // magnitude of average accelerometer output vector as constant gravity value

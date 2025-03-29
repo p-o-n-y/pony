@@ -1,6 +1,6 @@
-// Aug-2022
+// Feb-2025
 /*	pony_ins_attitude
-	
+
 	pony plugins for ins angular rate integration:
 */
 void pony_ins_attitude_rodrigues(void); // via Euler vector using Rodrigues' rotation formula

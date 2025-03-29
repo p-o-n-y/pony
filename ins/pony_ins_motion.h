@@ -1,6 +1,6 @@
-// Aug-2022
+// Feb-2025
 /*	pony_ins_motion
-	
+
 	pony plugins for ins position and velocity algorithms
 */
 void pony_ins_motion_euler           (void); // velocity and position using first-order Euler integration
