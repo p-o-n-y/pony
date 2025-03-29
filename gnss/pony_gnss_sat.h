@@ -1,6 +1,6 @@
-// Aug-2022
+// Jan-2025
 /*	pony_gnss_sat
-	
+
 	pony plugins for GNSS satellite-related calculations:
 */
 void pony_gnss_sat_pos_vel_clock_gps(void); // position, velocity and clock correction for all GPS             satellites from ephemeris

@@ -1,6 +1,6 @@
-// Aug-2022
-/*	pony_gnss_io_rinex 
-	
+// Jan-2025
+/*	pony_gnss_io_rinex
+
 	pony plugins for GNSS RINEX input/output:
 */
 void pony_gnss_io_rinex_v3_read_obs_from_file(void); // reads observation data (measurements) from RINEX v3.0x files
