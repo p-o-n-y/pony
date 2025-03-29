@@ -1,15 +1,15 @@
-// Aug-2022
-/*	pony_gnss_io_ublox 
-	
+// Jan-2025
+/*	pony_gnss_io_ublox
+
 	pony plugins for GNSS u-Blox receiver input/output:
 
-	- pony_gnss_io_ublox_read_file 
+	- pony_gnss_io_ublox_read_file
 		Reads raw observation and navigation data (measurements and ephemeris) from u-Blox binary files.
 		Processes messages RXM-RAW/RXM-EPH (GPS L1-only) and RXM-RAWX/RXM-SFRBX
 		Tested for UBX protocol versions 6, M8T, F9T/F9P.
 		Supports GPS, GLONASS, Galileo and BeiDou systems.
-		Multi-receiver/multi-antenna capable, with syncronization option.
-	
+		Multi-receiver/multi-antenna capable, with synchronization option.
+
 */
 
 #include <stdio.h>
@@ -38,22 +38,22 @@ typedef struct // gnss signal id conversion table entry
 const pony_gnss_io_ublox_signal_id_converson_table_struct pony_gnss_io_ublox_signal_id_conversion_table[] = {
 	{   // gps
 		0,
-		3, 
+		3,
 		{  0,        3,        4      },
 		{{'1','C'},{'2','L'},{'2','M'}}
 	},{ // glo
 		6,
-		2, 
+		2,
 		{  0,        2},
 		{{'1','C'},{'2','C'}}
 	},{ // gal
 		2,
-		4, 
+		4,
 		{  0,        1,        5,        6      },
 		{{'1','C'},{'1','B'},{'7','I'},{'7','Q'}}
 	},{ // bds
 		3,
-		4, 
+		4,
 		{  0,        1,        2,        3      },
 		{{'1','I'},{'2','I'},{'7','I'},{'7','D'}}
 	}
@@ -124,7 +124,7 @@ typedef struct {
 typedef struct {
 	unsigned long	sf[3][8];
 } pony_gnss_io_ublox_RXM_EPH_block;
-	
+
 
 // navigation subframe parsing
 typedef struct {
@@ -154,7 +154,7 @@ void   pony_gnss_io_ublox_checksum_recurse(unsigned char *cs,  unsigned char byt
 char   pony_gnss_io_ublox_obs_types_allocate(char (**obs_types)[4], size_t *obs_count, pony_gnss_sat *sat, const size_t sat_count, const pony_gnss_io_ublox_signal_id_converson_table_struct *sig); // observation types handling
 void   pony_gnss_io_ublox_drop_flags_pony_sats(pony_gnss_sat *sat, const size_t sat_count, const size_t obs_count);	// drop satellite flags
 void   pony_gnss_io_ublox_drop_flags_pony_sol(pony_sol *sol);														// drop solution flags
-void   pony_gnss_io_ublox_free_null(void **ptr);																	// memory release with NULL-check and NULL-asignment 
+void   pony_gnss_io_ublox_free_null(void **ptr);																	// memory release with NULL-check and NULL-asignment
 int    pony_gnss_io_ublox_round(double x);																			// round to the nearest integer
 double pony_gnss_io_ublox_dmod(double x, double y);																	// remainder after division for doubles
 
@@ -174,13 +174,13 @@ double pony_gnss_io_ublox_dmod(double x, double y);																	// remainder
 // plugin definitions
 
 /* pony_gnss_io_ublox_read_file - pony plugin
-	
+
 	Reads raw observation and navigation data (measurements and ephemeris) from u-Blox binary files.
 	Processes messages RXM-RAW/RXM-EPH (GPS L1-only) and RXM-RAWX/RXM-SFRBX
 	Tested for UBX protocol versions 6, M8T, F9T/F9P.
 	Supports GPS, GLONASS, Galileo and BeiDou systems.
-	Multi-receiver/multi-antenna capable, with syncronization option.
-	When new issue of navigation data starts, this plugin drops ephemeris validity flag, 
+	Multi-receiver/multi-antenna capable, with synchronization option.
+	When new issue of navigation data starts, this plugin drops ephemeris validity flag,
 	so satellite stops being used (except for continuous integration in GLONASS).
 
 	uses:
@@ -222,8 +222,8 @@ double pony_gnss_io_ublox_dmod(double x, double y);																	// remainder
 			example: gnss_sync = 0.09
 			negative values result in sync turned off
 */
-void pony_gnss_io_ublox_read_file(void) {
-
+void pony_gnss_io_ublox_read_file(void)
+{
 	enum  system_id {gps, glo, gal,	bds, sys_count}; // supported constellations
 	// supported messages
 	enum ubx_msg_id									  { RXM_RAWX,							RXM_SFRBX,								RXM_RAW,							RXM_EPH, msg_id_count};
@@ -240,14 +240,13 @@ void pony_gnss_io_ublox_read_file(void) {
 	char *str;
 	pony_time_epoch latest_epoch = {0,0,0,0,0,0};
 
+
+	// requires gnss data initialized
+	if (pony->gnss == NULL)
+		return;
+
 	// init
 	if (pony->mode == 0)	{
-
-		// requires gnss data initialized
-		if (pony->gnss == NULL) {
-			pony->mode = -1;
-			return;
-		}
 
 		// allocate memory
 			// file pointers, memory buffers and observation format specifiers
@@ -264,7 +263,7 @@ void pony_gnss_io_ublox_read_file(void) {
 		if (
 			   fp			== NULL
 			|| payload_hdr	== NULL
-			|| payload_blk	== NULL	
+			|| payload_blk	== NULL
 			) {
 			printf("\nERROR: memory allocation failed for ublox data");
 			pony->mode = -1;
@@ -277,31 +276,31 @@ void pony_gnss_io_ublox_read_file(void) {
 				continue;
 			// ubx file name from configuration
 			str = pony_locate_token(cfg_file_token, pony->gnss[r].cfg_settings, pony->gnss[r].settings_length, '=');
-			if ( str == NULL || str[0] == '\0' ) {
-				printf("\n\terror: could not find GNSS ubx file name in the configuration for gnss[%d]:\n\t\t'%s'",
+			if ( str == NULL || str[0] == 0 ) {
+				printf("\n\terror: could not find GNSS ubx file name in the configuration for gnss[%lu]:\n\t\t'%s'",
 					r, pony->gnss[r].cfg_settings);
 				pony->mode = -1;
 				return;
 			}
 			for ( ; str < pony->gnss[r].cfg_settings+pony->gnss[r].settings_length && *str && *str <= ' '; str++);
 			if (*str != quote || str >= pony->gnss[r].cfg_settings + pony->gnss[r].settings_length || !(*str)) {
-				printf("\n\terror: could not parse GNSS ubx file name in the configuration for gnss[%d]:\n\t\t'%s'",
+				printf("\n\terror: could not parse GNSS ubx file name in the configuration for gnss[%lu]:\n\t\t'%s'",
 					r, pony->gnss[r].cfg_settings);
 				pony->mode = -1;
 				return;
 			}
 			for (str++, i = 0; str+i < pony->gnss[r].cfg_settings+pony->gnss[r].settings_length && str[i] && str[i] != quote; i++);
 			if (str+i >= pony->gnss[r].cfg_settings + pony->gnss[r].settings_length || !(str[i])) {
-				printf("\n\terror: could not parse GNSS ubx file name in the configuration for gnss[%d]:\n\t\t'%s'",
+				printf("\n\terror: could not parse GNSS ubx file name in the configuration for gnss[%lu]:\n\t\t'%s'",
 					r, pony->gnss[r].cfg_settings);
 				pony->mode = -1;
 				return;
 			}
 			// open the file
-			str[i] = '\0';
+			str[i] = 0;
 			fp[r] = fopen(str,"rb");
 			if (fp[r] == NULL) {
-				printf("\n\terror: could not open GNSS ubx file '%s' for gnss[%d]",str,r);
+				printf("\n\terror: could not open GNSS ubx file '%s' for gnss[%lu]",str,r);
 				str[i] = quote;
 				pony->mode = -1;
 				return;
@@ -314,7 +313,7 @@ void pony_gnss_io_ublox_read_file(void) {
 				|| ( pony->gnss[r].gal !=NULL && !pony_gnss_io_ublox_obs_types_allocate(&(pony->gnss[r].gal->obs_types), &(pony->gnss[r].gal->obs_count), pony->gnss[r].gal->sat, pony->gnss[r].gal->max_sat_count, &(pony_gnss_io_ublox_signal_id_conversion_table[gal])) )
 				|| ( pony->gnss[r].bds !=NULL && !pony_gnss_io_ublox_obs_types_allocate(&(pony->gnss[r].bds->obs_types), &(pony->gnss[r].bds->obs_count), pony->gnss[r].bds->sat, pony->gnss[r].bds->max_sat_count, &(pony_gnss_io_ublox_signal_id_conversion_table[bds])) )
 				) {
-				printf("\n\terror: could not allocate memory for observation types in gnss[%d]",r);
+				printf("\n\terror: could not allocate memory for observation types in gnss[%lu]",r);
 				pony->mode = -1;
 				return;
 			}
@@ -322,7 +321,7 @@ void pony_gnss_io_ublox_read_file(void) {
 
 		// check for gnss_sync option
 		str = pony_locate_token(gnss_sync_token, pony->cfg_settings, pony->settings_length, '=');
-		if ( str != NULL && sscanf(str,"%lf",&gnss_sync) && gnss_sync > 0) 
+		if ( str != NULL && sscanf(str,"%lf",&gnss_sync) && gnss_sync > 0)
 			printf("\n\n\t GNSS observations will be synchronized by time of day within %.3f msec to the latest one\n", gnss_sync*1e3);
 		else
 			gnss_sync = -1;
@@ -360,13 +359,13 @@ void pony_gnss_io_ublox_read_file(void) {
 			for (id = UINT_MAX; !feof(fp[r]) && !ferror(fp[r]) && id != RXM_RAWX && id != RXM_RAW; id = pony_gnss_io_ublox_file_read_message(&(pony->gnss[r]), fp[r], payload_hdr, payload_blk) );
 			count += (id == RXM_RAWX || id == RXM_RAW) ? 1 : 0;
 		}
-		
+
 		if (!count) // no single measurement parsed
 			pony->mode = -1;
-		
+
 		if (gnss_sync <= 0) // no observation time skew check
 			return;
-		
+
 		// try to synchronize observations
 			// look for the latest epoch in observations
 		for (r = 0; r < pony->gnss_count; r++)
@@ -383,15 +382,15 @@ void pony_gnss_io_ublox_read_file(void) {
 						(       latest_epoch.h*3600.0 +        latest_epoch.m*60 +        latest_epoch.s) - // latest epoch
 						(pony->gnss[r].epoch.h*3600.0 + pony->gnss[r].epoch.m*60 + pony->gnss[r].epoch.s),  // receiver epoch
 						pony->gnss_const.sec_in_d)                                                          // modulo seconds in a day
-					>	
+					>
 					gnss_sync ) {
 					for (id = UINT_MAX; !feof(fp[r]) && !ferror(fp[r]) && id != RXM_RAWX && id != RXM_RAW; id = pony_gnss_io_ublox_file_read_message(&(pony->gnss[r]), fp[r], payload_hdr, payload_blk) );
-					if (id != RXM_RAWX && id != RXM_RAW) { // end-of-file or file error before syncronized epoch found
+					if (id != RXM_RAWX && id != RXM_RAW) { // end-of-file or file error before synchronized epoch found
 						pony->mode = -1;
 						return;
 					}
 				}
-		
+
 	}
 
 }
@@ -407,8 +406,8 @@ void pony_gnss_io_ublox_read_file(void) {
 
 // message parsers
 	// read message from stream
-size_t pony_gnss_io_ublox_file_read_message(pony_gnss *gnss, FILE *fp, void *hdr_buf, void *blk_buf) {
-
+size_t pony_gnss_io_ublox_file_read_message(pony_gnss *gnss, FILE *fp, void *hdr_buf, void *blk_buf)
+{
 	enum ubx_msg_id									  { RXM_RAWX,							 RXM_SFRBX,							RXM_RAW,							RXM_EPH, msg_id_count};
 
 	const unsigned char	msg_id[msg_id_count][2]	=	{{0x02,0x15},							{0x02,0x13},						{0x02,0x10},						{0x02,0x31}	},
@@ -421,6 +420,11 @@ size_t pony_gnss_io_ublox_file_read_message(pony_gnss *gnss, FILE *fp, void *hdr
 	size_t id;
 	short len;
 
+
+	// validate
+	if (gnss == NULL || fp == NULL || hdr_buf == NULL || blk_buf == NULL)
+		return 0;
+	// check file
 	if ( feof(fp) || ferror(fp) )
 		return UINT_MAX;
 	// synchronize
@@ -433,7 +437,7 @@ size_t pony_gnss_io_ublox_file_read_message(pony_gnss *gnss, FILE *fp, void *hdr
 		|| !fread((void *)(buf+1),1,1,fp) ) // message class and id expected
 		return UINT_MAX;
 	for (id = 0; id < msg_id_count; id++) // check through message list
-		if (   (0xff & buf[0]) == msg_id[id][0] 
+		if (   (0xff & buf[0]) == msg_id[id][0]
 			&& (0xff & buf[1]) == msg_id[id][1] ) {
 			// renew checksum
 			pony_gnss_io_ublox_checksum_recurse(cs, buf[0]);
@@ -462,14 +466,15 @@ size_t pony_gnss_io_ublox_file_read_message(pony_gnss *gnss, FILE *fp, void *hdr
 
 	return UINT_MAX;
 }
-	// RXM-RAWX: multi-gnss raw measurement data
-char pony_gnss_io_ublox_file_parse_RXM_RAWX(unsigned char *cs, pony_gnss *gnss, FILE *fp, void *hdr_buf, void *blk_buf) {
 
+	// RXM-RAWX: multi-gnss raw measurement data
+char pony_gnss_io_ublox_file_parse_RXM_RAWX(unsigned char *cs, pony_gnss *gnss, FILE *fp, void *hdr_buf, void *blk_buf)
+{
 	enum  system_id {gps, glo, gal,	bds, sys_count};
 
 	const unsigned char message_version_expected = 0x01;
-	const size_t 
-		chars_8byte = (8*8)/CHAR_BIT, 
+	const size_t
+		chars_8byte = (8*8)/CHAR_BIT,
 		chars_4byte = (4*8)/CHAR_BIT,
 		freq_id_eph = 16;
 
@@ -479,12 +484,13 @@ char pony_gnss_io_ublox_file_parse_RXM_RAWX(unsigned char *cs, pony_gnss *gnss, 
 	unsigned char *ptr				= NULL;
 	size_t i, j, m, sys, s, maxsat;
 
+
+	// validate
 	if (cs == NULL || gnss == NULL || fp == NULL || hdr_buf == NULL || blk_buf == NULL)
 		return 0;
-
+	// cast pointers
 	hdr = (pony_gnss_io_ublox_RXM_RAWX_header *)hdr_buf;
 	blk = (pony_gnss_io_ublox_RXM_RAWX_block  *)blk_buf;
-
 	// get header data
 	memset(hdr_buf,0,sizeof(*hdr)); // drop to all zeros
 	if ( !fread((void *)(&(hdr->rcvTow      )),8,1,fp) ) return 0; // R8: time of week
@@ -527,17 +533,17 @@ char pony_gnss_io_ublox_file_parse_RXM_RAWX(unsigned char *cs, pony_gnss *gnss, 
 		memset(blk_buf,0,sizeof(*blk)); // drop to all zeros
 		if ( !fread((void *)(&(blk->prMes    )),8,1,fp) ) return 0; // R8: pseudorange measurement, [m]
 		if ( !fread((void *)(&(blk->cpMes    )),8,1,fp) ) return 0; // R8: carrier phase measurement, [cycles]
-		if ( !fread((void *)(&(blk->doMes    )),4,1,fp) ) return 0; // R4: doppler measurement, [Hz] 
+		if ( !fread((void *)(&(blk->doMes    )),4,1,fp) ) return 0; // R4: doppler measurement, [Hz]
 		if ( !fread((void *)(&(blk->gnssId   )),1,1,fp) ) return 0; // U1: gnss identifier
-		if ( !fread((void *)(&(blk->svId     )),1,1,fp) ) return 0; // U1: satellite identifier 
-		if ( !fread((void *)(&(blk->sigId    )),1,1,fp) ) return 0; // U1: signal identifier 
+		if ( !fread((void *)(&(blk->svId     )),1,1,fp) ) return 0; // U1: satellite identifier
+		if ( !fread((void *)(&(blk->sigId    )),1,1,fp) ) return 0; // U1: signal identifier
 		if ( !fread((void *)(&(blk->freqId   )),1,1,fp) ) return 0; // U1: GLONASS frequency slot + 7
-		if ( !fread((void *)(&(blk->locktime )),2,1,fp) ) return 0; // U2: carrier phase locktime counter, [ms] 
+		if ( !fread((void *)(&(blk->locktime )),2,1,fp) ) return 0; // U2: carrier phase locktime counter, [ms]
 		if ( !fread((void *)(&(blk->cno      )),1,1,fp) ) return 0; // U1: carrier-to-noise density ratio (signal strength), [dBHz]
 		if ( !fread((void *)(&(blk->prStdev  )),1,1,fp) ) return 0; // X1: estimated pseudorange standard deviation, [0.01x2^n m]
 		if ( !fread((void *)(&(blk->cpStdev  )),1,1,fp) ) return 0; // X1: estimated carrier phase standard deviation, [0.004 cycles]
-		if ( !fread((void *)(&(blk->doStdev  )),1,1,fp) ) return 0; // X1: estimated doppler standard deviation, [0.002x2^n Hz] 
-		if ( !fread((void *)(&(blk->trkStat  )),1,1,fp) ) return 0; // X1: tracking status 
+		if ( !fread((void *)(&(blk->doStdev  )),1,1,fp) ) return 0; // X1: estimated doppler standard deviation, [0.002x2^n Hz]
+		if ( !fread((void *)(&(blk->trkStat  )),1,1,fp) ) return 0; // X1: tracking status
 		if ( !fread((void *)(&(blk->reserved2)),1,1,fp) ) return 0; // U1: reserved2
 		// checksum
 		ptr = (unsigned char *)(&(blk->prMes)); // converting double to chars
@@ -592,12 +598,13 @@ char pony_gnss_io_ublox_file_parse_RXM_RAWX(unsigned char *cs, pony_gnss *gnss, 
 
 	return hdr->numMeas;
 }
-	// RXM-RAW: GPS L1 raw measurement data
-char pony_gnss_io_ublox_file_parse_RXM_RAW(unsigned char *cs, pony_gnss *gnss, FILE *fp, void *hdr_buf, void *blk_buf) {
 
-	const size_t 
+	// RXM-RAW: GPS L1 raw measurement data
+char pony_gnss_io_ublox_file_parse_RXM_RAW(unsigned char *cs, pony_gnss *gnss, FILE *fp, void *hdr_buf, void *blk_buf)
+{
+	const size_t
 		sigId = 0,
-		chars_8byte = (8*8)/CHAR_BIT, 
+		chars_8byte = (8*8)/CHAR_BIT,
 		chars_4byte = (4*8)/CHAR_BIT;
 	const unsigned char   lli_max = 0x07;      // maximum loss of lock indicator value
 	const   signed char mesQI_min = 4;         // minimum measurement quality indicator value
@@ -608,18 +615,19 @@ char pony_gnss_io_ublox_file_parse_RXM_RAW(unsigned char *cs, pony_gnss *gnss, F
 	pony_gnss_io_ublox_RXM_RAW_block  *blk	= NULL;
 	unsigned char *ptr				= NULL, i, j, s, svid;
 
-	if (   gnss           == NULL 
-		|| gnss->gps      == NULL 
-		|| gnss->gps->sat == NULL 
-		|| cs      == NULL 
-		|| fp      == NULL 
-		|| hdr_buf == NULL 
+
+	// validate
+	if (   gnss           == NULL
+		|| gnss->gps      == NULL
+		|| gnss->gps->sat == NULL
+		|| cs      == NULL
+		|| fp      == NULL
+		|| hdr_buf == NULL
 		|| blk_buf == NULL)
 		return 0;
-
+	// cast pointers
 	hdr = (pony_gnss_io_ublox_RXM_RAW_header *)hdr_buf;
 	blk = (pony_gnss_io_ublox_RXM_RAW_block  *)blk_buf;
-
 	// get header data
 	memset(hdr_buf,0,sizeof(*hdr)); // drop to all zeros
 	if ( !fread((void *)(&(hdr->iTOW     )),4,1,fp) ) return 0; // I4: measurement integer millisecond GPS time of week
@@ -646,8 +654,8 @@ char pony_gnss_io_ublox_file_parse_RXM_RAW(unsigned char *cs, pony_gnss *gnss, F
 		memset(blk_buf,0,sizeof(*blk)); // drop to all zeros
 		if ( !fread((void *)(&(blk->cpMes)),8,1,fp) ) return 0; // R8: carrier phase measurement, [cycles]
 		if ( !fread((void *)(&(blk->prMes)),8,1,fp) ) return 0; // R8: pseudorange measurement, [m]
-		if ( !fread((void *)(&(blk->doMes)),4,1,fp) ) return 0; // R4: doppler measurement, [Hz] 
-		if ( !fread((void *)(&(blk->sv   )),1,1,fp) ) return 0; // U1: space vehicle number 
+		if ( !fread((void *)(&(blk->doMes)),4,1,fp) ) return 0; // R4: doppler measurement, [Hz]
+		if ( !fread((void *)(&(blk->sv   )),1,1,fp) ) return 0; // U1: space vehicle number
 		if ( !fread((void *)(&(blk->mesQI)),1,1,fp) ) return 0; // I1: nav measurements quality indicator
 		if ( !fread((void *)(&(blk->cno  )),1,1,fp) ) return 0; // I1: signal strength carrier-to-noise ratio, [dBHz]
 		if ( !fread((void *)(&(blk->lli  )),1,1,fp) ) return 0; // U1: loss of lock indicator
@@ -664,11 +672,11 @@ char pony_gnss_io_ublox_file_parse_RXM_RAW(unsigned char *cs, pony_gnss *gnss, F
 		pony_gnss_io_ublox_checksum_recurse(cs,(unsigned char)(blk->lli  ));
 		// process
 		if (blk->sv == 0 || blk->sv > gnss->gps->max_sat_count) continue; // satellite id not supported
-		if (   blk->mesQI < mesQI_min 
-			|| blk->cno <= 0 
+		if (   blk->mesQI < mesQI_min
+			|| blk->cno <= 0
 			|| blk->lli > lli_max
 			|| blk->prMes < pr_min || blk->prMes > pr_max
-			|| blk->doMes < do_min || blk->doMes > do_max) 
+			|| blk->doMes < do_min || blk->doMes > do_max)
 			return s; // corrupted data
 		svid = blk->sv-1;
 		gnss->gps->sat[svid].obs[sigId*4+0] =         blk->prMes; // code pseudorange
@@ -683,6 +691,7 @@ char pony_gnss_io_ublox_file_parse_RXM_RAW(unsigned char *cs, pony_gnss *gnss, F
 
 	return hdr->numSV;
 }
+
 	// RXM-SFRBX: multi-GNSS broadcast navigation data subframe
 #define PONY_GNSS_IO_UBLOX_TWO_m05    ((double)1./(0x01<< 5)) // 2^-5
 #define PONY_GNSS_IO_UBLOX_TWO_m11    ((double)1./(0x01<<11)) // 2^-11
@@ -697,17 +706,17 @@ char pony_gnss_io_ublox_file_parse_RXM_RAW(unsigned char *cs, pony_gnss *gnss, F
 #define PONY_GNSS_IO_UBLOX_PI          3.1415926535898
 #define PONY_GNSS_IO_UBLOX_TWO_m31xPI (PONY_GNSS_IO_UBLOX_TWO_m31*PONY_GNSS_IO_UBLOX_PI) // 2^-31*pi
 #define PONY_GNSS_IO_UBLOX_TWO_m43xPI (PONY_GNSS_IO_UBLOX_TWO_m43*PONY_GNSS_IO_UBLOX_PI) // 2^-43*pi
-char pony_gnss_io_ublox_file_parse_RXM_SFRBX(unsigned char *cs, pony_gnss *gnss, FILE *fp, void *hdr_buf, void *blk_buf) {
-	
+char pony_gnss_io_ublox_file_parse_RXM_SFRBX(unsigned char *cs, pony_gnss *gnss, FILE *fp, void *hdr_buf, void *blk_buf)
+{
 	enum system_id {gps, glo, gal, bds, sys_count};
 
 	const unsigned char message_version_expected = 0x02;
-	const size_t 
-		max_words = 10, 
+	const size_t
+		max_words = 10,
 		epoch_eph = 0,
 		freq_eph  = 16;
 
-	static char (*subframe_parser[])(pony_gnss_sat *, pony_gnss_io_ublox_RXM_SFRBX_block *blk) = 
+	static char (*subframe_parser[])(pony_gnss_sat *, pony_gnss_io_ublox_RXM_SFRBX_block *blk) =
 		{pony_gnss_io_ublox_nav_subframe_parser_gps, pony_gnss_io_ublox_nav_subframe_parser_glo, pony_gnss_io_ublox_nav_subframe_parser_gal, pony_gnss_io_ublox_nav_subframe_parser_bds};
 
 	pony_gnss_io_ublox_RXM_SFRBX_header *hdr	= NULL;
@@ -715,12 +724,12 @@ char pony_gnss_io_ublox_file_parse_RXM_SFRBX(unsigned char *cs, pony_gnss *gnss,
 	pony_gnss_sat *sat				= NULL;
 	unsigned char i, j, sys, s, maxsat;
 
+	// validate
 	if (cs == NULL || gnss == NULL || fp == NULL || hdr_buf == NULL || blk_buf == NULL)
 		return 0;
-
+	// cast pointers
 	hdr = (pony_gnss_io_ublox_RXM_SFRBX_header *)hdr_buf;
 	blk = (pony_gnss_io_ublox_RXM_SFRBX_block  *)blk_buf;
-
 	// get header data
 	memset(hdr_buf,0,sizeof(*hdr)); // drop to all zeros
 	if ( !fread((void *)(&(hdr->gnssId   )),1,1,fp) ) return 0; // U1: gnss identifier
@@ -741,8 +750,10 @@ char pony_gnss_io_ublox_file_parse_RXM_SFRBX(unsigned char *cs, pony_gnss *gnss,
 	pony_gnss_io_ublox_checksum_recurse(cs,hdr->version  );
 	pony_gnss_io_ublox_checksum_recurse(cs,hdr->reserved2);
 	// validate
-	if (hdr->version > message_version_expected) return 0;
-	if (hdr->numWords == 0 || hdr->numWords > max_words) return 0;
+	if (hdr->version > message_version_expected)
+		return 0;
+	if (hdr->numWords == 0 || hdr->numWords > max_words)
+		return 0;
 	// process
 	for (sys = 0; sys < sys_count && hdr->gnssId != pony_gnss_io_ublox_signal_id_conversion_table[sys].gnss_id; sys++);
 	if (sys >= sys_count) return 0; // unknown gnss constellation
@@ -770,25 +781,26 @@ char pony_gnss_io_ublox_file_parse_RXM_SFRBX(unsigned char *cs, pony_gnss *gnss,
 	}
 	// process
 	if (sat[s].eph[epoch_eph+1] < 1) { // approximate date to resolve gps week number mod 1024, glonass day number, etc.
-		sat[s].eph[epoch_eph+0] = gnss->epoch.Y; 
+		sat[s].eph[epoch_eph+0] = gnss->epoch.Y;
 		sat[s].eph[epoch_eph+1] = gnss->epoch.M;
 		sat[s].eph[epoch_eph+2] = gnss->epoch.D;
 	}
-	return (subframe_parser[sys])(&(sat[s]), blk);
 
+	return (subframe_parser[sys])(&(sat[s]), blk);
 }
+
 	// RXM-SFRB: GPS broadcast navigation data subframe
 #define PONY_GNSS_IO_UBLOX_RXM_EPH_MAX_TOTAL_CONVERSION_ENTRIES 12
-char pony_gnss_io_ublox_file_parse_RXM_EPH(unsigned char *cs, pony_gnss *gnss, FILE *fp, void *hdr_buf, void *blk_buf) {
-	
-	const unsigned char 
+char pony_gnss_io_ublox_file_parse_RXM_EPH(unsigned char *cs, pony_gnss *gnss, FILE *fp, void *hdr_buf, void *blk_buf)
+{
+	const unsigned char
 		alert_flag_bit = 12, alert_eph = 29,	// alert flag
 		eph_counter_full = 0x07;
-	const double 
+	const double
 		URA_sqrt2minus1 = 0.41,
 		alert_value	= 8192;
 	const int wk_rollover = 0x0400;
-	const size_t 
+	const size_t
 		    max_words   = 8,
 			max_frames  = 3,
 		  epoch_eph     = 0,
@@ -808,7 +820,7 @@ char pony_gnss_io_ublox_file_parse_RXM_EPH(unsigned char *cs, pony_gnss *gnss, F
 		{   4,    0,   8, UINT_MAX, -PONY_GNSS_IO_UBLOX_TWO_m31   , 31      }, //  5 T_GD, x 2^-31
 		{   5,   16,   8,       11,                              1, 32      }, //  6 IODC LSB (issue of clock data least significant bits)
 		{   5,    0,  16, UINT_MAX,                           0x10,  5      }, //  7 toc (time of clock data), x 2^4
-		{   6,   16,   8, UINT_MAX, -PONY_GNSS_IO_UBLOX_TWO_m55   ,  8      }, //  8 af2, x 2^-55 
+		{   6,   16,   8, UINT_MAX, -PONY_GNSS_IO_UBLOX_TWO_m55   ,  8      }, //  8 af2, x 2^-55
 		{   6,    0,  16, UINT_MAX, -PONY_GNSS_IO_UBLOX_TWO_m43   ,  7      }, //  9 af1, x 2^-43
 		{   7,    2,  22, UINT_MAX, -PONY_GNSS_IO_UBLOX_TWO_m31   ,  6      }, // 10 af0, x 2^-31
 		// extra entries for MSB sections
@@ -825,7 +837,7 @@ char pony_gnss_io_ublox_file_parse_RXM_EPH(unsigned char *cs, pony_gnss *gnss, F
 		{   5,    8,  16, UINT_MAX, -PONY_GNSS_IO_UBLOX_TWO_m29   , 15      }, //  6 Cus,        x 2^-29
 		{   6,    0,  24,       11,  PONY_GNSS_IO_UBLOX_TWO_m19   , 16      }, //  7 sqrtA LSB,  x 2^-33
 		{   7,    8,  16, UINT_MAX,                           0x10, 17      }, //  8 toe (time of ephemeris data)
-		// extra entries for MSB sections			          
+		// extra entries for MSB sections
 		{   1,    0,   8, UINT_MAX,                              0, UINT_MAX}, //  9 M0    MSB
 		{   3,    0,   8, UINT_MAX,                              0, UINT_MAX}, // 10 e     MSB
 		{   5,    0,   8, UINT_MAX,                              0, UINT_MAX}, // 11 sqrtA MSB
@@ -855,18 +867,19 @@ char pony_gnss_io_ublox_file_parse_RXM_EPH(unsigned char *cs, pony_gnss *gnss, F
 	int week0;
 	pony_time_epoch epoch = {0,0,0,0,0,0};
 
+
+	// validate
 	if (   gnss           == NULL
 		|| gnss->gps      == NULL
 		|| gnss->gps->sat == NULL
-		|| cs      == NULL 
-		|| fp      == NULL 
-		|| hdr_buf == NULL 
+		|| cs      == NULL
+		|| fp      == NULL
+		|| hdr_buf == NULL
 		|| blk_buf == NULL)
 		return 0;
-
+	// cast pointers
 	hdr = (pony_gnss_io_ublox_RXM_EPH_header *)hdr_buf;
 	blk = (pony_gnss_io_ublox_RXM_EPH_block  *)blk_buf;
-
 	// get header data
 	memset(hdr_buf,0,sizeof(*hdr)); // drop to all zeros
 	if ( !fread((void *)(&(hdr->svid)),4,1,fp) ) return 0; // U4: satellite vehicle identifier
@@ -888,7 +901,7 @@ char pony_gnss_io_ublox_file_parse_RXM_EPH(unsigned char *cs, pony_gnss *gnss, F
 		}
 	sat = &(gnss->gps->sat[hdr->svid-1]);
 	if (sat->eph[epoch_eph+1] < 1) { // approximate date to resolve gps week number mod 1024, glonass day number, etc.
-		sat->eph[epoch_eph+0] = gnss->epoch.Y; 
+		sat->eph[epoch_eph+0] = gnss->epoch.Y;
 		sat->eph[epoch_eph+1] = gnss->epoch.M;
 		sat->eph[epoch_eph+2] = gnss->epoch.D;
 	}
@@ -904,7 +917,7 @@ char pony_gnss_io_ublox_file_parse_RXM_EPH(unsigned char *cs, pony_gnss *gnss, F
 		if ( !pony_gnss_io_ublox_nav_subframe_parse_data(sat->eph, blk->sf[sf], (pony_gnss_io_ublox_nav_subframe_conversion_entry *)(&(ctable[sf])), entries_count[sf], 1) )
 			return 0;
 		// special entries handling
-		switch (sf+1) { 
+		switch (sf+1) {
 			case 1:
 				// URA index to SV accuracy: SVa = 2^(1+N/2) [N = 0..6], 2^(N-2) [N = 7..15]
 				N = (unsigned short)(sat->eph[ ctable[0][SVa_entry].eph ]);
@@ -947,7 +960,6 @@ char pony_gnss_io_ublox_file_parse_RXM_EPH(unsigned char *cs, pony_gnss *gnss, F
 	}
 
 	return 0;
-
 }
 
 
@@ -955,16 +967,17 @@ char pony_gnss_io_ublox_file_parse_RXM_EPH(unsigned char *cs, pony_gnss *gnss, F
 
 // navigation subframe parsers
 	// single subframe data parser
-char pony_gnss_io_ublox_nav_subframe_parse_data(double *eph, unsigned long *dwrd, 
+char pony_gnss_io_ublox_nav_subframe_parse_data(double *eph, unsigned long *dwrd,
 									  pony_gnss_io_ublox_nav_subframe_conversion_entry *conversion_table, const size_t entries_count,
-									  const char complement) {
-
+									  const char complement)
+{
 	unsigned long value, mask;
 	size_t i, j;
 
+	// validate
 	if (eph == NULL || dwrd == NULL || conversion_table == NULL || entries_count == 0)
 		return 0; // invalid input
-
+	// parse
 	for (i = 0; i < entries_count; i++) {
 		mask  = ((unsigned long)(-1))>>(sizeof(long)*CHAR_BIT - conversion_table[i].bits);
 		value = ((dwrd[conversion_table[i].wrd])>>(conversion_table[i].shift)) & mask;
@@ -974,27 +987,27 @@ char pony_gnss_io_ublox_nav_subframe_parse_data(double *eph, unsigned long *dwrd
 			value += (( ((dwrd[conversion_table[j].wrd])>>(conversion_table[j].shift)) & ((0x01<<conversion_table[j].bits)-1) )<<conversion_table[i].bits);
 			value &= mask;
 		}
-		eph[conversion_table[i].eph] = 
+		eph[conversion_table[i].eph] =
 		//      treat as signed                 ? (  sign bit               ?                     two's complement or not      1 bit less :   negative value ) :  as is
 			( ( conversion_table[i].scale < 0 ) ? ( (value & ((mask>>1)+1)) ? (double)(( complement ? (~value + 1) : value ) & (mask>>1)) : -((double)value) ) : (double)value )*conversion_table[i].scale;
 	}
-	return 1;
 
+	return 1;
 }
 
 	// GPS subframes
 #define PONY_GNSS_IO_UBLOX_GPS_NAV_SUBFRAME_MAX_TOTAL_CONVERSION_ENTRIES 12
-char pony_gnss_io_ublox_nav_subframe_parser_gps(pony_gnss_sat *sat, pony_gnss_io_ublox_RXM_SFRBX_block *subframe) {
-
-	const unsigned char 
+char pony_gnss_io_ublox_nav_subframe_parser_gps(pony_gnss_sat *sat, pony_gnss_io_ublox_RXM_SFRBX_block *subframe)
+{
+	const unsigned char
 		tlm_word = 0, tlm_preamble_shift = 22, tlm_preamble = 0x8b, tlm_preamble_mask = 0xff,				// telemetry word
 		how_word = 1, how_alert_flag_bit = 12, how_alert_eph = 29, how_id_shift = 8, how_id_mask = 0x07,	// handover word
 		eph_counter_full = 0x07;
-	const double 
+	const double
 		URA_sqrt2minus1 = 0.41,
 		how_alert_value	= 8192;
 	const int wk_rollover = 0x0400;
-	const size_t 
+	const size_t
 		  epoch_eph     = 0,
 		    IOD_eph     = 9,
 		    toc_entry   = 7,
@@ -1013,7 +1026,7 @@ char pony_gnss_io_ublox_nav_subframe_parser_gps(pony_gnss_sat *sat, pony_gnss_io
 		{   6,    6,   8, UINT_MAX, -PONY_GNSS_IO_UBLOX_TWO_m31   , 31      }, //  5 T_GD, x 2^-31
 		{   7,   22,   8,       11,                              1, 32      }, //  6 IODC LSB (issue of clock data least significant bits)
 		{   7,    6,  16, UINT_MAX,                           0x10,  5      }, //  7 toc (time of clock data), x 2^4
-		{   8,   22,   8, UINT_MAX, -PONY_GNSS_IO_UBLOX_TWO_m55   ,  8      }, //  8 af2, x 2^-55 
+		{   8,   22,   8, UINT_MAX, -PONY_GNSS_IO_UBLOX_TWO_m55   ,  8      }, //  8 af2, x 2^-55
 		{   8,    6,  16, UINT_MAX, -PONY_GNSS_IO_UBLOX_TWO_m43   ,  7      }, //  9 af1, x 2^-43
 		{   9,    8,  22, UINT_MAX, -PONY_GNSS_IO_UBLOX_TWO_m31   ,  6      }, // 10 af0, x 2^-31
 		// extra entries for MSB sections
@@ -1030,7 +1043,7 @@ char pony_gnss_io_ublox_nav_subframe_parser_gps(pony_gnss_sat *sat, pony_gnss_io
 		{   7,   14,  16, UINT_MAX, -PONY_GNSS_IO_UBLOX_TWO_m29   , 15      }, //  6 Cus,        x 2^-29
 		{   8,    6,  24,       11,  PONY_GNSS_IO_UBLOX_TWO_m19   , 16      }, //  7 sqrtA LSB,  x 2^-33
 		{   9,   14,  16, UINT_MAX,                           0x10, 17      }, //  8 toe (time of ephemeris data)
-		// extra entries for MSB sections			          
+		// extra entries for MSB sections
 		{   3,    6,   8, UINT_MAX,                              0, UINT_MAX}, //  9 M0    MSB
 		{   5,    6,   8, UINT_MAX,                              0, UINT_MAX}, // 10 e     MSB
 		{   7,    6,   8, UINT_MAX,                              0, UINT_MAX}, // 11 sqrtA MSB
@@ -1057,6 +1070,10 @@ char pony_gnss_io_ublox_nav_subframe_parser_gps(pony_gnss_sat *sat, pony_gnss_io
 	int week0, IODprev;
 	pony_time_epoch epoch = {0,0,0,0,0,0};
 
+
+	// validate
+	if (sat == NULL || subframe == NULL)
+		return 0;
 	// store current satellite date, if present
 	epoch.Y = pony_gnss_io_ublox_round(sat->eph[epoch_eph+0]);
 	epoch.M = pony_gnss_io_ublox_round(sat->eph[epoch_eph+1]);
@@ -1067,9 +1084,9 @@ char pony_gnss_io_ublox_nav_subframe_parser_gps(pony_gnss_sat *sat, pony_gnss_io
 	IODprev = pony_gnss_io_ublox_round(sat->eph[IOD_eph]);
 	// tlm word - telemetry
 		// preamble
-	if ( ((subframe->dwrd[tlm_word]>>tlm_preamble_shift) & tlm_preamble_mask) != tlm_preamble ) 
+	if ( ((subframe->dwrd[tlm_word]>>tlm_preamble_shift) & tlm_preamble_mask) != tlm_preamble )
 		return 0;
-	// how word - handover 
+	// how word - handover
 		// subframe id
 	id = (subframe->dwrd[how_word]>>how_id_shift) & how_id_mask;
 	// regular data processing
@@ -1077,7 +1094,7 @@ char pony_gnss_io_ublox_nav_subframe_parser_gps(pony_gnss_sat *sat, pony_gnss_io
 	if ( !pony_gnss_io_ublox_nav_subframe_parse_data(sat->eph, subframe->dwrd, (pony_gnss_io_ublox_nav_subframe_conversion_entry *)(&(ctable[id-1])), entries_count[id-1], 1) )
 		return 0;
 	// special entries handling
-	switch (id) { 
+	switch (id) {
 		case 1:
 			// URA index to SV accuracy: SVa = 2^(1+N/2) [N = 0..6], 2^(N-2) [N = 7..15]
 			N = (unsigned short)(sat->eph[ ctable[0][SVa_entry].eph ]);
@@ -1125,10 +1142,10 @@ char pony_gnss_io_ublox_nav_subframe_parser_gps(pony_gnss_sat *sat, pony_gnss_io
 
 	// GLONASS subframes
 #define PONY_GNSS_IO_UBLOX_GLO_NAV_SUBFRAME_MAX_TOTAL_CONVERSION_ENTRIES 7
-char pony_gnss_io_ublox_nav_subframe_parser_glo(pony_gnss_sat *sat, pony_gnss_io_ublox_RXM_SFRBX_block *subframe) {
-
+char pony_gnss_io_ublox_nav_subframe_parser_glo(pony_gnss_sat *sat, pony_gnss_io_ublox_RXM_SFRBX_block *subframe)
+{
 	const double dt_utc_h = 3, dt_utc_s = dt_utc_h*3600;
-	const unsigned char 
+	const unsigned char
 		msg_id_shift		= 27,
 		tb_shift            = 14,
 		NT_shift            = 21,
@@ -1175,7 +1192,7 @@ char pony_gnss_io_ublox_nav_subframe_parser_glo(pony_gnss_sat *sat, pony_gnss_io
 		{   1,   19,  13,        4, -PONY_GNSS_IO_UBLOX_TWO_m19/2, 18      }, //  1 Vz LSB, x 2^-20
 		{   1,   14,   5, UINT_MAX, -PONY_GNSS_IO_UBLOX_TWO_m29/2, 19      }, //  2 Az,     x 2^-30
 		{   2,   19,  13,        5, -PONY_GNSS_IO_UBLOX_TWO_m11  , 17      }, //  3 Z  LSB, x 2^-11
-		// extra entries for MSB sections				  
+		// extra entries for MSB sections
 		{   0,    0,  11, UINT_MAX,                             0, UINT_MAX}, //  4 Vz MSB
 		{   1,    0,  14, UINT_MAX,                             0, UINT_MAX}, //  5 Z  MSB
 	}, {
@@ -1184,7 +1201,7 @@ char pony_gnss_io_ublox_nav_subframe_parser_glo(pony_gnss_sat *sat, pony_gnss_io
 		{   0,    5,  22, UINT_MAX, -PONY_GNSS_IO_UBLOX_TWO_m29/2,  6      }, //  0 tau,    x 2^-30
 		{   1,   27,   5, UINT_MAX,                             1, 20      }, //  1 E
 		{   2,   26,   6,        3,                             1,  2      }, //  2 NT LSB
-		// extra entries for MSB sections				        
+		// extra entries for MSB sections
 		{   1,    0,   5, UINT_MAX,                             0, UINT_MAX}, //  3 NT MSB
 	} };
 
@@ -1192,6 +1209,10 @@ char pony_gnss_io_ublox_nav_subframe_parser_glo(pony_gnss_sat *sat, pony_gnss_io
 	long tk_prev;
 	pony_time_epoch epoch;
 
+
+	//validate
+	if (sat == NULL || subframe == NULL)
+		return 0;
 	// store current satellite date, if present
 	epoch.Y = pony_gnss_io_ublox_round(sat->eph[epoch_eph+0]);
 	epoch.M = pony_gnss_io_ublox_round(sat->eph[epoch_eph+1]);
@@ -1228,9 +1249,9 @@ char pony_gnss_io_ublox_nav_subframe_parser_glo(pony_gnss_sat *sat, pony_gnss_io
 			sat->eph[ ctable[1][tb_entry].eph ] = epoch.m;
 			break;
 		case 3: break;
-		case 4: 
+		case 4:
 			// tauN x -1
-			sat->eph[ ctable[3][tau_entry].eph ] *= -1; 
+			sat->eph[ ctable[3][tau_entry].eph ] *= -1;
 			// copy NT to eph_counter bitfield and restore satellite date until full subframe set is collected
 			sat->eph_counter &= ~(NT_mask<<NT_shift); // drop bits
 			sat->eph_counter |= (unsigned long)(pony_gnss_io_ublox_round(sat->eph[ ctable[3][NT_entry].eph ]/ctable[3][NT_entry].scale))<<NT_shift;
@@ -1273,22 +1294,22 @@ char pony_gnss_io_ublox_nav_subframe_parser_glo(pony_gnss_sat *sat, pony_gnss_io
 
 	// Galileo subframes I/NAV E1-B/E5b-I
 #define PONY_GNSS_IO_UBLOX_GAL_NAV_SUBFRAME_MAX_TOTAL_CONVERSION_ENTRIES 12
-char pony_gnss_io_ublox_nav_subframe_parser_gal(pony_gnss_sat *sat, pony_gnss_io_ublox_RXM_SFRBX_block *subframe) {
-
-	const unsigned char 
+char pony_gnss_io_ublox_nav_subframe_parser_gal(pony_gnss_sat *sat, pony_gnss_io_ublox_RXM_SFRBX_block *subframe)
+{
+	const unsigned char
 		even_word         = 0,
 		 odd_word         = 4,
 		even_odd_shift    = 31,
 		msg_type_word     = 0,
 		msg_type_shift    = 24,
 		msg_type_mask     = 0x3f,
-		health_bits_count = 6, 
+		health_bits_count = 6,
 		eph_counter_full  = 0x1f;
-	const unsigned short 
+	const unsigned short
 		wk_rollover = 0x1000, // GST/GAL week rollover interval
 		wk_shift    = 0x0400, // GST week shift to align with GPS week
 		DS_bitfield = 0x0201; // data source I/NAV E1-B, bit 0 and bit 9 set
-	const size_t 
+	const size_t
 		  epoch_eph  = 0,
 		     DS_eph  = 26,
 		    IOD_eph  = 9,
@@ -1306,7 +1327,7 @@ char pony_gnss_io_ublox_nav_subframe_parser_gal(pony_gnss_sat *sat, pony_gnss_io
 		{   1,    0,  32, UINT_MAX, -PONY_GNSS_IO_UBLOX_TWO_m31xPI, 12      }, //  2 M0,        x 2^-31 x pi
 		{   2,    0,  32, UINT_MAX,  PONY_GNSS_IO_UBLOX_TWO_m31/4 , 14      }, //  3 e,         x 2^-33
 		{   4,   16,  14,        5,  PONY_GNSS_IO_UBLOX_TWO_m19   , 16      }, //  4 sqrtA LSB, x 2^-19
-		// extra entries for MSB sections										  
+		// extra entries for MSB sections
 		{   3,   14,  18, UINT_MAX,                              0, UINT_MAX}, //  5 sqrtA MSB
 	}, {
 		// I/NAV word type 2 entries (Table 40, OS-SIS-ICD, Issue 1.2 (November 2015), p. 37
@@ -1316,7 +1337,7 @@ char pony_gnss_io_ublox_nav_subframe_parser_gal(pony_gnss_sat *sat, pony_gnss_io
 		{   2,   14,  18,        6, -PONY_GNSS_IO_UBLOX_TWO_m31xPI, 21      }, //  2 i0    LSB, x 2^-31 x pi
 		{   3,   14,  18,        7, -PONY_GNSS_IO_UBLOX_TWO_m31xPI, 23      }, //  3 omega LSB, x 2^-31 x pi
 		{   4,   16,  14, UINT_MAX, -PONY_GNSS_IO_UBLOX_TWO_m43xPI, 25      }, //  4 idot,      x 2^-43 x pi
-		// extra entries for MSB sections										  
+		// extra entries for MSB sections
 		{   0,    0,  14, UINT_MAX,                              0, UINT_MAX}, //  5 Om0   MSB
 		{   1,    0,  14, UINT_MAX,                              0, UINT_MAX}, //  6 i0    MSB
 		{   2,    0,  14, UINT_MAX,                              0, UINT_MAX}, //  7 omega MSB
@@ -1331,7 +1352,7 @@ char pony_gnss_io_ublox_nav_subframe_parser_gal(pony_gnss_sat *sat, pony_gnss_io
 		{   3,   22,  10,       10, -PONY_GNSS_IO_UBLOX_TWO_m05   , 22      }, //  5 Crc   LSB, x 2^-5
 		{   4,   22,   8,       11, -PONY_GNSS_IO_UBLOX_TWO_m05   , 10      }, //  6 Crs   LSB, x 2^-5
 		{   4,   14,   8, UINT_MAX,                              1, 29      }, //  7 SISA
-		// extra entries for MSB sections										  
+		// extra entries for MSB sections
 		{   0,    0,  14, UINT_MAX,                              0, UINT_MAX}, //  8 Omdot MSB
 		{   1,    0,   6, UINT_MAX,                              0, UINT_MAX}, //  9 Cuc   MSB
 		{   2,    0,   6, UINT_MAX,                              0, UINT_MAX}, // 10 Crc   MSB
@@ -1346,7 +1367,7 @@ char pony_gnss_io_ublox_nav_subframe_parser_gal(pony_gnss_sat *sat, pony_gnss_io
 		{   3,   27,   5,        9, -PONY_GNSS_IO_UBLOX_TWO_m31/8 ,  6      }, //  4 af0   LSB, x 2^-34
 		{   4,   22,   8,       10, -PONY_GNSS_IO_UBLOX_TWO_m43/8 ,  7      }, //  5 af1   LSB, x 2^-46
 		{   4,   16,   6, UINT_MAX, -PONY_GNSS_IO_UBLOX_TWO_m55/16,  8      }, //  6 af2,       x 2^-59
-		// extra entries for MSB sections										  
+		// extra entries for MSB sections
 		{   0,    0,   8, UINT_MAX,                              0, UINT_MAX}, //  7 Cic   MSB
 		{   1,    0,   8, UINT_MAX,                              0, UINT_MAX}, //  8 toc   MSB
 		{   2,    0,  26, UINT_MAX,                              0, UINT_MAX}, //  9 af0   MSB
@@ -1359,7 +1380,7 @@ char pony_gnss_io_ublox_nav_subframe_parser_gal(pony_gnss_sat *sat, pony_gnss_io
 		{   2,   21,   6, UINT_MAX,                              1, 30      }, //  2 health flags
 		{   2,    9,  12, UINT_MAX,                              1, 27      }, //  3 WN
 		{   3,   21,  11,        6,                              1, 33      }, //  4 TOW         LSB
-		// extra entries for MSB sections				  	      					    
+		// extra entries for MSB sections
 		{   1,    0,   5, UINT_MAX,                              0, UINT_MAX}, //  5 BGD(E1,E5b) MSB
 		{   2,    0,   9, UINT_MAX,                              0, UINT_MAX}, //  6 TOW         MSB
 	} };
@@ -1370,6 +1391,10 @@ char pony_gnss_io_ublox_nav_subframe_parser_gal(pony_gnss_sat *sat, pony_gnss_io
 	double SISA;
 	pony_time_epoch epoch = {0,0,0,0,0,0};
 
+
+	//validate
+	if (sat == NULL || subframe == NULL)
+		return 0;
 	// store current satellite date, if present
 	epoch.Y = pony_gnss_io_ublox_round(sat->eph[epoch_eph+0]);
 	epoch.M = pony_gnss_io_ublox_round(sat->eph[epoch_eph+1]);
@@ -1382,7 +1407,7 @@ char pony_gnss_io_ublox_nav_subframe_parser_gal(pony_gnss_sat *sat, pony_gnss_io
 	// store IODnav
 	IODprev = pony_gnss_io_ublox_round(sat->eph[IOD_eph]);
 	// check even/odd bits
-	if ( ((subframe->dwrd[even_word]>>even_odd_shift) & 0x01) != 0 || ((subframe->dwrd[odd_word]>>even_odd_shift) & 0x01) != 1 ) 
+	if ( ((subframe->dwrd[even_word]>>even_odd_shift) & 0x01) != 0 || ((subframe->dwrd[odd_word]>>even_odd_shift) & 0x01) != 1 )
 		return 0;
 	// message type id
 	id = (subframe->dwrd[msg_type_word]>>msg_type_shift) & msg_type_mask;
@@ -1391,19 +1416,19 @@ char pony_gnss_io_ublox_nav_subframe_parser_gal(pony_gnss_sat *sat, pony_gnss_io
 	if ( !pony_gnss_io_ublox_nav_subframe_parse_data(sat->eph, subframe->dwrd, (pony_gnss_io_ublox_nav_subframe_conversion_entry *)(&(ctable[id-1])), entries_count[id-1], 1) )
 		return 0;
 	// special entries handling
-	switch (id) { 
+	switch (id) {
 		case 1: break;
 		case 2: break;
-		case 3:  
-			// SISA index to signal in space accuracy 
+		case 3:
+			// SISA index to signal in space accuracy
 			SISA = sat->eph[ ctable[2][SISA_entry].eph ];
-			sat->eph[ ctable[2][SISA_entry].eph ] = 
-				  (SISA <=  50) ? (       SISA     *0.01) : 
-				( (SISA <=  75) ? (0.5 + (SISA- 50)*0.02) : 
-				( (SISA <= 100) ? (1.0 + (SISA- 75)*0.04) : 
+			sat->eph[ ctable[2][SISA_entry].eph ] =
+				  (SISA <=  50) ? (       SISA     *0.01) :
+				( (SISA <=  75) ? (0.5 + (SISA- 50)*0.02) :
+				( (SISA <= 100) ? (1.0 + (SISA- 75)*0.04) :
 				( (SISA <= 125) ? (2.0 + (SISA-100)*0.16) : -1) ) ); // -1 for NAPA state - no accuracy prediction available
 			break;
-		case 4: 
+		case 4:
 			// toc seconds to time of day and date, if available
 			if (week0 < 0) { // no date available
 				// remove whole days
@@ -1427,7 +1452,7 @@ char pony_gnss_io_ublox_nav_subframe_parser_gal(pony_gnss_sat *sat, pony_gnss_io
 				sat->eph[epoch_eph+5] = epoch.s;
 			}
 			break;
-		case 5: 
+		case 5:
 			// GST week to GAL week (aligned to GPS week)
 			sat->eph[ ctable[4][week_entry].eph ] += wk_shift;
 			if (week0 >= 0) {
@@ -1472,14 +1497,13 @@ char pony_gnss_io_ublox_nav_subframe_parser_gal(pony_gnss_sat *sat, pony_gnss_io
 	sat->eph[DS_eph] = (double)((short)(sat->eph[DS_eph]) | DS_bitfield); // set E1-B and bit 9
 
 	return 1;
-
 }
 
 	// BeiDou subframes
 #define PONY_GNSS_IO_UBLOX_BDS_NAV_SUBFRAME_MAX_TOTAL_CONVERSIION_ENTRIES 18
-char pony_gnss_io_ublox_nav_subframe_parser_bds(pony_gnss_sat *sat, pony_gnss_io_ublox_RXM_SFRBX_block *subframe) {
-
-	const unsigned char 
+char pony_gnss_io_ublox_nav_subframe_parser_bds(pony_gnss_sat *sat, pony_gnss_io_ublox_RXM_SFRBX_block *subframe)
+{
+	const unsigned char
 		eph_counter_full = 0x07,
 		toe_MSB_shift    = 30,
 		toe_LSB_shift    = 15;
@@ -1490,9 +1514,9 @@ char pony_gnss_io_ublox_nav_subframe_parser_bds(pony_gnss_sat *sat, pony_gnss_io
 		pre_word = 0, pre_shift = 19, pre_mask = 0x07ff, preamble = 0x0712, // preamble
 		fra_word = 0, fra_shift = 12, fra_mask = 0x0007,					// frame id
 		wk_shift = 1356, wk_rollover = 0x2000;
-	const double 
+	const double
 		URA_sqrt2minus1 = 0.41;
-	const size_t 
+	const size_t
 		  epoch_eph     = 0,
 		    toe_eph     = 17,
 		   URAI_entry   = 3,
@@ -1517,7 +1541,7 @@ char pony_gnss_io_ublox_nav_subframe_parser_bds(pony_gnss_sat *sat, pony_gnss_io
 		{   8,   13,  17,       15, -PONY_GNSS_IO_UBLOX_TWO_m31/4 ,  6      }, //  9 a0      LSB, x 2^-33
 		{   9,   13,  17,       16, -PONY_GNSS_IO_UBLOX_TWO_m50   ,  7      }, // 10 a1      LSB, x 2^-50
 		{   9,    8,   5, UINT_MAX,                              1,  9      }, // 11 AODE         (age of data - ephemeris)
-		// extra entries for MSB sections			  	      						 	    
+		// extra entries for MSB sections
 		{   0,    4,   8, UINT_MAX,                              0, UINT_MAX}, // 12 SOW     MSB  (seconds of BDS week most significant bits)
 		{   2,    8,   9, UINT_MAX,                              0, UINT_MAX}, // 13 toc     MSB
 		{   3,    8,   4, UINT_MAX,                              0, UINT_MAX}, // 14 TGD2    MSB
@@ -1536,7 +1560,7 @@ char pony_gnss_io_ublox_nav_subframe_parser_bds(pony_gnss_sat *sat, pony_gnss_io
 		{   8,   20,  10,       16, -PONY_GNSS_IO_UBLOX_TWO_m05/2 , 10      }, //  7 Crs     LSB, x 2^-6
 		{   9,   10,  20,       17, +PONY_GNSS_IO_UBLOX_TWO_m19   , 16      }, //  8 sqrtA   LSB, x 2^-19
 		{   9,    8,   2, UINT_MAX,                   (0x01<<15)*8, 17      }, //  9 toe     MSB, x 8*2^15
-		// extra entries for MSB sections											   
+		// extra entries for MSB sections
 		{   0,    4,   8, UINT_MAX,                              0, UINT_MAX}, // 10 SOW     MSB  (seconds of BDS week most significant bits)
 		{   1,    8,  10, UINT_MAX,                              0, UINT_MAX}, // 11 Delta n MSB
 		{   2,    8,  16, UINT_MAX,                              0, UINT_MAX}, // 12 Cuc     MSB
@@ -1557,7 +1581,7 @@ char pony_gnss_io_ublox_nav_subframe_parser_bds(pony_gnss_sat *sat, pony_gnss_io
 		{   7,   29,   1,       15, -PONY_GNSS_IO_UBLOX_TWO_m43xPI, 25      }, //  6 i dot   LSB, x 2^-43 x pi
 		{   8,   19,  11,       16, -PONY_GNSS_IO_UBLOX_TWO_m31xPI, 19      }, //  7 Om0     LSB, x 2^-31 x pi
 		{   9,    9,  21,       17, -PONY_GNSS_IO_UBLOX_TWO_m31xPI, 23      }, //  8 omega   LSB, x 2^-31 x pi
-		// extra entries for MSB sections										    
+		// extra entries for MSB sections
 		{   0,    4,   8, UINT_MAX,                              0, UINT_MAX}, //  9 SOW     MSB  (seconds of BDS week most significant bits)
 		{   1,    8,  10, UINT_MAX,                              0, UINT_MAX}, // 10 toe     ISB  (intermediate bits)
 		{   2,    8,  17, UINT_MAX,                              0, UINT_MAX}, // 11 i0      MSB
@@ -1575,6 +1599,10 @@ char pony_gnss_io_ublox_nav_subframe_parser_bds(pony_gnss_sat *sat, pony_gnss_io
 	double toe;
 	pony_time_epoch epoch = {0,0,0,0,0,0}, epoch0;
 
+
+	//validate
+	if (sat == NULL || subframe == NULL)
+		return 0;
 	// store current satellite toc, if present
 	epoch.Y = pony_gnss_io_ublox_round(sat->eph[epoch_eph+0]);
 	epoch.M = pony_gnss_io_ublox_round(sat->eph[epoch_eph+1]);
@@ -1589,7 +1617,7 @@ char pony_gnss_io_ublox_nav_subframe_parser_bds(pony_gnss_sat *sat, pony_gnss_io
 	// store toe
 	toe = sat->eph[toe_eph];
 	// preamble
-	if ( ((subframe->dwrd[pre_word]>>pre_shift) & pre_mask) != preamble ) 
+	if ( ((subframe->dwrd[pre_word]>>pre_shift) & pre_mask) != preamble )
 		return 0;
 	// subframe id
 	id = (unsigned char)((subframe->dwrd[fra_word]>>fra_shift) & fra_mask);
@@ -1598,7 +1626,7 @@ char pony_gnss_io_ublox_nav_subframe_parser_bds(pony_gnss_sat *sat, pony_gnss_io
 	if ( !pony_gnss_io_ublox_nav_subframe_parse_data(sat->eph, subframe->dwrd, (pony_gnss_io_ublox_nav_subframe_conversion_entry *)(&(ctable[id-1])), entries_count[id-1], 1) )
 		return 0;
 	// special entries handling
-	switch (id) { 
+	switch (id) {
 		case 1:
 			// URA index to user range accuracy: URA = 2^(1+N/2) [N = 0..5], 2^(N-2) [N = 6..15]
 			N = (unsigned short)(sat->eph[ ctable[0][URAI_entry].eph ]);
@@ -1622,13 +1650,13 @@ char pony_gnss_io_ublox_nav_subframe_parser_bds(pony_gnss_sat *sat, pony_gnss_io
 			sat->eph[epoch_eph+4] = epoch.m;
 			sat->eph[epoch_eph+5] = epoch.s;
 			break;
-		case 2: 
+		case 2:
 			// move toe most significant bits to eph_counter for further processing
 			sat->eph_counter &= ~(toe_MSB_mask<<toe_MSB_shift); // reset toe MSB bits in counter
 			sat->eph_counter |= ((unsigned long)(sat->eph[ ctable[1][toe_MSB_entry].eph ] / ctable[1][toe_MSB_entry].scale))<<toe_MSB_shift;
 			sat->eph[toe_eph] = toe;
 			break;
-		case 3: 
+		case 3:
 			// move toe least significant bits to eph_counter for further processing
 			sat->eph_counter &= ~(toe_LSB_mask<<toe_LSB_shift); // reset toe MSB bits in counter
 			sat->eph_counter |= ((unsigned long)(sat->eph[ ctable[2][toe_LSB_entry].eph ] / ctable[2][toe_LSB_entry].scale))<<toe_LSB_shift;
@@ -1647,7 +1675,7 @@ char pony_gnss_io_ublox_nav_subframe_parser_bds(pony_gnss_sat *sat, pony_gnss_io
 	sat->eph_counter |= (0x01<<(id-1));
 	if ((sat->eph_counter & eph_counter_full) == eph_counter_full) {
 		// move toe from eph_counter to ephemeris
-		sat->eph[toe_eph] = 
+		sat->eph[toe_eph] =
 			((sat->eph_counter>>toe_MSB_shift)&toe_MSB_mask)*ctable[1][toe_MSB_entry].scale +
 			((sat->eph_counter>>toe_LSB_shift)&toe_LSB_mask)*ctable[2][toe_LSB_entry].scale;
 		// set flag, reset counter
@@ -1663,14 +1691,16 @@ char pony_gnss_io_ublox_nav_subframe_parser_bds(pony_gnss_sat *sat, pony_gnss_io
 
 // internal routines
 	// GLONASS day into 4-year cycle and tb to time epoch closest to given year, see A.3.1.3 in ICD L1,L2 GLONASS Ed. 5.1 2008, p. 57
-void pony_gnss_io_ublox_glonass_day2date(pony_time_epoch *epoch, unsigned int day) {
-
+void pony_gnss_io_ublox_glonass_day2date(pony_time_epoch *epoch, unsigned int day)
+{
                                // Mar Apr May Jun Jul Aug Sep Oct Nov Dec Jan
 	const unsigned short dom[] = { 30, 60, 91,121,152,183,213,244,274,305,336}; // days of year since March 1 when months end
-	
+
+	// validate
+	if (epoch == NULL)
+		return;
 	// GLONASSS clock starts in 1996
 	epoch->Y = (epoch->Y < 1996) ? 1996 : (epoch->Y/4)*4; // latest multiple of four not less than 1996
-
 	// year
 	if (day > 366)
 		epoch->Y += (day - 2)/365;
@@ -1684,21 +1714,21 @@ void pony_gnss_io_ublox_glonass_day2date(pony_time_epoch *epoch, unsigned int da
 	epoch->D += (epoch->M > 0) ? -dom[epoch->M-1] : 1;
 	// move starting day from March 1 to January 1
 	epoch->M += (epoch->M > 9) ? -9 : 3;
-
 }
 
 	// observation types handling
-char pony_gnss_io_ublox_obs_types_allocate(char (**obs_types)[4], size_t *obs_count, pony_gnss_sat *sat, const size_t sat_count, const pony_gnss_io_ublox_signal_id_converson_table_struct *sig) {
-
+char pony_gnss_io_ublox_obs_types_allocate(char (**obs_types)[4], size_t *obs_count, pony_gnss_sat *sat, const size_t sat_count, const pony_gnss_io_ublox_signal_id_converson_table_struct *sig)
+{
 	enum obs_type_id {code, phase, doppler, SS, obs_type_count};
 
 	const char obs_type[] = {'C','L','D','S'};
 
 	size_t i;
 
-	if (sig == NULL || obs_type == NULL || obs_count == NULL || sat == NULL)
+	// validate
+	if (sig == NULL || obs_types == NULL || obs_count == NULL || sat == NULL)
 		return 0;
-
+	// allocate memory
 	*obs_count = sig->types*obs_type_count;
 	*obs_types = (char (*)[4])calloc(*obs_count, sizeof (char [4]));
 	if (*obs_types == NULL)
@@ -1718,20 +1748,20 @@ char pony_gnss_io_ublox_obs_types_allocate(char (**obs_types)[4], size_t *obs_co
 	}
 
 	return 1;
-
 }
 
 
 
 
 	// drop satellite flags
-void pony_gnss_io_ublox_drop_flags_pony_sats(pony_gnss_sat *sat, const size_t sat_count, const size_t obs_count) {
-
+void pony_gnss_io_ublox_drop_flags_pony_sats(pony_gnss_sat *sat, const size_t sat_count, const size_t obs_count)
+{
 	size_t i, s;
 
+	// validate
 	if (sat == NULL)
-		return; // nothing to do
-
+		return; // do nothing
+	// drop flags
 	for (s = 0; s < sat_count; s++) {
 		sat[s].t_em_valid = 0;
 		sat[s].x_valid = 0;
@@ -1739,15 +1769,18 @@ void pony_gnss_io_ublox_drop_flags_pony_sats(pony_gnss_sat *sat, const size_t sa
 		for (i = 0; i < obs_count; i++)
 			sat[s].obs_valid[i] = 0;
 	}
-
 }
 
 
 
 
 	// drop solution flags
-void pony_gnss_io_ublox_drop_flags_pony_sol(pony_sol *sol) {
-
+void pony_gnss_io_ublox_drop_flags_pony_sol(pony_sol *sol)
+{
+	// validate
+	if (sol == NULL)
+		return;
+	// drop flags
 	sol->x_valid	= 0;
 	sol->llh_valid	= 0;
 	sol->v_valid	= 0;
@@ -1755,25 +1788,33 @@ void pony_gnss_io_ublox_drop_flags_pony_sol(pony_sol *sol) {
 	sol->L_valid	= 0;
 	sol->rpy_valid	= 0;
 	sol->dt_valid	= 0;
-
 }
 
 
 
 	// uBlox 8-bit Fletcher recursive checksum
-void pony_gnss_io_ublox_checksum_recurse(unsigned char *cs,  unsigned char byte) {
-		cs[0] = 0xff & ( (0xff & (cs[0])) + (0xff & byte ) );
-		cs[1] = 0xff & ( (0xff & (cs[1])) + (0xff & cs[0]) );
+void pony_gnss_io_ublox_checksum_recurse(unsigned char *cs,  unsigned char byte)
+{
+	enum {byte_mask = 0xff};
+
+	// validate
+	if (cs == NULL)
+		return;
+	// update checksum
+	cs[0] = byte_mask & ( (byte_mask & (cs[0])) + (byte_mask & byte ) );
+	cs[1] = byte_mask & ( (byte_mask & (cs[1])) + (byte_mask & cs[0]) );
 }
 
 
 
 
 	// free memory with pointer NULL-check and NULL-assignment
-void pony_gnss_io_ublox_free_null(void **ptr) 
+void pony_gnss_io_ublox_free_null(void **ptr)
 {
-	if (*ptr == NULL)
+	// validate
+	if (ptr == NULL || *ptr == NULL)
 		return;
+	// free memory
 	free(*ptr);
 	*ptr = NULL;
 }
@@ -1782,11 +1823,13 @@ void pony_gnss_io_ublox_free_null(void **ptr)
 
 
 	// round to the nearest integer
-int pony_gnss_io_ublox_round(double x) {
+int pony_gnss_io_ublox_round(double x)
+{
 	return ( (int)( x >= 0.0 ? (x + 0.5) : (x - 0.5) ) );
 }
 
 	// remainder after division for doubles
-double pony_gnss_io_ublox_dmod(double x, double y) {
-    return x - (int)(x/y) * y;
+double pony_gnss_io_ublox_dmod(double x, double y)
+{
+    return x - (int)(x/y)*y;
 }

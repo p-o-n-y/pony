@@ -1,14 +1,14 @@
-// Aug-2022
-/*	pony_gnss_io_rinex 
-	
+// Jan-2025
+/*	pony_gnss_io_rinex
+
 	pony plugins for GNSS RINEX input/output:
 
-	- pony_gnss_io_rinex_v3_read_obs_from_file 
+	- pony_gnss_io_rinex_v3_read_obs_from_file
 		Reads observation data (measurements) from RINEX v3.0x files, including header and data records.
 		Supports GPS, GLONASS, Galileo and BeiDou systems.
-		Multi-receiver/multi-antenna capable, with syncronization option.
+		Multi-receiver/multi-antenna capable, with synchronization option.
 		Does not support header updates after END OF HEADER line.
-		Only limited number of header labels are processed. 
+		Only limited number of header labels are processed.
 
 	- pony_gnss_io_rinex_read_eph_from_file
 		Reads navigation data (ephemeris) from RINEX v2-3 files, including header and data records.
@@ -16,7 +16,7 @@
 		Multi-receiver/multi-antenna capable.
 		Does not support header updates after END OF HEADER line.
 		Only limited number of header labels are processed.
-	
+
 */
 
 #include <stdio.h>
@@ -50,15 +50,15 @@ char   pony_gnss_io_rinex_eph_file_header_parse_time_corr(pony_gnss *gnss,  char
 void   pony_gnss_io_rinex_eph_file_header_parse_time_corr_line(double *clock_corr, char *time_sys, char *valid,  char *buf, const size_t len);
 void   pony_gnss_io_rinex_eph_file_records_read(pony_gnss_sat *sat, pony_time_epoch *epoch, FILE *fp, char *buf, double *eph, unsigned int *sn, const size_t sys, const size_t maxsat, const size_t maxeph);
 char   pony_gnss_io_rinex_eph_file_parse_record_header(double *eph, char *buf, const size_t len);
-size_t pony_gnss_io_rinex_eph_file_parse_record_lines(double *eph,  FILE *fp, char *buf, const size_t lines);
+size_t pony_gnss_io_rinex_eph_file_parse_record_lines(double *eph, const size_t maxeph,  FILE *fp, char *buf, const size_t lines);
 char   pony_gnss_io_rinex_file_header_parse_leap_sec(pony_gnss *gnss,  char *buf, const size_t len, char bds_only);
 
 	// service routines
 void   pony_gnss_io_rinex_free_null(void **ptr); // free memory with NULL-check and NULL-assignment
-	   
+
 void   pony_gnss_io_rinex_drop_flags_pony_sats(pony_gnss_sat *sat, const size_t sat_count, const size_t obs_count);
 void   pony_gnss_io_rinex_drop_flags_pony_sol(pony_sol *sol);
-	   
+
 void   pony_gnss_io_rinex_charrep(char *s, char oldc, char newc);
 char   pony_gnss_io_rinex_read_token_str(char *value,  const char *token, const char *src, const size_t len);
 char   pony_gnss_io_rinex_read_token_double(double *dest, const char *token, const char *src, const size_t len);
@@ -83,12 +83,12 @@ double pony_gnss_io_rinex_dmod(double x, double y);
 // plugin definitions
 
 /* pony_gnss_io_rinex_v3_read_obs_from_file - pony plugin
-	
+
 	Reads observation data (measurements) from RINEX v3.0x files, including header and data records.
 	Supports GPS, GLONASS, Galileo and BeiDou systems.
-	Multi-receiver/multi-antenna capable, with syncronization option.
+	Multi-receiver/multi-antenna capable, with synchronization option.
 	Does not support header updates after END OF HEADER line.
-	Only limited number of header labels are processed. 
+	Only limited number of header labels are processed.
 
 	description:
 		supported header labels are
@@ -99,7 +99,7 @@ double pony_gnss_io_rinex_dmod(double x, double y);
 				END OF HEADER
 			- optional
 				GLONASS SLOT / FRQ #
-				LEAP SECONDS	
+				LEAP SECONDS
 	uses:
 		pony->gnss_count
 		pony->gnss[].gps/glo/gal/bds->max_sat_count
@@ -136,18 +136,19 @@ double pony_gnss_io_rinex_dmod(double x, double y);
 			example: gnss_sync = 0.09
 			negative values result in sync turned off
 */
-void pony_gnss_io_rinex_v3_read_obs_from_file(void) {
-
-	const char 
+void pony_gnss_io_rinex_v3_read_obs_from_file(void)
+{
+	const char
 		cfg_obs_token  [] = "obs_in",    // gnss rinex observation data input source              parameter name in configuration
 		gnss_sync_token[] = "gnss_sync"; // multi-receiver observations synchronization threshold parameter name in configuration
-	
+
 	static FILE   **fp        = NULL;    // file pointers for each receiver
 	static char   **buf       = NULL;    // data buffers  for each receiver
 	static double   gnss_sync = -1;      // multi-receiver observations synchronization threshold in seconds, negative for sync off
 
 	size_t          r, count;                     // common counting variables
 	pony_time_epoch latest_epoch = {0,0,0,0,0,0}; // latest epoch to sync
+
 
 	// requires gnss data initialized
 	if (pony->gnss == NULL)
@@ -180,9 +181,9 @@ void pony_gnss_io_rinex_v3_read_obs_from_file(void) {
 				return;
 			}
 			// observation file name from configuration
-			if (  !pony_gnss_io_rinex_read_token_str(buf[r],  cfg_obs_token, pony->gnss[r].cfg_settings, pony->gnss[r].settings_length) 
-				|| buf[r][0] == '\0' ) {
-				printf("\n\tERROR: could not find GNSS observations RINEX file name in the configuration for gnss[%d]:\n\t\t'%s'",
+			if (  !pony_gnss_io_rinex_read_token_str(buf[r],  cfg_obs_token, pony->gnss[r].cfg_settings, pony->gnss[r].settings_length)
+				|| buf[r][0] == 0 ) {
+				printf("\n\tERROR: could not find GNSS observations RINEX file name in the configuration for gnss[%lu]:\n\t\t'%s'",
 					r, pony->gnss[r].cfg_settings);
 				pony->mode = -1;
 				return;
@@ -190,14 +191,14 @@ void pony_gnss_io_rinex_v3_read_obs_from_file(void) {
 			// open the file
 			fp[r] = fopen(buf[r],"r");
 			if (fp[r] == NULL) {
-				printf("\n\terror: could not open GNSS observations RINEX file '%s' for gnss[%d]",buf[r],r);
+				printf("\n\terror: could not open GNSS observations RINEX file '%s' for gnss[%lu]",buf[r],r);
 				pony->mode = -1;
 				return;
 			}
 			printf("\n\t'%s' opened",buf[r]);
 			// read RINEX header
 			if ( !pony_gnss_io_rinex_v3_obs_file_header_read(&(pony->gnss[r]), fp[r], buf[r]) ) {
-				printf("\n\tERROR: GNSS observations RINEX file header not parsed for gnss[%d]", r);
+				printf("\n\tERROR: GNSS observations RINEX file header not parsed for gnss[%lu]", r);
 				pony->mode = -1;
 				return;
 			}
@@ -224,14 +225,13 @@ void pony_gnss_io_rinex_v3_read_obs_from_file(void) {
 					continue;
 				else if (fp[r] != NULL)
 					fclose(fp[r]);
-			free(fp);
-			fp = NULL;
+			pony_gnss_io_rinex_free_null( (void **)(&fp) );
 		}
 		// free memory
 		for (r = 0; r < pony->gnss_count; r++) {
 			if (pony->gnss[r].cfg == NULL)
 				continue;
-			pony_gnss_io_rinex_free_null( (void **)(&(buf[r])) );
+			free(buf[r]);
 		}
 		pony_gnss_io_rinex_free_null( (void **)(&buf) );
 
@@ -265,7 +265,7 @@ void pony_gnss_io_rinex_v3_read_obs_from_file(void) {
 			if (fp[r] == NULL)
 				continue;
 			else
-				while ( 
+				while (
 					pony_gnss_io_rinex_dmod(
 						(       latest_epoch.h*3600.0 +        latest_epoch.m*60 +        latest_epoch.s) - // latest   epoch time of day
 						(pony->gnss[r].epoch.h*3600.0 + pony->gnss[r].epoch.m*60 + pony->gnss[r].epoch.s),  // receiver epoch time of day
@@ -276,13 +276,13 @@ void pony_gnss_io_rinex_v3_read_obs_from_file(void) {
 						pony->mode = -1;
 						break;
 					}
-		
+
 	}
 
 }
 
 /* pony_gnss_io_rinex_read_eph_from_file - pony plugin
-	
+
 	Reads navigation data (ephemeris) from RINEX v2-3 files, including header and data records.
 	Supports GPS, GLONASS, Galileo and BeiDou systems.
 	Multi-receiver/multi-antenna capable.
@@ -334,11 +334,11 @@ void pony_gnss_io_rinex_v3_read_obs_from_file(void) {
 			         {gnss: {gal: eph_in = "data/191025_0255/191025_0255_rover.19e"}}
 			         {gnss: {bds: eph_in = "data/191025_0255/191025_0255_rover.19c"}}
 */
-void pony_gnss_io_rinex_read_eph_from_file(void) {
-
+void pony_gnss_io_rinex_read_eph_from_file(void)
+{
 	enum sys_index {gps, glo, gal, bds, sys_count};
 	const char cfg_eph_token[] = "eph_in";
-	
+
 	static FILE         ***fp            = NULL; // file pointer for each receiver for each system (for mixed rinex files only one is used per receiver)
 	static char         ***buf           = NULL; // reading buffer for each receiver for each system (for mixed rinex files only one is used per receiver)
 	static double       ***eph           = NULL; // latest ephemeris set parsed for each receiver for each system
@@ -346,11 +346,12 @@ void pony_gnss_io_rinex_read_eph_from_file(void) {
 	static size_t         *max_eph_count = NULL; // maximum number of ephemeris for each system
 	static size_t         *max_sat_count = NULL; // maximum number of satellites for each system
 
-	char 
+	char
 		fname [PONY_GNSS_IO_RINEX_BUFFER_SIZE] = "", // system-specific file name, if found in configuration
 		fname0[PONY_GNSS_IO_RINEX_BUFFER_SIZE] = ""; // mixed data file name,      if found in configuration
 	pony_gnss_sat *sat;    // pointer to particular satellite data
 	size_t         r, sys; // receiver and system index variables
+
 
 	// requires gnss data initialized
 	if (pony->gnss == NULL)
@@ -388,7 +389,7 @@ void pony_gnss_io_rinex_read_eph_from_file(void) {
 			if (max_eph_count[sys] > 0)
 				break;
 		if (sys == sys_count) // neither GPS, GLONASS, Galileo or BeiDou data initialized on the bus
-			return; 
+			return;
 		// allocate buffers for receivers
 		eph = (double      ***)calloc( pony->gnss_count, sizeof(double      **) );
 		fp  = (FILE        ***)calloc( pony->gnss_count, sizeof(FILE        **) );
@@ -406,8 +407,8 @@ void pony_gnss_io_rinex_read_eph_from_file(void) {
 			if (pony->gnss[r].cfg == NULL)
 				continue;
 			// allocate variables for each supported system
-			fp [r] = (FILE         **)calloc( sys_count, sizeof(FILE       *) ); 
-			buf[r] = (char         **)calloc( sys_count, sizeof(char       *) ); 
+			fp [r] = (FILE         **)calloc( sys_count, sizeof(FILE       *) );
+			buf[r] = (char         **)calloc( sys_count, sizeof(char       *) );
 			sn [r] = (unsigned int  *)calloc( sys_count, sizeof(unsigned int) );
 			eph[r] = (double       **)calloc( sys_count, sizeof(double     *) );
 			if (fp[r] == NULL || buf[r] == NULL || sn[r] == NULL || eph[r] == NULL) {
@@ -415,17 +416,9 @@ void pony_gnss_io_rinex_read_eph_from_file(void) {
 				pony->mode = -1;
 				return;
 			}
-			for (sys = 0; sys < sys_count; sys++) {
-				eph[r][sys] = (double *)calloc( max_eph_count[sys], sizeof(double) );
-				if (eph[r][sys] == NULL && max_eph_count[sys] > 0) {
-					printf("\nERROR: memory allocation failed for rinex ephemeris gnss system data");
-					pony->mode = -1;
-					return;
-				}
-			}		
 			// determine files from configuration
 				// check for a mixed multi-gnss file
-			pony_gnss_io_rinex_read_token_str(fname0,  cfg_eph_token, pony->gnss[r].cfg_settings, pony->gnss[r].settings_length); 	
+			pony_gnss_io_rinex_read_token_str(fname0,  cfg_eph_token, pony->gnss[r].cfg_settings, pony->gnss[r].settings_length);
 				// gps
 			fp[r][gps] = NULL;
 			if (pony->gnss[r].gps != NULL) // look for navigation data file for gps
@@ -455,11 +448,11 @@ void pony_gnss_io_rinex_read_eph_from_file(void) {
 				else
 					fp[r][bds] = fopen(fname0, "r"); // try to open for reading
 				// check for required files found
-			if (    (pony->gnss[r].gps != NULL && fp[r][gps] == NULL) 
-				 || (pony->gnss[r].glo != NULL && fp[r][glo] == NULL) 
+			if (    (pony->gnss[r].gps != NULL && fp[r][gps] == NULL)
+				 || (pony->gnss[r].glo != NULL && fp[r][glo] == NULL)
 				 || (pony->gnss[r].gal != NULL && fp[r][gal] == NULL)
 				 || (pony->gnss[r].bds != NULL && fp[r][bds] == NULL) ) { // at least one of required ephemeris file does not exist
-						printf("\n\tERROR: failed to get all required ephemeris RINEX files from configuration for gnss[%d]:\n\t\t'%s'",
+						printf("\n\tERROR: failed to get all required ephemeris RINEX files from configuration for gnss[%lu]:\n\t\t'%s'",
 							r, pony->gnss[r].cfg_settings);
 						pony->mode = -1;
 						return;
@@ -469,16 +462,19 @@ void pony_gnss_io_rinex_read_eph_from_file(void) {
 				// skip unopened files
 				if (fp[r][sys] == NULL)
 					continue;
-				// memory buffer
-				buf[r][sys] = (char *)calloc( PONY_GNSS_IO_RINEX_BUFFER_SIZE, sizeof(char) );
-				if (buf[r][sys] == NULL) {
-					printf("\nERROR: memory allocation failed for rinex ephemeris data buffer");
+				eph[r][sys] = (double *)calloc( max_eph_count[sys]            , sizeof(double) ); // ephemeris buffer
+				buf[r][sys] = (char   *)calloc( PONY_GNSS_IO_RINEX_BUFFER_SIZE, sizeof(char  ) ); // file data buffer
+				if (0
+					||  buf[r][sys] == NULL
+					|| (eph[r][sys] == NULL && max_eph_count[sys] > 0)
+					) {
+					printf("\nERROR: memory allocation failed for RINEX ephemeris data buffer");
 					pony->mode = -1;
 					return;
 				}
 				// parse navigation data header
 				if ( !pony_gnss_io_rinex_eph_file_header_read(&(pony->gnss[r]), fp[r][sys], buf[r][sys]) ) {
-					printf("\n\tERROR: ephemeris RINEX file header not parsed for gnss[%d]", r);
+					printf("\n\tERROR: ephemeris RINEX file header not parsed for gnss[%lu]", r);
 					pony->mode = -1;
 					return;
 				}
@@ -500,16 +496,13 @@ void pony_gnss_io_rinex_read_eph_from_file(void) {
 					continue;
 				// for each system
 				for (sys = 0; sys < sys_count; sys++) {
-					if (fp[r][sys] == NULL) 
-						continue; 
+					if (fp[r][sys] == NULL)
+						continue;
 					fclose(fp[r][sys]);
-					fp[r][sys] = NULL;
 				}
 				free(fp[r]);
-				fp[r] = NULL;
 			}
-			free(fp);
-			fp = NULL;
+			pony_gnss_io_rinex_free_null( (void **)(&fp) );
 		}
 		// free memory
 		for (r = 0; r < pony->gnss_count; r++) {
@@ -538,6 +531,9 @@ void pony_gnss_io_rinex_read_eph_from_file(void) {
 
 	// regular processing
 	else {
+
+		if (fp == NULL)
+			return; // nothing to do
 		// for each receiver
 		for (r = 0; r < pony->gnss_count; r++)
 			// skip uninitialized
@@ -550,26 +546,26 @@ void pony_gnss_io_rinex_read_eph_from_file(void) {
 						sat = NULL;
 						switch (sys) {
 							case gps:
-								if (pony->gnss[r].gps != NULL) 
-									sat = pony->gnss[r].gps->sat; 
+								if (pony->gnss[r].gps != NULL)
+									sat = pony->gnss[r].gps->sat;
 								else
 									continue;
 								break;
 							case glo:
-								if (pony->gnss[r].glo != NULL) 
-									sat = pony->gnss[r].glo->sat; 
+								if (pony->gnss[r].glo != NULL)
+									sat = pony->gnss[r].glo->sat;
 								else
 									continue;
 								break;
 							case gal:
-								if (pony->gnss[r].gal != NULL) 
-									sat = pony->gnss[r].gal->sat; 
+								if (pony->gnss[r].gal != NULL)
+									sat = pony->gnss[r].gal->sat;
 								else
 									continue;
 								break;
 							case bds:
-								if (pony->gnss[r].bds != NULL) 
-									sat = pony->gnss[r].bds->sat; 
+								if (pony->gnss[r].bds != NULL)
+									sat = pony->gnss[r].bds->sat;
 								else
 									continue;
 								break;
@@ -578,8 +574,8 @@ void pony_gnss_io_rinex_read_eph_from_file(void) {
 						}
 						// parse records from file
 						pony_gnss_io_rinex_eph_file_records_read(
-							sat, &(pony->gnss[r].epoch), 
-							fp[r][sys], buf[r][sys], eph[r][sys], &(sn[r][sys]), 
+							sat, &(pony->gnss[r].epoch),
+							fp[r][sys], buf[r][sys], eph[r][sys], &(sn[r][sys]),
 							sys, max_sat_count[sys], max_eph_count[sys]);
 					}
 	}
@@ -596,16 +592,16 @@ void pony_gnss_io_rinex_read_eph_from_file(void) {
 // internal routines
 	// RINEX routines
 		// observation file header
-char pony_gnss_io_rinex_v3_obs_file_header_read(pony_gnss *gnss, FILE *fp, char *buf) {
-
+char pony_gnss_io_rinex_v3_obs_file_header_read(pony_gnss *gnss, FILE *fp, char *buf)
+{
 	enum system_id          {gps, glo, gal, bds, sys_count};
 
-	const char   sys_id[] = {'G', 'R', 'E', 'C'}; 
+	const char   sys_id[] = {'G', 'R', 'E', 'C'};
 	const size_t label_offset = 61, label_len = 20, type_offset = 20, sys_offset = 40;
 
 	// required label - version and type
 	const char  rinex_version_type_label[] = "RINEX VERSION / TYPE";
-	const float rinex_version_range[] = {3.02f, 3.04f};
+	const float rinex_version_range[] = {3.00f, 3.05f};
 	const float rinex_version_prec = 0.001f;
 	const char  rinex_type_token = 'O';
 
@@ -623,25 +619,27 @@ char pony_gnss_io_rinex_v3_obs_file_header_read(pony_gnss *gnss, FILE *fp, char 
 	// optional label - leap seconds
 	const char rinex_leap_sec_label[] = "LEAP SECONDS";
 
-	size_t tokens_found = 0;
+	size_t tokens_found;
 	float version;
 	size_t i, sys, maxsat, *obs_count = NULL;
 	int scanned;
-	char rinex_type_sys, current_sys = 0, sys_obstypes_found = 0, glo_freq_slot_found = 0, flag, (**obs_types)[4] = NULL; 
+	char rinex_type_sys, current_sys = 0, sys_obstypes_found = 0, glo_freq_slot_found = 0, flag, (**obs_types)[4] = NULL;
 	pony_gnss_sat *sat = NULL;
 
 
-
+	// validate
 	if (fp == NULL || feof(fp))
 		return 0;
 
+	// init counter
+	tokens_found = 0;
+	
 	// check starting label
-	rinex_type_sys = 0;
 	while ( !feof(fp) ) {
-		// read a new string
-		fgets(buf, PONY_GNSS_IO_RINEX_BUFFER_SIZE, fp);
-		for (i = 0; buf[i] >= ' '; i++); buf[i] = '\0';		// set end of line on the first non-printable character
-		if (i < label_offset) continue;						// check if buffer contains enough characters to proceed
+		// read new line
+		if (fgets(buf, PONY_GNSS_IO_RINEX_BUFFER_SIZE, fp) == NULL) break;                 // break on end-of-file or read error
+		for (i = 0; i < PONY_GNSS_IO_RINEX_BUFFER_SIZE && buf[i] >= ' '; i++); buf[i] = 0; // set end of line on the first non-printable character
+		if (i < label_offset) continue;                                                    // check if buffer contains enough characters to proceed
 
 		// check if a starting token is found
 		if ( pony_gnss_io_rinex_find_token(rinex_version_type_label,buf+label_offset-1,label_len) ) {
@@ -662,15 +660,17 @@ char pony_gnss_io_rinex_v3_obs_file_header_read(pony_gnss *gnss, FILE *fp, char 
 			tokens_found++;
 			break;
 		}
+		else
+			return 0; // starting label is required
 	}
 	// check other labels
 	current_sys = 0;
 	flag = 0;
-	while ( !feof(fp) ) {
-
-		fgets(buf, PONY_GNSS_IO_RINEX_BUFFER_SIZE, fp);
-		for (i = 0; buf[i] >= ' '; i++); buf[i] = '\0';		// set end of line on the first non-printable character
-		if (i < label_offset) continue;						// check if buffer contains enough characters to proceed
+	while (!feof(fp) && tokens_found) {
+		// read new line
+		if (fgets(buf, PONY_GNSS_IO_RINEX_BUFFER_SIZE, fp) == NULL) break;                 // break on end-of-file or read error
+		for (i = 0; i < PONY_GNSS_IO_RINEX_BUFFER_SIZE && buf[i] >= ' '; i++); buf[i] = 0; // set end of line on the first non-printable character
+		if (i < label_offset) continue;                                                    // check if buffer contains enough characters to proceed
 
 		// check if a token is found
 		if ( pony_gnss_io_rinex_find_token(rinex_sys_obstypes_label,buf+label_offset-1,label_len) ) {
@@ -695,39 +695,39 @@ char pony_gnss_io_rinex_v3_obs_file_header_read(pony_gnss *gnss, FILE *fp, char 
 						flag = 1;
 						break;
 					}
-					
+
 			switch (sys) {
-				case gps:  
-					if (gnss->gps == NULL) 
+				case gps:
+					if (gnss->gps == NULL)
 						continue;
 					obs_count = &(gnss->gps->obs_count);
 					obs_types = &(gnss->gps->obs_types);
 					sat       =   gnss->gps->sat;
-					maxsat    =   gnss->gps->max_sat_count; 
+					maxsat    =   gnss->gps->max_sat_count;
 					break;
-				case glo:  
-					if (gnss->glo == NULL) 
+				case glo:
+					if (gnss->glo == NULL)
 						continue;
 					obs_count = &(gnss->glo->obs_count);
 					obs_types = &(gnss->glo->obs_types);
 					sat       =   gnss->glo->sat;
-					maxsat    =   gnss->glo->max_sat_count; 
+					maxsat    =   gnss->glo->max_sat_count;
 					break;
-				case gal:  
-					if (gnss->gal == NULL) 
+				case gal:
+					if (gnss->gal == NULL)
 						continue;
 					obs_count = &(gnss->gal->obs_count);
 					obs_types = &(gnss->gal->obs_types);
 					sat       =   gnss->gal->sat;
-					maxsat    =   gnss->gal->max_sat_count; 
+					maxsat    =   gnss->gal->max_sat_count;
 					break;
-				case bds:  
-					if (gnss->bds == NULL) 
+				case bds:
+					if (gnss->bds == NULL)
 						continue;
 					obs_count = &(gnss->bds->obs_count);
 					obs_types = &(gnss->bds->obs_types);
 					sat       =   gnss->bds->sat;
-					maxsat    =   gnss->bds->max_sat_count; 
+					maxsat    =   gnss->bds->max_sat_count;
 					break;
 				default: continue;
 			}
@@ -792,8 +792,8 @@ char pony_gnss_io_rinex_v3_obs_file_header_read(pony_gnss *gnss, FILE *fp, char 
 }
 
 	// observation file header line sys/obstypes
-char pony_gnss_io_rinex_obs_file_header_parse_sys_obstypes(size_t *obs_count, char (**obs_types)[4], pony_gnss_sat *sat,  char *buf, const size_t len, const size_t sat_count, char flag) {
-
+char pony_gnss_io_rinex_obs_file_header_parse_sys_obstypes(size_t *obs_count, char (**obs_types)[4], pony_gnss_sat *sat,  char *buf, const size_t len, const size_t sat_count, char flag)
+{
 	const size_t obstype_length = 3;
 
 	static unsigned int current_sys_obs_count = 0, current_sys_obs_index = 0;
@@ -801,6 +801,11 @@ char pony_gnss_io_rinex_obs_file_header_parse_sys_obstypes(size_t *obs_count, ch
 	size_t i, j, n;
 	int scanned;
 
+
+	// validate
+	if (obs_count == NULL || obs_types == NULL || sat == NULL || buf == NULL)
+		return 0;
+	// parse
 	for (n = 0; n < len && buf[n]; n++);
 	i = 0;
 	switch (flag) {
@@ -813,7 +818,7 @@ char pony_gnss_io_rinex_obs_file_header_parse_sys_obstypes(size_t *obs_count, ch
 			// observation count
 				// parse the number
 			scanned = sscanf(buf + i, "%u", &current_sys_obs_count);
-			if (scanned < 1 || current_sys_obs_count == 0) 
+			if (scanned < 1 || current_sys_obs_count == 0)
 				return 0;
 			*obs_count = current_sys_obs_count;
 				// allocate memory for observations & validity flags
@@ -850,8 +855,8 @@ char pony_gnss_io_rinex_obs_file_header_parse_sys_obstypes(size_t *obs_count, ch
 }
 
 	// observation file header line glonass slot/frq #
-char pony_gnss_io_rinex_obs_file_header_parse_glo_slot_frq(pony_gnss_glo *glo,  char *buf, const size_t len, char flag) {
-
+char pony_gnss_io_rinex_obs_file_header_parse_glo_slot_frq(pony_gnss_glo *glo,  char *buf, const size_t len, char flag)
+{
 	const int max_frq_num = 24;
 
 	static unsigned int entry_count = 0, current_entry_index = 0;
@@ -860,6 +865,11 @@ char pony_gnss_io_rinex_obs_file_header_parse_glo_slot_frq(pony_gnss_glo *glo,  
 	unsigned int sn;
 	int scanned;
 
+
+	//validate
+	if (glo == NULL || buf == NULL)
+		return 0;
+	// parse
 	for (n = 0; n < len && buf[n]; n++);
 	for (i = 0; i < n && buf[i] && buf[i] <= ' '; i++); // skip all non-printable
 	switch (flag) {
@@ -869,7 +879,7 @@ char pony_gnss_io_rinex_obs_file_header_parse_glo_slot_frq(pony_gnss_glo *glo,  
 			// entry count
 				// parse the number
 			scanned = sscanf(buf + i, "%u", &entry_count);
-			if (scanned < 1 || entry_count == 0 || entry_count > glo->max_sat_count) 
+			if (scanned < 1 || entry_count == 0 || entry_count > glo->max_sat_count)
 				return 0;
 			current_entry_index = 0;
 
@@ -899,13 +909,12 @@ char pony_gnss_io_rinex_obs_file_header_parse_glo_slot_frq(pony_gnss_glo *glo,  
 	}
 
 	return 1;
-
 }
 
 	// observation file records
-char pony_gnss_io_rinex_v3_obs_file_record_read(pony_gnss *gnss, FILE *fp, char *buf) {
-
-	const char 
+char pony_gnss_io_rinex_v3_obs_file_record_read(pony_gnss *gnss, FILE *fp, char *buf)
+{
+	const char
 		gps_sys_id[] = "G",
 		glo_sys_id[] = "R",
 		gal_sys_id[] = "E",
@@ -914,19 +923,22 @@ char pony_gnss_io_rinex_v3_obs_file_record_read(pony_gnss *gnss, FILE *fp, char 
 
 	int epoch_flag = -1, scanned;
 	unsigned int i, n = 0;
+	char *res;
 
+
+	// validate
 	if (gnss == NULL || fp == NULL || buf == NULL || gnss->cfg == NULL)
 		return 0;
 
 	// wait for the record identifier to occur
 	do
-		fgets(buf,PONY_GNSS_IO_RINEX_BUFFER_SIZE,fp);
-	while (!feof(fp) && buf[0] != rec_id);
+		res = fgets(buf,PONY_GNSS_IO_RINEX_BUFFER_SIZE,fp); // try getting new line
+	while (res != NULL && buf[0] != rec_id);                // break if either end-of-file/read error, or record id character occurred
 
-	if ( feof(fp) )
+	if (res == NULL) // no data
 		return 0;
 
-	scanned = sscanf(buf, "%*c %d %d %d  %d %d %lf  %d  %u", 
+	scanned = sscanf(buf, "%*c %d %d %d  %d %d %lf  %d  %u",
 		&(gnss->epoch.Y), &(gnss->epoch.M), &(gnss->epoch.D),
 		&(gnss->epoch.h), &(gnss->epoch.m), &(gnss->epoch.s),
 		&epoch_flag, &n);
@@ -947,24 +959,25 @@ char pony_gnss_io_rinex_v3_obs_file_record_read(pony_gnss *gnss, FILE *fp, char 
 		pony_gnss_io_rinex_drop_flags_pony_sats(gnss->bds->sat, gnss->bds->max_sat_count, gnss->bds->obs_count); // BeiDou satellite flags
 	pony_gnss_io_rinex_drop_flags_pony_sol( &(gnss->sol) ); // solution flags
 
+	// parse new satellite data
 	for (i = 0; i < n && !feof(fp); i++) {
-		fgets(buf,PONY_GNSS_IO_RINEX_BUFFER_SIZE,fp);
-
-		if      (buf[0] == gps_sys_id[0] && gnss->gps != NULL 
+		if (fgets(buf,PONY_GNSS_IO_RINEX_BUFFER_SIZE,fp) == NULL) break; // get new line, break on end-of-file or read error
+		// check constellation
+		if (0); // for code alignment, removed by optimizer
+		else if (buf[0] == gps_sys_id[0] && gnss->gps != NULL
 			&& !pony_gnss_io_rinex_obs_file_record_parse_obs_line(gnss->gps->sat,  buf, PONY_GNSS_IO_RINEX_BUFFER_SIZE, gnss->gps->max_sat_count, gnss->gps->obs_count) )
 				break;
 		else if (buf[0] == glo_sys_id[0] && gnss->glo != NULL
 			&& !pony_gnss_io_rinex_obs_file_record_parse_obs_line(gnss->glo->sat,  buf, PONY_GNSS_IO_RINEX_BUFFER_SIZE, gnss->glo->max_sat_count, gnss->glo->obs_count) )
 				break;
-		else if (buf[0] == gal_sys_id[0] && gnss->gal != NULL 
+		else if (buf[0] == gal_sys_id[0] && gnss->gal != NULL
 			&& !pony_gnss_io_rinex_obs_file_record_parse_obs_line(gnss->gal->sat,  buf, PONY_GNSS_IO_RINEX_BUFFER_SIZE, gnss->gal->max_sat_count, gnss->gal->obs_count) )
 				break;
-		else if (buf[0] == bds_sys_id[0] && gnss->bds != NULL 
+		else if (buf[0] == bds_sys_id[0] && gnss->bds != NULL
 			&& !pony_gnss_io_rinex_obs_file_record_parse_obs_line(gnss->bds->sat,  buf, PONY_GNSS_IO_RINEX_BUFFER_SIZE, gnss->bds->max_sat_count, gnss->bds->obs_count) )
 				break;
 		else
 			continue;
-
 	}
 	if (i < n) // not enough satellite data collected
 		return 0;
@@ -972,8 +985,8 @@ char pony_gnss_io_rinex_v3_obs_file_record_read(pony_gnss *gnss, FILE *fp, char 
 	return 1;
 }
 
-char pony_gnss_io_rinex_obs_file_record_parse_obs_line(pony_gnss_sat *sat,  char *buf, const size_t len, const size_t sat_count, const size_t obs_count) {
-
+char pony_gnss_io_rinex_obs_file_record_parse_obs_line(pony_gnss_sat *sat,  char *buf, const size_t len, const size_t sat_count, const size_t obs_count)
+{
 	const size_t obs_width = 14,	LLI_width = 1,		SS_width = 1,		rec_width = obs_width+LLI_width+SS_width, sat_id_width = 3;
 	const char	 obs_fmt[] = "%lf",	LLI_fmt[] = "%d",	SS_fmt[] = "%d";
 
@@ -982,7 +995,12 @@ char pony_gnss_io_rinex_obs_file_record_parse_obs_line(pony_gnss_sat *sat,  char
 	int scanned;
 	int LLI, SS;
 	char c;
-	
+
+
+	// validate
+	if (sat == NULL || buf == NULL)
+		return 0;
+	// parse
 	for (n = 0; n < len && buf[n]; n++);
 	if (n < sat_id_width)
 		return 0;
@@ -1018,16 +1036,19 @@ char pony_gnss_io_rinex_obs_file_record_parse_obs_line(pony_gnss_sat *sat,  char
 	}
 
 	return 1;
-
 }
 
-int pony_gnss_io_rinex_v3_obs_file_record_read_parse_entry(char *buf, const size_t width, const char *fmt, void *dest) {
-
+int pony_gnss_io_rinex_v3_obs_file_record_read_parse_entry(char *buf, const size_t width, const char *fmt, void *dest)
+{
 	char c;
 	int scanned;
 
+	// validate
+	if (buf == NULL || fmt == NULL || dest == NULL)
+		return 0;
+	// parse
 	c = buf[width];
-	buf[width] = '\0';
+	buf[width] = 0;
 	scanned = sscanf(buf, fmt, dest);
 	buf[width] = c;
 
@@ -1036,16 +1057,16 @@ int pony_gnss_io_rinex_v3_obs_file_record_read_parse_entry(char *buf, const size
 
 
 	// ephemeris file header
-char pony_gnss_io_rinex_eph_file_header_read(pony_gnss *gnss, FILE *fp, char *buf) {
-
+char pony_gnss_io_rinex_eph_file_header_read(pony_gnss *gnss, FILE *fp, char *buf)
+{
 	enum system_id          {gps, glo, gal, bds, sys_count};
 
-	const char   sys_id[] = {'G', 'R', 'E', 'C'}; 
+	const char   sys_id[] = {'G', 'R', 'E', 'C'};
 	const size_t label_offset = 61, label_len = 20, type_offset = 20, sys_offset = 40;
 
 	// mandatory label: RINEX version and type
 	const char  rinex_version_type_label[] = "RINEX VERSION / TYPE";
-	const float rinex_version_range[] = {2.10f, 3.04f};
+	const float rinex_version_range[] = {2.10f, 3.05f};
 	const float rinex_version_prec = 0.001f;
 	const char  rinex_type_token = 'N';
 	// mandatory label: end of header
@@ -1055,22 +1076,27 @@ char pony_gnss_io_rinex_eph_file_header_read(pony_gnss *gnss, FILE *fp, char *bu
 	// optional labels
 	const char rinex_iono_corr_label[] = "IONOSPHERIC CORR";
 	const char rinex_time_corr_label[] = "TIME SYSTEM CORR";
-	const char rinex_leap_sec_label[] = "LEAP SECONDS";
-	
+	const char rinex_leap_sec_label[]  = "LEAP SECONDS";
+
 	float version;
 	char  rinex_type_sys;
-	size_t i, tokens_found = 0;
+	size_t i, tokens_found;
 
 
-	if ( feof(fp) )
+	// validate
+	if (gnss == NULL || fp == NULL || buf == NULL)
 		return 0;
 
+	// init counter
+	tokens_found = 0;
+	
 	// check starting label
+	rinex_type_sys = 0;
 	while ( !feof(fp) ) {
-		// read a new string
-		fgets(buf, PONY_GNSS_IO_RINEX_BUFFER_SIZE, fp);
-		for (i = 0; buf[i] >= ' '; i++); buf[i] = '\0';		// set end of line on the first non-printable character
-		if (i < label_offset) continue;						// check if buffer contains enough characters to proceed
+		// read new line
+		if (fgets(buf, PONY_GNSS_IO_RINEX_BUFFER_SIZE, fp) == NULL) break;                 // break on end-of-file or read error
+		for (i = 0; i < PONY_GNSS_IO_RINEX_BUFFER_SIZE && buf[i] >= ' '; i++); buf[i] = 0; // set end of line on the first non-printable character
+		if (i < label_offset) continue;                                                    // check if buffer contains enough characters to proceed
 
 		// check if a starting token is found
 		if ( pony_gnss_io_rinex_find_token(rinex_version_type_label,buf+label_offset-1,label_len) ) {
@@ -1091,14 +1117,16 @@ char pony_gnss_io_rinex_eph_file_header_read(pony_gnss *gnss, FILE *fp, char *bu
 			tokens_found++;
 			break;
 		}
+		else
+			return 0; // starting label is required
 	}
 
 	// check other labels
-	while ( !feof(fp) ) {
-
-		fgets(buf, PONY_GNSS_IO_RINEX_BUFFER_SIZE-1, fp);
-		for (i = 0; buf[i] >= ' '; i++); buf[i] = '\0';		// set end of line on the first non-printable character
-		if (i < label_offset) continue;						// check if buffer contains enough characters to proceed
+	while (!feof(fp) && tokens_found) {
+		// get new line
+		if (fgets(buf, PONY_GNSS_IO_RINEX_BUFFER_SIZE, fp) == NULL) break;                 // break on end-of-file or read error
+		for (i = 0; i < PONY_GNSS_IO_RINEX_BUFFER_SIZE && buf[i] >= ' '; i++); buf[i] = 0; // set end of line on the first non-printable character
+		if (i < label_offset) continue;                                                    // check if buffer contains enough characters to proceed
 
 		// check ionospheric correction
 		if ( pony_gnss_io_rinex_find_token(rinex_iono_corr_label,buf+label_offset-1,label_len) ) {
@@ -1127,23 +1155,26 @@ char pony_gnss_io_rinex_eph_file_header_read(pony_gnss *gnss, FILE *fp, char *bu
 		// check end of header
 		if ( pony_gnss_io_rinex_find_token(rinex_EOH_label,buf+label_offset-1,label_len) ) {
 			printf("\n\t%s",buf);
-			tokens_found++;   
+			tokens_found++;
 			break;
 		}
 
 	}
 
 	return (tokens_found == tokens_required)? 1 : 0;
-
 }
 
 		// ephemeris file header ionospheric correction
-char pony_gnss_io_rinex_eph_file_header_parse_iono_corr(pony_gnss *gnss,  char *buf, const size_t len) {
-	
+char pony_gnss_io_rinex_eph_file_header_parse_iono_corr(pony_gnss *gnss,  char *buf, const size_t len)
+{
 	const char gpsa_id[]		= "GPSA", gpsb_id[] =	"GPSB", gal_id[] =	"GAL", bdsa_id[] =	"BDSA", bdsb_id[] =	"BDSB";
 	const size_t id_width[]		= {4,					4,					3,					4,					4};
 	const size_t field_count[]	= {4,					4,					3,					4,					4};
-	
+
+	// validate
+	if (gnss == NULL || buf == NULL)
+		return 0;
+	// parse
 	if (pony_gnss_io_rinex_find_token(gpsa_id, buf, id_width[0]) && gnss->gps != NULL)
 		if ( !pony_gnss_io_rinex_eph_file_header_parse_iono_corr_line(gnss->gps->iono_a,  buf+id_width[0]+1, len-id_width[0], field_count[0]) )
 			return 0;
@@ -1170,20 +1201,25 @@ char pony_gnss_io_rinex_eph_file_header_parse_iono_corr(pony_gnss *gnss,  char *
 }
 
 		// ephemeris file header ionospheric correction - single line
-char pony_gnss_io_rinex_eph_file_header_parse_iono_corr_line(double *iono,  char *buf, const size_t len, const size_t field_count) {
-
+char pony_gnss_io_rinex_eph_file_header_parse_iono_corr_line(double *iono,  char *buf, const size_t len, const size_t field_count)
+{
 	const size_t field_width = 12;
 
 	size_t i, j, n;
 	int scanned;
 	char c;
 
+
+	// validate
+	if (iono == NULL || buf == NULL)
+		return 0;
+	// parse
 	for (n = 0; n < len && buf[n]; n++);
 	for (i = 0, j = 0; i < field_count && buf[j] && j < n; i++) {
 		if (j > n-field_width)
 			break;
 		c = buf[j+field_width];
-		buf[j+field_width] = '\0';
+		buf[j+field_width] = 0;
 
 		pony_gnss_io_rinex_charrep(buf+j, 'D', 'E'); pony_gnss_io_rinex_charrep(buf+j, 'd', 'e');
 		scanned = sscanf( buf+j, "%lg", &(iono[i]) );
@@ -1198,16 +1234,21 @@ char pony_gnss_io_rinex_eph_file_header_parse_iono_corr_line(double *iono,  char
 }
 
 		// ephemeris file header time system correction
-char pony_gnss_io_rinex_eph_file_header_parse_time_corr(pony_gnss *gnss,  char *buf, const size_t len) {
-
+char pony_gnss_io_rinex_eph_file_header_parse_time_corr(pony_gnss *gnss,  char *buf, const size_t len)
+{
 	const char gps_time_id[] = "GP", glo_time_id[] = "GL", gal_time_id[] = "GA", bds_time_id[] = "BD";
 	const size_t time_id_len = 2;
 
 	size_t i, i1, n;
 
+
+	// validate
+	if (gnss == NULL || buf == NULL)
+		return 0;
+	// parse
 	for (n = 0; n < len && buf[n]; n++);
 	i = 0;
-	for (; buf[i] <= ' ' && i < n-time_id_len; i++); // skip non-printables
+	for (; i < n-time_id_len && buf[i] <= ' '; i++); // skip non-printables
 	if (i >= n)
 		return 0;
 	i1 = i + time_id_len;
@@ -1224,27 +1265,32 @@ char pony_gnss_io_rinex_eph_file_header_parse_time_corr(pony_gnss *gnss,  char *
 }
 
 		// ephemeris file header time system correction - single line
-void pony_gnss_io_rinex_eph_file_header_parse_time_corr_line(double *clock_corr, char *time_sys, char *valid,  char *buf, const size_t len) {
-
+void pony_gnss_io_rinex_eph_file_header_parse_time_corr_line(double *clock_corr, char *time_sys, char *valid,  char *buf, const size_t len)
+{
 	const size_t time_id_len = 2, clock_corr_terms_count = 4, clock_corr_terms_len[] = {17, 16, 7, 5};
 
 	size_t i, j, n;
 	int scanned;
 	char c;
 
+
+	// validate
+	if (clock_corr == NULL || time_sys == NULL || valid == NULL || buf == NULL)
+		return;
+	// parse
 	for (n = 0; n < len && buf[n]; n++);
-	for (i = 0, j = 0; j < time_id_len && buf[i] && i < n; j++, i++)
+	for (i = 0, j = 0; j < time_id_len && i < n && buf[i]; j++, i++)
 		time_sys[j] = buf[i];
 	if (i >= n-1)
 		return;
 
 	i++; // skip one position
 
-	for (j = 0; j < clock_corr_terms_count && buf[i]; j++) {
+	for (j = 0; j < clock_corr_terms_count && i < n && buf[i]; j++) {
 		if (i > n-clock_corr_terms_len[j])
 			break;
 		c = buf[i+clock_corr_terms_len[j]];
-		buf[i+clock_corr_terms_len[j]] = '\0';
+		buf[i+clock_corr_terms_len[j]] = 0;
 
 		pony_gnss_io_rinex_charrep(buf+i, 'D', 'E'); pony_gnss_io_rinex_charrep(buf+i, 'd', 'e');
 		scanned = sscanf(buf+i, "%lg", &(clock_corr[j]));
@@ -1257,8 +1303,8 @@ void pony_gnss_io_rinex_eph_file_header_parse_time_corr_line(double *clock_corr,
 }
 
 	// file header leap seconds
-char pony_gnss_io_rinex_file_header_parse_leap_sec(pony_gnss *gnss,  char *buf, const size_t len, char bds_only) {
-
+char pony_gnss_io_rinex_file_header_parse_leap_sec(pony_gnss *gnss,  char *buf, const size_t len, char bds_only)
+{
 	enum format {cur_leap_sec = 0, future_past_leap_sec = 6, week = 12, day = 18, time_id = 24, end}; // format according to RINEX Version 3.03 Table A2 & Table A5 "LEAP SECONDS"
 
 	const char gps_id[] = {'G','P','S'}, // GPS time system identifier according to RINEX Version 3.03 Table A2 & Table A5 "LEAP SECONDS"
@@ -1269,13 +1315,16 @@ char pony_gnss_io_rinex_file_header_parse_leap_sec(pony_gnss *gnss,  char *buf, 
 	char c;
 
 
+	// validate
+	if (gnss == NULL || buf == NULL)
+		return 0;
 	// check string length
 	for (n = 0; n < len && buf[n]; n++);
 	if (n < future_past_leap_sec) // no room for current leap second field
 		return 0;
 	// parse current leap seconds
 	c = buf[future_past_leap_sec];    // store character after the end of the field
-	buf[future_past_leap_sec] = '\0'; // limit parsing to the beginning of the next field
+	buf[future_past_leap_sec] = 0; // limit parsing to the beginning of the next field
 	scanned = sscanf(buf+cur_leap_sec, "%d", &(gnss->leap_sec) );
 	buf[future_past_leap_sec] = c;    // restore replaced character
 	if (scanned == 1 && gnss->leap_sec > 0) // check if the value is parsed and valid
@@ -1311,40 +1360,42 @@ char pony_gnss_io_rinex_file_header_parse_leap_sec(pony_gnss *gnss,  char *buf, 
 
 	// ephemeris file records
 void pony_gnss_io_rinex_eph_file_records_read(
-	pony_gnss_sat *sat, pony_time_epoch *gnss_epoch, 
-	FILE *fp, char *buf, double *eph, unsigned int *sn, 
-	const size_t sys, const size_t maxsat, const size_t maxeph) 
+	pony_gnss_sat *sat, pony_time_epoch *gnss_epoch,
+	FILE *fp, char *buf, double *eph, unsigned int *sn,
+	const size_t sys, const size_t maxsat, const size_t maxeph)
 {
-
 	enum sys_index {gps, glo, gal, bds, sys_count};
 	const char sys_id[sys_count+1] = "GREC"; // GNSS system identifiers: GPS, GLONASS, Galileo, BeiDou, see RINEX documentation
-	const size_t														// gps glo gal bds
-				sys_record_lines							[sys_count] = { 7,  3,  7,  7}, 
-				sys_total_eph								[sys_count] = {35, 21, 34, 35};
-	const int	sys_update_older_ephemeris_if_less_than_min	[sys_count] = {61, 16,  6, 31};
-	const size_t sat_id_width = 3, header_eph_count = 9;
+	const size_t                       // gps glo gal bds
+		record_lines       [sys_count] = { 7,  3,  7,  7},
+		min_total_eph      [sys_count] = {35, 21, 33, 35};
+	const int
+		min_update_interval[sys_count] = {61, 16,  6, 31}; // in minutes
+	const size_t sat_id_width = 3, hdr_eph = 9;
 
 	size_t i;
 	int scanned = 0;
-	char refepoch_flag;	// 1 if reference epoch exists, 0 otherwise 
+	char refepoch_flag;	// 1 if reference epoch exists, 0 otherwise
+	char *res;
 	pony_time_epoch epoch, satepoch;
 
-	// safety check
+
+	// validate
 	if (sat == NULL || gnss_epoch == NULL || fp == NULL || buf == NULL || eph == NULL || sn == NULL)
 		return;
-	
+	// parse
 	while ( !feof(fp) ) { // read until end of file occurs
 
 		// check if eph buffers contain correct ephemeris, to use them for updating satellite data
 		refepoch_flag = pony_gnss_io_rinex_epoch_check(gnss_epoch);
 		if ( pony_gnss_io_rinex_epoch_from_array(&epoch, eph) )
-			if ( *sn > 0 && *sn <= maxsat && ( 
-				   !pony_gnss_io_rinex_epoch_from_array(&satepoch, sat[*sn-1].eph) 
+			if ( *sn > 0 && *sn <= maxsat && (0
+				|| !pony_gnss_io_rinex_epoch_from_array(&satepoch, sat[*sn-1].eph)
 				|| (refepoch_flag && pony_time_epochs_compare(&satepoch, gnss_epoch) < 0)
 
-				// temporary measure(?) if there are e.g. two sets for the same GPS sat with less than 1 hour between them, say 11:59:44 and 12:00:00
-				|| (abs( (satepoch.h*60+satepoch.m)-(epoch.h*60+epoch.m) ) <  sys_update_older_ephemeris_if_less_than_min[sys]                          )
-				|| (abs( (satepoch.h*60+satepoch.m)-(epoch.h*60+epoch.m) ) > -sys_update_older_ephemeris_if_less_than_min[sys]+pony->gnss_const.sec_in_d)
+				// temporary measure(?) if there are e.g. two sets for the same satellite with less than 1 hour between them, say 11:59:44 and 12:00:00, to take the latest one
+				|| (abs( (satepoch.h*60+satepoch.m)-(epoch.h*60+epoch.m) ) <  min_update_interval[sys]                             )
+				|| (abs( (satepoch.h*60+satepoch.m)-(epoch.h*60+epoch.m) ) > -min_update_interval[sys]+pony->gnss_const.sec_in_d/60) // account for day roll-over
 
 				) ) {
 				for (i = 0; i < maxeph; i++)
@@ -1354,12 +1405,13 @@ void pony_gnss_io_rinex_eph_file_records_read(
 			else if (refepoch_flag && pony_time_epochs_compare(&satepoch, gnss_epoch) >= 0 && pony_time_epochs_compare(&satepoch, &epoch) < 0)
 				break;
 
-		// wait for system identifier 
-		for (buf[0] = '\0'; buf != NULL && buf[0] != sys_id[sys]; )
-			buf = fgets(buf,PONY_GNSS_IO_RINEX_BUFFER_SIZE-1,fp);
-		if (buf == NULL)
+		// wait for system identifier
+		do
+			res = fgets(buf,PONY_GNSS_IO_RINEX_BUFFER_SIZE,fp); // try getting new line
+		while (res != NULL && buf[0] != sys_id[sys]);           // break if either end-of-file/read error, or system id character occured
+		if (res == NULL)
 			break;
-		
+
 		// try to parse the sn next to the system identifier
 		scanned = sscanf(buf,"%*c%2u", sn);
 		if (scanned < 1 || *sn == 0 || *sn > maxsat)
@@ -1367,10 +1419,11 @@ void pony_gnss_io_rinex_eph_file_records_read(
 
 		for (i = 0; i < maxeph; i++) // reset ephemeris in the buffer
 			eph[i] = 0.0;
-		
-		if ( !pony_gnss_io_rinex_eph_file_parse_record_header(eph, buf+sat_id_width, PONY_GNSS_IO_RINEX_BUFFER_SIZE-sat_id_width-1) // try to parse the first line
-			 || !pony_gnss_io_rinex_epoch_from_array(&epoch, eph) 
-			 || pony_gnss_io_rinex_eph_file_parse_record_lines(eph+header_eph_count,  fp, buf, sys_record_lines[sys]) < sys_total_eph[sys] // parse the rest of the lines (system-dependent, see RINEX documentation)
+
+		if (0
+			|| !pony_gnss_io_rinex_eph_file_parse_record_header(eph, buf+sat_id_width, PONY_GNSS_IO_RINEX_BUFFER_SIZE-sat_id_width-1)          // try parsing the first line
+			|| !pony_gnss_io_rinex_epoch_from_array(&epoch, eph)                                                                               // on success, convert to epoch
+			|| (pony_gnss_io_rinex_eph_file_parse_record_lines(eph+hdr_eph, maxeph-hdr_eph,  fp, buf, record_lines[sys]) < min_total_eph[sys]) // on success, parse the rest of the lines
 			 )
 			continue;
 	}
@@ -1378,8 +1431,8 @@ void pony_gnss_io_rinex_eph_file_records_read(
 }
 
 		// ephemeris file record header
-char pony_gnss_io_rinex_eph_file_parse_record_header(double *eph, char *buf, const size_t len) {
-
+char pony_gnss_io_rinex_eph_file_parse_record_header(double *eph, char *buf, const size_t len)
+{
 	const size_t field_count = 9;
 	const size_t field_width[] = {5, 3, 3, 3, 3, 3,  19, 19, 19};
 
@@ -1387,13 +1440,17 @@ char pony_gnss_io_rinex_eph_file_parse_record_header(double *eph, char *buf, con
 	int scanned;
 	char c;
 
+	// validate
+	if (eph == NULL || buf == NULL)
+		return 0;
+	// parse
 	for (n = 0; n < len && buf[n]; n++);
 	pony_gnss_io_rinex_charrep(buf, 'D', 'E'); pony_gnss_io_rinex_charrep(buf, 'd', 'e');
 	for (i = 0, k = 0; i < field_count; i++) {
-		if (k >= n-field_width[i] || buf[k] == '\0')
+		if (k >= n-field_width[i] || buf[k] == 0)
 			break;
 		c = buf[k+field_width[i]];
-		buf[k+field_width[i]] = '\0';
+		buf[k+field_width[i]] = 0;
 
 		scanned = sscanf( buf+k, "%lg", &(eph[i]) );
 		if (scanned < 1)
@@ -1407,37 +1464,42 @@ char pony_gnss_io_rinex_eph_file_parse_record_header(double *eph, char *buf, con
 }
 
 		// ephemeris file single record
-size_t pony_gnss_io_rinex_eph_file_parse_record_lines(double *eph,  FILE *fp, char *buf, const size_t lines) {
-
+size_t pony_gnss_io_rinex_eph_file_parse_record_lines(double *eph, const size_t maxeph,  FILE *fp, char *buf, const size_t lines)
+{
 	const size_t rec_per_line = 4, rec_width = 19, blank_width = 4;
 
 	size_t i, k, line, n, total;
 	int scanned;
 	char c;
 
-	for (line = 1, total = 0; line <= lines; line++) {
-		fgets(buf,PONY_GNSS_IO_RINEX_BUFFER_SIZE-1,fp);
-		for (n = 0; buf[n] != '\0'; n++); // determine total length
-		pony_gnss_io_rinex_charrep(buf, 'D', 'E'); pony_gnss_io_rinex_charrep(buf, 'd', 'e');
-		for (i = 0, k = blank_width; i < rec_per_line; i++) {
-			if (k >= n-rec_width || buf[k] == '\0')
+	// validate
+	if (eph == NULL || fp == NULL || buf == NULL)
+		return 0;
+	// parse
+	for (line = 1, total = 0; line <= lines && total < maxeph; line++) {
+		if (fgets(buf, PONY_GNSS_IO_RINEX_BUFFER_SIZE, fp) == NULL) break; // get new line, break on end-of-file or read error
+		for (n = 0; n < PONY_GNSS_IO_RINEX_BUFFER_SIZE && buf[n]; n++);    // determine line length
+		// replace exponent separators
+		pony_gnss_io_rinex_charrep(buf, 'D', 'E');
+		pony_gnss_io_rinex_charrep(buf, 'd', 'e');
+		// parse records
+		for (i = 0, k = blank_width, scanned = 0; i < rec_per_line && total < maxeph; i++, total++) {
+			if (k >= n-rec_width || buf[k] == 0) // end of line reached
 				break;
-			c = buf[k+rec_width];
-			buf[k+rec_width] = '\0';
-
-			scanned = sscanf( buf+k, "%lg", &(eph[total]) );
-			if (scanned < 1)
-				break;
-
-			total++;
+			// advance current position
 			k += rec_width;
+			// save next character, null-terminate, scan and restore character
+			c = buf[k];
+			buf[k] = 0;
+			scanned = sscanf(buf+k-rec_width, "%lg", &(eph[total]));
 			buf[k] = c;
+			// check
+			if (scanned < 1) // last records may be spare, containing either blanks or zeros
+				break;       // currently, bail out on blanks, do not count them in total parsed records
 		}
-		if (line < lines && i < rec_per_line)
-			break;
 	}
-	return total;
 
+	return total;
 }
 
 
@@ -1446,10 +1508,14 @@ size_t pony_gnss_io_rinex_eph_file_parse_record_lines(double *eph,  FILE *fp, ch
 
 
 // service routines
-void pony_gnss_io_rinex_drop_flags_pony_sats(pony_gnss_sat *sat, const size_t sat_count, const size_t obs_count) {
-
+void pony_gnss_io_rinex_drop_flags_pony_sats(pony_gnss_sat *sat, const size_t sat_count, const size_t obs_count)
+{
 	size_t i, s;
 
+	// validate
+	if (sat == NULL)
+		return;
+	// drop flags
 	for (s = 0; s < sat_count; s++) {
 		sat[s].t_em_valid = 0;
 		sat[s].x_valid = 0;
@@ -1460,8 +1526,12 @@ void pony_gnss_io_rinex_drop_flags_pony_sats(pony_gnss_sat *sat, const size_t sa
 
 }
 
-void pony_gnss_io_rinex_drop_flags_pony_sol(pony_sol *sol) {
-
+void pony_gnss_io_rinex_drop_flags_pony_sol(pony_sol *sol)
+{
+	// validate
+	if (sol == NULL)
+		return;
+	// drop flags
 	sol->  x_valid = 0;
 	sol->llh_valid = 0;
 	sol->  v_valid = 0;
@@ -1469,43 +1539,53 @@ void pony_gnss_io_rinex_drop_flags_pony_sol(pony_sol *sol) {
 	sol->  L_valid = 0;
 	sol->rpy_valid = 0;
 	sol-> dt_valid = 0;
-
 }
 
 
 
 
 		// free memory with NULL-check and NULL-assignment
-void pony_gnss_io_rinex_free_null(void **ptr) {
-
-	if (*ptr == NULL)
+void pony_gnss_io_rinex_free_null(void **ptr)
+{
+	// validate
+	if (ptr == NULL || *ptr == NULL)
 		return;
-	
+	// free memory
 	free(*ptr);
 	*ptr = NULL;
-
 }
 
 
 
 
 
-void pony_gnss_io_rinex_charrep(char *s, char oldc, char newc) {
+void pony_gnss_io_rinex_charrep(char *s, char oldc, char newc)
+{
 	size_t i;
 
+	// validate
+	if (s == NULL)
+		return;
 	for (i = 0; s[i]; i++)
 		if (s[i] == oldc)
 			s[i] = newc;
 }
 
-char pony_gnss_io_rinex_read_token_str(char *value,  const char *token, const char *src, const size_t len) {
-
+char pony_gnss_io_rinex_read_token_str(char *value,  const char *token, const char *src, const size_t len)
+{
 	const char delim = '=', quote = '"', brace_open = '{', brace_close = '}';
 
 	size_t i, j, k, n, len1;
-	
+
+
+	// validate
+	if (value == NULL || token == NULL || src == NULL)
+		return 0;
+
+	// initialize
 	value[0] = 0;
 
+	// parse
 	for (n = 0; token[n]; n++); // determine token length
 	if (n == 0)
 		return 0;
@@ -1514,9 +1594,9 @@ char pony_gnss_io_rinex_read_token_str(char *value,  const char *token, const ch
 	// look for the token
 	for (i = 0, j = 0, k = 0; i < len1 && src[i]; i++) // throughout the string
 		if (src[i] == quote) // skip quoted values
-			for (i++; src[i] && i < len1 && src[i] != quote; i++);
+			for (i++; i < len1 && src[i] && src[i] != quote; i++);
 		else if (src[i] == brace_open) // skip groups
-			for (i++; src[i] && i < len1 && src[i] != brace_close; i++);
+			for (i++; i < len1 && src[i] && src[i] != brace_close; i++);
 		else {
 			for (j = 0, k = i; j < n && src[k] == token[j]; j++, k++); // check token
 			if (j == n) // token found
@@ -1528,7 +1608,7 @@ char pony_gnss_io_rinex_read_token_str(char *value,  const char *token, const ch
 	// try to parse
 	for (i = k+1; i < len && src[i] && src[i] <= ' '; i++); // skip all non-printables
 	if (i >= len || src[i] != delim) // no delimiter found
-		return 0; 
+		return 0;
 
 	for (i++; i < len && src[i] && src[i] <= ' '; i++); // skip the delimiter and all non-printables
 	if (i >= len || src[i] != quote) // no opening quote found
@@ -1544,23 +1624,30 @@ char pony_gnss_io_rinex_read_token_str(char *value,  const char *token, const ch
 
 }
 
-char pony_gnss_io_rinex_read_token_double(double *dest, const char *token, const char *src, const size_t len) {
-
+char pony_gnss_io_rinex_read_token_double(double *dest, const char *token, const char *src, const size_t len)
+{
 	const char delim = '=', quote = '"', brace_open = '{', brace_close = '}';
+
 	size_t i, j, n;
 	char token_found = 0;
 
+
+	// validate
+	if (dest == NULL || token == NULL || src == NULL)
+		return 0;
+
+	// parse
 	for (n = 0; n < len && src[n]; n++);
-	for (i = 0; !token_found && src[i] && i < n; ) {
+	for (i = 0; !token_found && i < n && src[i]; ) {
 		if (src[i] == quote) // skip quoted values
-			for (i++; src[i] && i < n && src[i] != quote; i++);
+			for (i++; i < n && src[i] && src[i] != quote; i++);
 		else if (src[i] == brace_open) // skip groups
-			for (i++; src[i] && i < n && src[i] != brace_close; i++);
+			for (i++; i < n && src[i] && src[i] != brace_close; i++);
 		else {
 			j = 0;
 			if (src[i] == token[j]) {
 				token_found = 1;
-				for (i++,j++; src[i] && token[j] && i < n; i++,j++)
+				for (i++, j++; i < n && src[i] && token[j]; i++,j++)
 					if (src[i] != token[j]) {
 						token_found = 0;
 						break;
@@ -1576,38 +1663,43 @@ char pony_gnss_io_rinex_read_token_double(double *dest, const char *token, const
 		return 0;
 
 	for (i++; i < n && src[i] && src[i] <= ' '; i++); // skip all non-printables
-	if (!src[i] || i == n || src[i] != delim)
+	if (i >= n || !src[i] || src[i] != delim)
 		return 0; // no delimiter found
 
 	for (i++; i < n && src[i] && src[i] <= ' '; i++); // skip the delimiter and all non-printables
-	if (!src[i] || i == n)
+	if (i >= n || !src[i])
 		return 0; // no token value found
 
 	if (sscanf(src+i,"%lg",dest) < 1)	// try to scan double value
 		return 0;							// failed to scan
 	else
 		return 1;							// success
-
 }
 
-char pony_gnss_io_rinex_find_token(const char *token, const char *src, const size_t len) {
-
+char pony_gnss_io_rinex_find_token(const char *token, const char *src, const size_t len)
+{
 	size_t i, j = 0, k, n, len1;
 
+	// validate
+	if (token == NULL || src == NULL)
+		return 0;
+	// parse
 	for (n = 0; token[n]; n++); // determine token length
-
-	for (i = 0, len1 = len-n+1; src[i] && i < len1; i++) {
+	for (i = 0, len1 = len-n+1; i < len1 && src[i]; i++) {
 		for (j = 0, k = i; j < n && src[k] == token[j]; j++, k++);
 		if (j == n) // all characters matched
 			return 1;
 	}
 
 	return 0;
-
 }
 
-char pony_gnss_io_rinex_epoch_from_array(pony_time_epoch *epoch, double *YMDhms) {
-
+char pony_gnss_io_rinex_epoch_from_array(pony_time_epoch *epoch, double *YMDhms)
+{
+	// validate
+	if (epoch == NULL || YMDhms == NULL)
+		return 0;
+	// parse
 	epoch->Y = pony_gnss_io_rinex_resolve_2digit_year( (int)(YMDhms[0]) );
 	epoch->M = (int)(YMDhms[1]);
 	epoch->D = (int)(YMDhms[2]);
@@ -1618,8 +1710,14 @@ char pony_gnss_io_rinex_epoch_from_array(pony_time_epoch *epoch, double *YMDhms)
 	return pony_gnss_io_rinex_epoch_check(epoch);
 }
 
-char pony_gnss_io_rinex_epoch_check(pony_time_epoch *epoch) {
+char pony_gnss_io_rinex_epoch_check(pony_time_epoch* epoch)
+{
 	const double time_precision = 1./(0x01<<5); // 1/32 sec, half precision step between 32 and 64
+
+	// validate
+	if (epoch == NULL)
+		return 0;
+
 	return (
 		   epoch->Y <  0					|| (100 <= epoch->Y && epoch->Y < 1980)
 		|| epoch->M <= 0					|| epoch->M > 12
@@ -1629,7 +1727,8 @@ char pony_gnss_io_rinex_epoch_check(pony_time_epoch *epoch) {
 		|| epoch->s <  0.0-time_precision	|| epoch->s > 60.0+time_precision)? 0 : 1;
 }
 
-int  pony_gnss_io_rinex_resolve_2digit_year(int Y) {
+int  pony_gnss_io_rinex_resolve_2digit_year(int Y)
+{
 	if (Y >= 100 || Y < 0)
 		return Y;
 
@@ -1639,7 +1738,7 @@ int  pony_gnss_io_rinex_resolve_2digit_year(int Y) {
 		return Y + 2000;
 }
 
-double pony_gnss_io_rinex_dmod(double x, double y) {
-
-    return x - (int)(x/y) * y;
+double pony_gnss_io_rinex_dmod(double x, double y)
+{
+    return x - (int)(x/y)*y;
 }

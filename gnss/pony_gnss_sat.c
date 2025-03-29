@@ -1,15 +1,15 @@
-// Aug-2022
-/*	pony_gnss_sat 
-	
+// Jan-2025
+/*	pony_gnss_sat
+
 	pony plugins for GNSS satellite-related calculations:
 
 	- pony_gnss_sat_pos_vel_clock_gps
 		Calculates position, velocity and clock correction for all GPS             satellites with valid ephemeris.
-	- pony_gnss_sat_pos_vel_clock_glo									           
+	- pony_gnss_sat_pos_vel_clock_glo
 		Calculates position, velocity and clock correction for all GLONASS         satellites with valid ephemeris.
-	- pony_gnss_sat_pos_vel_clock_gal									           
+	- pony_gnss_sat_pos_vel_clock_gal
 		Calculates position, velocity and clock correction for all Galileo         satellites with valid ephemeris.
-	- pony_gnss_sat_pos_vel_clock_bds 
+	- pony_gnss_sat_pos_vel_clock_bds
 		Calculates position, velocity and clock correction for all BeiDou MEO/IGSO satellites with valid ephemeris.
 */
 
@@ -45,7 +45,7 @@ char   pony_gnss_sat_alloc_ppointer_gnss_count_sat_count_gal  (double  ***ptr); 
 char   pony_gnss_sat_alloc_pppointer_gnss_count_sat_count_gal (double ****ptr, const size_t internal_size); // allocate memory for [gnss_count x sat_count x internal_size] doubles
 char   pony_gnss_sat_alloc_ppointer_gnss_count_sat_count_bds  (double  ***ptr);                             // allocate memory for [gnss_count x sat_count                ] doubles
 char   pony_gnss_sat_alloc_pppointer_gnss_count_sat_count_bds (double ****ptr, const size_t internal_size); // allocate memory for [gnss_count x sat_count x internal_size] doubles
-void   pony_gnss_sat_free_pppointer_gnss_count_sat_count_gps  (void   ****ptr);                             // free memory and assign NULL to pointer to [gnss_count x sat_count] double arrays 
+void   pony_gnss_sat_free_pppointer_gnss_count_sat_count_gps  (void   ****ptr);                             // free memory and assign NULL to pointer to [gnss_count x sat_count] double arrays
 void   pony_gnss_sat_free_pppointer_gnss_count_sat_count_glo  (void   ****ptr);                             // free memory and assign NULL to pointer to [gnss_count x sat_count] double arrays
 void   pony_gnss_sat_free_pppointer_gnss_count_sat_count_gal  (void   ****ptr);                             // free memory and assign NULL to pointer to [gnss_count x sat_count] double arrays
 void   pony_gnss_sat_free_pppointer_gnss_count_sat_count_bds  (void   ****ptr);                             // free memory and assign NULL to pointer to [gnss_count x sat_count] double arrays
@@ -69,17 +69,17 @@ int    pony_gnss_sat_round(double x);                                           
 // plugin definitions
 
 /* pony_gnss_sat_pos_vel_clock_gps - pony plugin
-	
-	Calculates position, velocity and clock correction for all GPS satellites with valid ephemeris. 
+
+	Calculates position, velocity and clock correction for all GPS satellites with valid ephemeris.
 
 	description:
 		- ephemeris have to match RINEX format and order;
 		- calculations comply with Sections 20.3.3.3.3 and 20.3.3.4.3 of IS-GPS-200J (22 May 2018);
-		- if no single code measurement available, the calculated position refers to 
+		- if no single code measurement available, the calculated position refers to
 		  receiver reference epoch (pony->gnss[].epoch) in ECEF at the same time instant;
-		- if at least one code measurement available, the calculated position refers to 
+		- if at least one code measurement available, the calculated position refers to
 		  estimated time of signal emission (pony->gnss[].gps.sat[].t_em) in ECEF at estimated time of signal reception;
-        - if receiver position-and-clock solution is available (pony->gnss[].sol.x_valid, pony->gnss[].sol.dt_valid), 
+        - if receiver position-and-clock solution is available (pony->gnss[].sol.x_valid, pony->gnss[].sol.dt_valid),
 		  ECEF frame is adjusted by receiver clock error, and satellite elevation (pony->gnss[].gps.sat[s].sinEl) becomes available;
 		- all time intervals only less than 24 hours;
 		- satellite position fit intervals only less than 6 hours.
@@ -99,7 +99,7 @@ int    pony_gnss_sat_round(double x);                                           
 		pony->gnss[].gps->sat[].  x_valid
 	changes:
 		pony->gnss[].gps->sat[]. t_em
-		pony->gnss[].gps->sat[]. t_em_valid	
+		pony->gnss[].gps->sat[]. t_em_valid
 		pony->gnss[].gps->sat[].    x
 		pony->gnss[].gps->sat[].    x_valid
 		pony->gnss[].gps->sat[].    v
@@ -107,17 +107,18 @@ int    pony_gnss_sat_round(double x);                                           
 		pony->gnss[].gps->sat[].Deltatsv
 		pony->gnss[].gps->sat[].sinEl
 		pony->gnss[].gps->sat[].sinEl_valid
-		pony->gnss[].gps->sat[].  eph_valid	
+		pony->gnss[].gps->sat[].  eph_valid
 	cfg parameters:
 		none
 */
-void pony_gnss_sat_pos_vel_clock_gps(void) 
+void pony_gnss_sat_pos_vel_clock_gps(void)
 {
 	static double **allIODE = NULL; // issues of data, ephemeris, for each receiver and each satellite to check if they have changed
 	// elements pre-calculated and constant between ephemeride issues to speed up epoch processing
 	static double **allA = NULL, **alln = NULL, **allE = NULL, ***allaf = NULL;
 
 	size_t r, s;
+
 
 	// requires gnss structure initialized
 	if (pony->gnss == NULL)
@@ -141,7 +142,7 @@ void pony_gnss_sat_pos_vel_clock_gps(void)
 			if (pony->gnss[r].gps == NULL) // do nothing if no gps data in the receiver available
 				continue;
 			for (s = 0; s < pony->gnss[r].gps->max_sat_count; s++) {
-				allIODE	[r][s] = -1;	
+				allIODE	[r][s] = -1;
 				allE	[r][s] = -20;
 			}
 		}
@@ -163,7 +164,7 @@ void pony_gnss_sat_pos_vel_clock_gps(void)
 
 	// regular processing
 	else {
-		
+
 		for (r = 0; r < pony->gnss_count; r++) {
 			if (pony->gnss[r].gps == NULL) // do nothing if no gps structure initialized in this receiver
 				continue;
@@ -176,17 +177,17 @@ void pony_gnss_sat_pos_vel_clock_gps(void)
 }
 
 /* pony_gnss_sat_pos_vel_clock_glo - pony plugin
-	
-	Calculates position, velocity and clock correction for all GLONASS satellites with valid ephemeris. 
+
+	Calculates position, velocity and clock correction for all GLONASS satellites with valid ephemeris.
 
 	description:
 		- ephemeris have to match RINEX format and order;
 		- calculations comply with Section A3.1.2 of ICD GLONASS Edition 5.1 2008;
-		- if no single code measurement available, the calculated position refers to 
+		- if no single code measurement available, the calculated position refers to
 		  receiver reference epoch (pony->gnss[].epoch) in ECEF at the same time instant;
-		- if at least one code measurement available, the calculated position refers to 
+		- if at least one code measurement available, the calculated position refers to
 		  estimated time of signal emission (pony->gnss[].glo.sat[].t_em) in ECEF at estimated time of signal reception;
-        - if receiver position-and-clock solution is available (pony->gnss[].sol.x_valid, pony->gnss[].sol.dt_valid), 
+        - if receiver position-and-clock solution is available (pony->gnss[].sol.x_valid, pony->gnss[].sol.dt_valid),
 		  ECEF frame is adjusted by receiver clock error, and satellite elevation (pony->gnss[].glo.sat[s].sinEl) becomes available;
 		- all time intervals only less than 24 hours;
 		- satellite position fit intervals only less than 6 hours.
@@ -209,7 +210,7 @@ void pony_gnss_sat_pos_vel_clock_gps(void)
 		pony->gnss[].glo->sat[].  x_valid
 	changes:
 		pony->gnss[].glo->sat[]. t_em
-		pony->gnss[].glo->sat[]. t_em_valid	
+		pony->gnss[].glo->sat[]. t_em_valid
 		pony->gnss[].glo->sat[].    x
 		pony->gnss[].glo->sat[].    x_valid
 		pony->gnss[].glo->sat[].    v
@@ -217,14 +218,14 @@ void pony_gnss_sat_pos_vel_clock_gps(void)
 		pony->gnss[].glo->sat[].Deltatsv
 		pony->gnss[].glo->sat[].sinEl
 		pony->gnss[].glo->sat[].sinEl_valid
-		pony->gnss[].glo->sat[].  eph_valid	
+		pony->gnss[].glo->sat[].  eph_valid
 	cfg parameters:
 		none
 */
-void pony_gnss_sat_pos_vel_clock_glo(void) 
+void pony_gnss_sat_pos_vel_clock_glo(void)
 {
 	const int rk4_state = 6, rk4_coeff = 4;
-	static double 
+	static double
 		**t ,			// at times t (sec) within a day [0 86400], for each receiver and each satellite:
 		***x,			// last known positions X, Y, Z (m),
 		***v,			// last known velocity components Vx, Vy, Vz (m/s),
@@ -233,6 +234,7 @@ void pony_gnss_sat_pos_vel_clock_glo(void)
 	static double *rk4_y, **rk4_k; // memory array to be used in Runge-Kutta integration
 
 	size_t r, s;
+
 
 	// requires gnss structure initialized
 	if (pony->gnss == NULL)
@@ -271,7 +273,7 @@ void pony_gnss_sat_pos_vel_clock_glo(void)
 	// terminate
 	if (pony->mode < 0) {
 
-		pony_gnss_sat_free_ppointer_gnss_count               ( (void *** )(&t ) ); 
+		pony_gnss_sat_free_ppointer_gnss_count               ( (void *** )(&t ) );
 		pony_gnss_sat_free_pppointer_gnss_count_sat_count_glo( (void ****)(&x ) );
 		pony_gnss_sat_free_pppointer_gnss_count_sat_count_glo( (void ****)(&v ) );
 		pony_gnss_sat_free_pppointer_gnss_count_sat_count_glo( (void ****)(&a ) );
@@ -283,7 +285,7 @@ void pony_gnss_sat_pos_vel_clock_glo(void)
 
 	// regular processing
 	else {
-		
+
 		for (r = 0; r < pony->gnss_count; r++) {
 			if (pony->gnss[r].glo == NULL) // do nothing if no glonass data initialized in this receiver
 				continue;
@@ -296,17 +298,17 @@ void pony_gnss_sat_pos_vel_clock_glo(void)
 }
 
 /* pony_gnss_sat_pos_vel_clock_gal - pony plugin
-	
-	Calculates position, velocity and clock correction for all Galileo satellites with valid ephemeris. 
+
+	Calculates position, velocity and clock correction for all Galileo satellites with valid ephemeris.
 
 	description:
 		- ephemeris have to match RINEX format and order;
 		- calculations comply with Sections 5.1.1 and 5.1.4 of Galileo OS SIS ICD Issue 1.2 (November 2015);
-		- if no single code measurement available, the calculated position refers to 
+		- if no single code measurement available, the calculated position refers to
 		  receiver reference epoch (pony->gnss[].epoch) in ECEF at the same time instant;
-		- if at least one code measurement available, the calculated position refers to 
+		- if at least one code measurement available, the calculated position refers to
 		  estimated time of signal emission (pony->gnss[].glo.sat[].t_em) in ECEF at estimated time of signal reception;
-        - if receiver position-and-clock solution is available (pony->gnss[].sol.x_valid, pony->gnss[].sol.dt_valid), 
+        - if receiver position-and-clock solution is available (pony->gnss[].sol.x_valid, pony->gnss[].sol.dt_valid),
 		  ECEF frame is adjusted by receiver clock error, and satellite elevation (pony->gnss[].glo.sat[s].sinEl) becomes available;
 		- all time intervals only less than 24 hours;
 		- satellite position fit intervals only less than 6 hours.
@@ -326,7 +328,7 @@ void pony_gnss_sat_pos_vel_clock_glo(void)
 		pony->gnss[].gal->sat[].  x_valid
 	changes:
 		pony->gnss[].gal->sat[]. t_em
-		pony->gnss[].gal->sat[]. t_em_valid	
+		pony->gnss[].gal->sat[]. t_em_valid
 		pony->gnss[].gal->sat[].    x
 		pony->gnss[].gal->sat[].    x_valid
 		pony->gnss[].gal->sat[].    v
@@ -334,17 +336,18 @@ void pony_gnss_sat_pos_vel_clock_glo(void)
 		pony->gnss[].gal->sat[].Deltatsv
 		pony->gnss[].gal->sat[].sinEl
 		pony->gnss[].gal->sat[].sinEl_valid
-		pony->gnss[].gal->sat[].  eph_valid	
+		pony->gnss[].gal->sat[].  eph_valid
 	cfg parameters:
 		none
 */
-void pony_gnss_sat_pos_vel_clock_gal(void) 
+void pony_gnss_sat_pos_vel_clock_gal(void)
 {
 	static double **allIODnav = NULL; // issues of data, ephemeris, for each receiver and each satellite to check if they have changed
 	// elements pre-calculated and constant between ephemeride issues to speed up epoch processing
 	static double **allA = NULL, **alln = NULL, **allE = NULL, ***allaf = NULL;
 
 	size_t r, s;
+
 
 	// requires gnss structure initialized
 	if (pony->gnss == NULL)
@@ -368,7 +371,7 @@ void pony_gnss_sat_pos_vel_clock_gal(void)
 			if (pony->gnss[r].gal == NULL) // do nothing if no galileo data in the receiver available
 				continue;
 			for (s = 0; s < pony->gnss[r].gal->max_sat_count; s++) {
-				allIODnav	[r][s] = -1;	
+				allIODnav	[r][s] = -1;
 				allE		[r][s] = -20;
 			}
 		}
@@ -390,7 +393,7 @@ void pony_gnss_sat_pos_vel_clock_gal(void)
 
 	// regular processing
 	else {
-		
+
 		for (r = 0; r < pony->gnss_count; r++) {
 			if (pony->gnss[r].gal == NULL) // do nothing if no galileo structure initialized in this receiver
 				continue;
@@ -403,17 +406,17 @@ void pony_gnss_sat_pos_vel_clock_gal(void)
 }
 
 /* pony_gnss_sat_pos_vel_clock_bds - pony plugin
-	
-	Calculates position, velocity and clock correction for all BeiDou MEO/IGSO satellites with valid ephemeris. 
+
+	Calculates position, velocity and clock correction for all BeiDou MEO/IGSO satellites with valid ephemeris.
 
 	description:
 		- ephemeris have to match RINEX format and order;
 		- calculations comply with Sections 5.2.4.10 and 5.2.4.12 of BeiDou SIS ICD OSS Version 2.1 (November 2016);
-		- if no single code measurement available, the calculated position refers to 
+		- if no single code measurement available, the calculated position refers to
 		  receiver reference epoch (pony->gnss[].epoch) in ECEF at the same time instant;
-		- if at least one code measurement available, the calculated position refers to 
+		- if at least one code measurement available, the calculated position refers to
 		  estimated time of signal emission (pony->gnss[].glo.sat[].t_em) in ECEF at estimated time of signal reception;
-        - if receiver position-and-clock solution is available (pony->gnss[].sol.x_valid, pony->gnss[].sol.dt_valid), 
+        - if receiver position-and-clock solution is available (pony->gnss[].sol.x_valid, pony->gnss[].sol.dt_valid),
 		  ECEF frame is adjusted by receiver clock error, and satellite elevation (pony->gnss[].glo.sat[s].sinEl) becomes available;
 		- all time intervals only less than 24 hours;
 		- satellite position fit intervals only less than 6 hours.
@@ -433,7 +436,7 @@ void pony_gnss_sat_pos_vel_clock_gal(void)
 		pony->gnss[].bds->sat[].  x_valid
 	changes:
 		pony->gnss[].bds->sat[]. t_em
-		pony->gnss[].bds->sat[]. t_em_valid	
+		pony->gnss[].bds->sat[]. t_em_valid
 		pony->gnss[].bds->sat[].    x
 		pony->gnss[].bds->sat[].    x_valid
 		pony->gnss[].bds->sat[].    v
@@ -441,17 +444,18 @@ void pony_gnss_sat_pos_vel_clock_gal(void)
 		pony->gnss[].bds->sat[].Deltatsv
 		pony->gnss[].bds->sat[].sinEl
 		pony->gnss[].bds->sat[].sinEl_valid
-		pony->gnss[].bds->sat[].  eph_valid	
+		pony->gnss[].bds->sat[].  eph_valid
 	cfg parameters:
 		none
 */
-void pony_gnss_sat_pos_vel_clock_bds(void) 
+void pony_gnss_sat_pos_vel_clock_bds(void)
 {
 	static double **allSOW = NULL; // seconds of the week of the NAV message, for each receiver and each satellite to check if they have changed
 	// elements pre-calculated and constant between ephemeride issues to speed up epoch processing
 	static double **allA = NULL, **alln = NULL, **allE = NULL, ***alla = NULL;
 
 	size_t r, s;
+
 
 	// requires gnss structure initialized
 	if (pony->gnss == NULL)
@@ -475,7 +479,7 @@ void pony_gnss_sat_pos_vel_clock_bds(void)
 			if (pony->gnss[r].bds == NULL) // do nothing if no beidou data in the receiver available
 				continue;
 			for (s = 0; s < pony->gnss[r].bds->max_sat_count; s++) {
-				allSOW	[r][s] = -1;	
+				allSOW	[r][s] = -1;
 				allE	[r][s] = -20;
 			}
 		}
@@ -497,7 +501,7 @@ void pony_gnss_sat_pos_vel_clock_bds(void)
 
 	// regular processing
 	else {
-		
+
 		for (r = 0; r < pony->gnss_count; r++) {
 			if (pony->gnss[r].bds == NULL) // do nothing if no beidou structure initialized in this receiver
 				continue;
@@ -520,7 +524,7 @@ void pony_gnss_sat_pos_vel_clock_bds(void)
 	// single-receiver satellite calculations for GPS
 void pony_gnss_sat_pos_vel_clock_gps_single_receiver(pony_gnss *gnss, double *allIODE, double *allA, double *alln, double *allE, double **allaf)
 {
-	const double 
+	const double
 		radius_squared_min   = 650e12,           //  m^2,    approx. (25.5e6)^2
 		radius_squared_max   = 756e12,           //  m^2,    approx. (27.5e6)^2
 		 speed_squared_min   =  13e6,            // (m/s)^2, approx. ( 3.6e3)^2
@@ -540,16 +544,16 @@ void pony_gnss_sat_pos_vel_clock_gps_single_receiver(pony_gnss *gnss, double *al
 	// subframe 1 parameters as in Section 20.3.3.3.3 of IS-GPS-200J (22 May 2018) p. 95
 	double t_toc, Deltatr; // Deltatsv
 
-	// ephemeris as in Table 20-III of IS-GPS-200J (22 May 2018) p. 103, 
+	// ephemeris as in Table 20-III of IS-GPS-200J (22 May 2018) p. 103,
 	// (!) Deltan, Omdot, idot - in rad/s, according to RINEX
-	// (!) M0, Om0, i0, om - in radiands, according to RINEX
+	// (!) M0, Om0, i0, om - in radians, according to RINEX
 	// (!) toe is seconds of GPS week, a fractional part to go with week number, according to RINEX
 	double IODE, Crs, Deltan, M0, Cuc, e, Cus, sqrtA, toe, Cic, Om0, Cis, i0, Crc, om, Omdot, idot;
 
 	// elements of coordinate systems as in Table 20-IV of IS-GPS-200J (22 May 2018) p. 104, except for pre-calculated ones
-	double // A, 
-		n0, // t, 
-		tk, // n, 
+	double // A,
+		n0, // t,
+		tk, // n,
 		Mk, Ek, nuk, Phik, duk, drk, dik, uk, rk, ik, xk_, yk_, Omk, xk, yk, zk;
 
 	// their derivatives for velocity calculation
@@ -560,12 +564,17 @@ void pony_gnss_sat_pos_vel_clock_gps_single_receiver(pony_gnss *gnss, double *al
 	double sqrt1e2, sinE, one_ecosE, cos2Phik, sin2Phik, cuk, suk, cOmk, sOmk, cik, sik, r, dx, ut, cut, sut, vr, vu, v0[3], v[3];
 	pony_gnss_sat *sat; // current satellite
 
-	// requires gnss, gps and sat structure to be initialized
-	if (gnss == NULL || gnss->gps == NULL || gnss->gps->sat == NULL)
+
+	// validate
+	if (gnss == NULL || allIODE == NULL || allA == NULL || alln == NULL || allE == NULL || allaf == NULL)
+		return;
+
+	// requires gps and sat structure to be initialized
+	if (gnss->gps == NULL || gnss->gps->sat == NULL)
 		return;
 
 	// run through all gps satellites
-	for (s = 0; s < gnss->gps->max_sat_count; s++) 
+	for (s = 0; s < gnss->gps->max_sat_count; s++)
 	{
 		sat = &(gnss->gps->sat[s]);
 		if (!sat->eph_valid || sat->eph == NULL) // do nothing if no valid ephemeris available
@@ -635,8 +644,8 @@ void pony_gnss_sat_pos_vel_clock_gps_single_receiver(pony_gnss *gnss, double *al
 			allaf[s][1]	= af1;
 			allaf[s][2]	= af2;
 		}
-		
-		// t_em - time of emission 
+
+		// t_em - time of emission
 		// (!) fit intervals only less than 12 hours are supported yet
 			// toe - time of epoch treated as t_em base approximation
 		sat->t_em = gnss->epoch.h*3600.0 + gnss->epoch.m*60.0 + gnss->epoch.s;
@@ -651,11 +660,11 @@ void pony_gnss_sat_pos_vel_clock_gps_single_receiver(pony_gnss *gnss, double *al
 				sat->t_em_valid = 1;
 
 				if (gnss->sol.dt_valid) // if receiver clock error estimated, receiver clock correction applies
-					ut -= gnss->sol.dt;				
+					ut -= gnss->sol.dt;
 				ut *= pony->gnss_const.gps.u; // ECEF frame rotation angle between emission and reception
 				break;
 			}
-	
+
 
 		// satellite position
 		// (!) fit intervals only less than 12 hours are supported yet
@@ -668,13 +677,13 @@ void pony_gnss_sat_pos_vel_clock_gps_single_receiver(pony_gnss *gnss, double *al
 			tk -= pony->gnss_const.sec_in_d;
 
 			// Mk - mean anomaly at current time
-		Mk = M0 + alln[s]*tk; 
+		Mk = M0 + alln[s]*tk;
 
 			// Kepler equation by iterations
 		if (allE[s] < -10) // if no previous estimate available, take the mean motion
 			allE[s] = Mk;
 		i = 0;
-		do {	
+		do {
 			Ek = allE[s];
 			allE[s] = Mk + e*sin(Ek);
 			i++;
@@ -704,9 +713,9 @@ void pony_gnss_sat_pos_vel_clock_gps_single_receiver(pony_gnss *gnss, double *al
 		yk_ = rk*suk;
 			// corrected longitude of ascending node
 		Omk = Om0 + (Omdot - pony->gnss_const.gps.u)*tk - pony->gnss_const.gps.u*toe; // gnss->gps_const.u stands for Omedot
-		
+
 			// Earth-fixed coordinates
-		cOmk = cos(Omk); sOmk = sin(Omk); 
+		cOmk = cos(Omk); sOmk = sin(Omk);
 		cik = cos(ik); sik = sin(ik);
 		xk = xk_*cOmk - yk_*cik*sOmk;
 		yk = xk_*sOmk + yk_*cik*cOmk;
@@ -716,7 +725,7 @@ void pony_gnss_sat_pos_vel_clock_gps_single_receiver(pony_gnss *gnss, double *al
 		r = xk*xk + yk*yk + zk*zk;
 
 		// rotate the coordinate frame to the time of reception if t_em was corrected
-		cut = cos(ut); 
+		cut = cos(ut);
 		sut = sin(ut);
 		sat->x[0] =  xk*cut + yk*sut;
 		sat->x[1] = -xk*sut + yk*cut;
@@ -784,17 +793,17 @@ void pony_gnss_sat_pos_vel_clock_gps_single_receiver(pony_gnss *gnss, double *al
 
 
 	// single-receiver satellite calculations for GLONASS
-void pony_gnss_sat_pos_vel_clock_glo_single_receiver(pony_gnss *gnss,  double *t, double **x, double **v, double **a, int *tb,  double *rk4_y, double **rk4_k) 
+void pony_gnss_sat_pos_vel_clock_glo_single_receiver(pony_gnss *gnss,  double *t, double **x, double **v, double **a, int *tb,  double *rk4_y, double **rk4_k)
 {
-	const double 
+	const double
 		radius_squared_min = 600e12, //  m^2,    (24.5e6)^2
 		radius_squared_max = 702e12, //  m^2,    (26.5e6)^2
 		 speed_squared_min =   3e6,  // (m/s)^2, ( 1.8e3)^2 - relative to the Earth (+/- 1.9e3 m/s in equatorial plane)
 		 speed_squared_max =  37e6,  // (m/s)^2, ( 6.1e3)^2 - relative to the Earth (+/- 1.9e3 m/s in equatorial plane)
 		max_dt             = 1,      // maximum integration step size, sec
 		max_fit_interval   = 6*3600; // maximum fit interval, seconds
-	const char 
-		code_id            = 'C', 
+	const char
+		code_id            = 'C',
 		utc_time_id[]      = "UT";
 
 	// ephemeris as in Table 4.5 of ICD GLONASS Edition 5.1 2008
@@ -812,8 +821,13 @@ void pony_gnss_sat_pos_vel_clock_glo_single_receiver(pony_gnss *gnss,  double *t
 	int tb_new;
 	size_t i, k, s;
 
-	// requires gnss, glo and sat structure to be initialized
-	if (gnss == NULL || gnss->glo == NULL || gnss->glo->sat == NULL)
+
+	// validate
+	if (gnss == NULL || t == NULL || x == NULL || v == NULL || a == NULL || tb == NULL || rk4_y == NULL || rk4_k == NULL)
+		return;
+
+	// requires glo and sat structure to be initialized
+	if (gnss->glo == NULL || gnss->glo->sat == NULL)
 		return;
 
 	// run through all glonass satellites
@@ -830,7 +844,7 @@ void pony_gnss_sat_pos_vel_clock_glo_single_receiver(pony_gnss *gnss,  double *t
 		toc.m  = pony_gnss_sat_round(sat->eph[4]);
 		toc.s  =                     sat->eph[5] ;
 		tb_new = pony_gnss_sat_round(toc.h*3600.0 + toc.m*60 + toc.s);
-		
+
 		// check tb
 		if (tb[s] < 0 || tb[s] != tb_new) { // new ephemeris have come
 
@@ -867,7 +881,7 @@ void pony_gnss_sat_pos_vel_clock_glo_single_receiver(pony_gnss *gnss,  double *t
 				continue;
 		}
 
-		// t_em - time of emission 
+		// t_em - time of emission
 		// (!) fit intervals only less than 12 hours are supported yet
 			// toe - time of epoch treated as t_em base approximation
 		sat->t_em = gnss->epoch.h*3600.0 + gnss->epoch.m*60.0 + gnss->epoch.s - ( (gnss->leap_sec_valid)? gnss->leap_sec : 0);
@@ -886,7 +900,7 @@ void pony_gnss_sat_pos_vel_clock_glo_single_receiver(pony_gnss *gnss,  double *t
 				ut *= pony->gnss_const.glo.u; // ECEF frame rotation angle between emission and reception
 				break;
 			}
-		
+
 			// satellite position & velocity
 		// (!) fit intervals only less than 12 hours are supported yet
 			// t_em - tb, time elapsed since the time of ephemeris
@@ -934,7 +948,7 @@ void pony_gnss_sat_pos_vel_clock_glo_single_receiver(pony_gnss *gnss,  double *t
 		}
 
 			// rotate the coordinate frame to the time of reception if t_em was corrected
-		cut = cos(ut); 
+		cut = cos(ut);
 		sut = sin(ut);
 		sat->x[0] =  x[s][0]*cut + x[s][1]*sut;
 		sat->x[1] = -x[s][0]*sut + x[s][1]*cut;
@@ -977,11 +991,16 @@ void pony_gnss_sat_pos_vel_clock_glo_single_receiver(pony_gnss *gnss,  double *t
 
 }
 
-void pony_gnss_sat_glo_motion_rk4_step(double *x, double *v, double *a,  double dt, double *y, double **k) 
+void pony_gnss_sat_glo_motion_rk4_step(double *x, double *v, double *a,  double dt, double *y, double **k)
 {
 	double dt_2, dt_6;
 	size_t i;
 
+	// validate
+	if (x == NULL || v == NULL || a == NULL || y == NULL || k == NULL)
+		return;
+
+	// time steps
 	dt_2 = dt/2;
 	dt_6 = dt/6;
 
@@ -1021,11 +1040,15 @@ void pony_gnss_sat_glo_motion_rk4_step(double *x, double *v, double *a,  double 
 }
 
 	// equations of satellite motion as in ICD GLONASS Edition 5.1 2008
-void pony_gnss_sat_glo_motion_ode_fun(double *dy,  double *y, double *a) 
+void pony_gnss_sat_glo_motion_ode_fun(double *dy,  double *y, double *a)
 {
 	double r, r3, r2, mu_r3, J02x3_2xa2_r2, z2_r2x5, u2;
 	size_t i;
 
+	// validate
+	if (dy == NULL || y == NULL || a == NULL)
+		return;
+	// calculate
 	for (i = 0, r = 0; i < 3; i++) {
 		r += y[i]*y[i];
 		dy[i] = y[3+i];																					// dx/dt = Vx, dy/dt = Vy, dz/dt = Vz
@@ -1049,7 +1072,7 @@ void pony_gnss_sat_glo_motion_ode_fun(double *dy,  double *y, double *a)
 	// single-receiver satellite calculations for Galileo
 void pony_gnss_sat_pos_vel_clock_gal_single_receiver(pony_gnss *gnss, double *allIODnav, double *allA, double *alln, double *allE, double **allaf)
 {
-	const double 
+	const double
 		radius_squared_min    = 812e12,           //  m^2,    approx. (28.5e6)^2
 		radius_squared_max    = 930e12,           //  m^2,    approx. (30.5e6)^2
 		 speed_squared_min    =  11e6,            // (m/s)^2, approx. ( 3.3e3)^2
@@ -1069,16 +1092,16 @@ void pony_gnss_sat_pos_vel_clock_gal_single_receiver(pony_gnss *gnss, double *al
 	// clock correction parameters as in Section 5.1.4 of Galileo OS SIS ICD Issue 1.2 (November 2015) p. 46
 	double t_toc, Deltatr; // Deltatsv
 
-	// ephemeris as in Table 57 of Galileo OS SIS ICD Issue 1.2 (November 2015) p. 43, 
+	// ephemeris as in Table 57 of Galileo OS SIS ICD Issue 1.2 (November 2015) p. 43,
 	// (!) Deltan, Omdot, idot - in rad/s, according to RINEX
-	// (!) M0, Om0, i0, om - in radiands, according to RINEX
+	// (!) M0, Om0, i0, om - in radians, according to RINEX
 	// (!) toe is seconds of Galileo week, a fractional part to go with week number, according to RINEX
 	double IODnav, Crs, Deltan, M0, Cuc, e, Cus, sqrtA, toe, Cic, Om0, Cis, i0, Crc, om, Omdot, idot;
 
 	// elements of coordinate systems as in Table 58 of Galileo OS SIS ICD Issue 1.2 (November 2015) p. 44, except for pre-calculated ones
-	double // A, 
-		n0, // t, 
-		tk, // n, 
+	double // A,
+		n0, // t,
+		tk, // n,
 		M, E, nu, Phi, du, dr, di, u, r, I, x_, y_, Om, x, y, z;
 
 	// their derivatives for velocity calculation
@@ -1089,12 +1112,17 @@ void pony_gnss_sat_pos_vel_clock_gal_single_receiver(pony_gnss *gnss, double *al
 	double sqrt1e2, sinE, one_ecosE, cos2Phi, sin2Phi, cu, su, cOm, sOm, ci, si, R, dx, ut, cut, sut, vr, vu, v0[3], v[3];
 	pony_gnss_sat *sat; // current satellite
 
-	// requires gnss, gal and sat structure to be initialized
-	if (gnss == NULL || gnss->gal == NULL || gnss->gal->sat == NULL)
+
+	// validate
+	if (gnss == NULL || allIODnav == NULL || allA == NULL || alln == NULL || allE == NULL || allaf == NULL)
+		return;
+
+	// requires gal and sat structure to be initialized
+	if (gnss->gal == NULL || gnss->gal->sat == NULL)
 		return;
 
 	// run through all galileo satellites
-	for (s = 0; s < gnss->gal->max_sat_count; s++) 
+	for (s = 0; s < gnss->gal->max_sat_count; s++)
 	{
 		sat = &(gnss->gal->sat[s]);
 		if (!sat->eph_valid || sat->eph == NULL) // do nothing if no valid ephemeris available
@@ -1167,8 +1195,8 @@ void pony_gnss_sat_pos_vel_clock_gal_single_receiver(pony_gnss *gnss, double *al
 			allaf[s][1]	= af1;
 			allaf[s][2]	= af2;
 		}
-		
-		// t_em - time of emission 
+
+		// t_em - time of emission
 		// (!) fit intervals only less than 12 hours are supported yet
 			// toe - time of epoch treated as t_em base approximation
 		sat->t_em = gnss->epoch.h*3600.0 + gnss->epoch.m*60.0 + gnss->epoch.s;
@@ -1183,11 +1211,11 @@ void pony_gnss_sat_pos_vel_clock_gal_single_receiver(pony_gnss *gnss, double *al
 				sat->t_em_valid = 1;
 
 				if (gnss->sol.dt_valid) // if receiver clock error estimated, receiver clock correction applies
-					ut -= gnss->sol.dt;				
+					ut -= gnss->sol.dt;
 				ut *= pony->gnss_const.gal.u; // ECEF frame rotation angle between emission and reception
 				break;
 			}
-	
+
 
 		// satellite position
 		// (!) fit intervals only less than 12 hours are supported yet
@@ -1200,13 +1228,13 @@ void pony_gnss_sat_pos_vel_clock_gal_single_receiver(pony_gnss *gnss, double *al
 			tk -= pony->gnss_const.sec_in_d;
 
 			// M - mean anomaly at current time
-		M = M0 + alln[s]*tk; 
+		M = M0 + alln[s]*tk;
 
 			// Kepler equation by iterations
 		if (allE[s] < -10) // if no previous estimate available, take the mean motion
 			allE[s] = M;
 		i = 0;
-		do {	
+		do {
 			E = allE[s];
 			allE[s] = M + e*sin(E);
 			i++;
@@ -1236,9 +1264,9 @@ void pony_gnss_sat_pos_vel_clock_gal_single_receiver(pony_gnss *gnss, double *al
 		y_ = r*su;
 			// corrected longitude of ascending node
 		Om = Om0 + (Omdot - pony->gnss_const.gal.u)*tk - pony->gnss_const.gal.u*toe; // gnss->gal_const.u stands for Omedot
-		
+
 			// Earth-fixed coordinates
-		cOm = cos(Om); sOm = sin(Om); 
+		cOm = cos(Om); sOm = sin(Om);
 		ci = cos(I); si = sin(I);
 		x = x_*cOm - y_*ci*sOm;
 		y = x_*sOm + y_*ci*cOm;
@@ -1248,7 +1276,7 @@ void pony_gnss_sat_pos_vel_clock_gal_single_receiver(pony_gnss *gnss, double *al
 		R = x*x + y*y + z*z;
 
 		// rotate the coordinate frame to the time of reception if t_em was corrected
-		cut = cos(ut); 
+		cut = cos(ut);
 		sut = sin(ut);
 		sat->x[0] =  x*cut + y*sut;
 		sat->x[1] = -x*sut + y*cut;
@@ -1321,9 +1349,9 @@ void pony_gnss_sat_pos_vel_clock_bds_single_receiver(pony_gnss *gnss, double *al
 	enum orbit_type                    {    meo,       igso,   orbits};
 		// nominal radius                28.0e6      42.0e6    m
 		// nominal speed                  3.8e3       3.1e3    m/s
-								     
-	const double 		                    
-		radius_squared_min[orbits]   = { 729e12,    1681e12  },     
+
+	const double
+		radius_squared_min[orbits]   = { 729e12,    1681e12  },
 		//                            ~(27.0e6)^2 ~(41.0e6)^2  m^2
 		radius_squared_max[orbits]   = { 841e12,    1849e12  },
 		//                            ~(29.0e6)^2 ~(43.0e6)^2  m^2
@@ -1350,14 +1378,14 @@ void pony_gnss_sat_pos_vel_clock_bds_single_receiver(pony_gnss *gnss, double *al
 
 	// ephemeris as in Sections 5.2.4.11-5.2.4.12 of BeiDou SIS ICD OSS Version 2.1 (November 2016) p. 31,
 	// (!) Deltan, Omdot, idot - in rad/s, according to RINEX
-	// (!) M0, Om0, i0, om - in radiands, according to RINEX
+	// (!) M0, Om0, i0, om - in radians, according to RINEX
 	// (!) toe is seconds of Beidou week, a fractional part to go with week number, according to RINEX
 	double AODE, Crs, Deltan, M0, Cuc, e, Cus, sqrtA, toe, Cic, Om0, Cis, i0, Crc, om, Omdot, idot;
 
 	// elements of coordinate systems as in Table 5-11 of BeiDou SIS ICD OSS Version 2.1 (November 2016) p. 34, except for pre-calculated ones
-	double // A, 
-		n0, // t, 
-		tk, // n, 
+	double // A,
+		n0, // t,
+		tk, // n,
 		Mk, Ek, nuk, Phik, duk, drk, dik, uk, rk, ik, xk_, yk_, Omk, xk, yk, zk;
 
 	// their derivatives for velocity calculation
@@ -1368,12 +1396,17 @@ void pony_gnss_sat_pos_vel_clock_bds_single_receiver(pony_gnss *gnss, double *al
 	double sqrt1e2, sinE, one_ecosE, cos2Phi, sin2Phi, cu, su, cOm, sOm, ci, si, R, dx, ut, cut, sut, vr, vu, v0[3], v[3];
 	pony_gnss_sat *sat; // current satellite
 
-	// requires gnss, bds and sat structure to be initialized
-	if (gnss == NULL || gnss->bds == NULL || gnss->bds->sat == NULL)
+
+	// validate
+	if (gnss == NULL || allSOW == NULL || allA == NULL || alln == NULL || allE == NULL || alla == NULL)
+		return;
+
+	// requires bds and sat structure to be initialized
+	if (gnss->bds == NULL || gnss->bds->sat == NULL)
 		return;
 
 	// run through all beidou satellites
-	for (s = 0; s < gnss->bds->max_sat_count; s++) 
+	for (s = 0; s < gnss->bds->max_sat_count; s++)
 	{
 		sat = &(gnss->bds->sat[s]);
 		if (!sat->eph_valid || sat->eph == NULL) // do nothing if no valid ephemeris available
@@ -1455,8 +1488,8 @@ void pony_gnss_sat_pos_vel_clock_bds_single_receiver(pony_gnss *gnss, double *al
 			alla[s][1]	= a1;
 			alla[s][2]	= a2;
 		}
-		
-		// t_em - time of emission 
+
+		// t_em - time of emission
 		// (!) fit intervals only less than 12 hours are supported yet
 			// toe - time of epoch treated as t_em base approximation
 		sat->t_em = gnss->epoch.h*3600.0 + gnss->epoch.m*60.0 + gnss->epoch.s - pony->gnss_const.bds.leap_sec;
@@ -1471,11 +1504,11 @@ void pony_gnss_sat_pos_vel_clock_bds_single_receiver(pony_gnss *gnss, double *al
 				sat->t_em_valid = 1;
 
 				if (gnss->sol.dt_valid) // if receiver clock error estimated, receiver clock correction applies
-					ut -= gnss->sol.dt;				
+					ut -= gnss->sol.dt;
 				ut *= pony->gnss_const.bds.u; // ECEF frame rotation angle between emission and reception
 				break;
 			}
-	
+
 
 		// satellite position
 		// (!) fit intervals only less than 12 hours are supported yet
@@ -1488,13 +1521,13 @@ void pony_gnss_sat_pos_vel_clock_bds_single_receiver(pony_gnss *gnss, double *al
 			tk -= pony->gnss_const.sec_in_d;
 
 			// Mk - mean anomaly at current time
-		Mk = M0 + alln[s]*tk; 
+		Mk = M0 + alln[s]*tk;
 
 			// Kepler equation by iterations
 		if (allE[s] < -10) // if no previous estimate available, take the mean motion
 			allE[s] = Mk;
 		i = 0;
-		do {	
+		do {
 			Ek = allE[s];
 			allE[s] = Mk + e*sin(Ek);
 			i++;
@@ -1524,9 +1557,9 @@ void pony_gnss_sat_pos_vel_clock_bds_single_receiver(pony_gnss *gnss, double *al
 		yk_ = rk*su;
 			// corrected longitude of ascending node
 		Omk = Om0 + (Omdot - pony->gnss_const.bds.u)*tk - pony->gnss_const.bds.u*toe; // gnss->bds_const.u stands for Omedot
-		
+
 			// Earth-fixed coordinates
-		cOm = cos(Omk); sOm = sin(Omk); 
+		cOm = cos(Omk); sOm = sin(Omk);
 		ci = cos(ik); si = sin(ik);
 		xk = xk_*cOm - yk_*ci*sOm;
 		yk = xk_*sOm + yk_*ci*cOm;
@@ -1536,7 +1569,7 @@ void pony_gnss_sat_pos_vel_clock_bds_single_receiver(pony_gnss *gnss, double *al
 		R = xk*xk + yk*yk + zk*zk;
 
 		// rotate the coordinate frame to the time of reception if t_em was corrected
-		cut = cos(ut); 
+		cut = cos(ut);
 		sut = sin(ut);
 		sat->x[0] =  xk*cut + yk*sut;
 		sat->x[1] = -xk*sut + yk*cut;
@@ -1607,142 +1640,151 @@ void pony_gnss_sat_pos_vel_clock_bds_single_receiver(pony_gnss *gnss, double *al
 
 	// service routines
 		// free memory
-void pony_gnss_sat_free_ppointer_gnss_count(void ***ptr) 
+void pony_gnss_sat_free_ppointer_gnss_count(void ***ptr)
 {
-
 	size_t r;
 
-	if (*ptr == NULL) 
+	// validate
+	if (ptr == NULL || *ptr == NULL)
 		return;
-	
+	// free array contents
 	for (r = 0; r < pony->gnss_count; r++)
-		if ( (*ptr)[r] != NULL )
+		if ( (*ptr)[r] != NULL ) {
 			free( (*ptr)[r] );
+			(*ptr)[r] = NULL;
+		}
+	// free array
 	free(*ptr);
 	*ptr = NULL;
-
 }
 
-void pony_gnss_sat_free_pppointer_gnss_count_sat_count_gps(void ****ptr) 
+void pony_gnss_sat_free_pppointer_gnss_count_sat_count_gps(void ****ptr)
 {
-
 	size_t r, s;
 
-	if (*ptr == NULL) 
+	// validate
+	if (ptr == NULL || *ptr == NULL)
 		return;
-	
-	for (r = 0; r < pony->gnss_count; r++) {
-		// requires gnss gps structure initialized
-		if (pony->gnss[r].gps == NULL)
-			continue;
-		for (s = 0; s < pony->gnss[r].gps->max_sat_count; s++)
-			if ( (*ptr)[r][s] != NULL ) {
-				free( (*ptr)[r][s] );
-				(*ptr)[r][s] = NULL;
-			}
-		free( (*ptr)[r] );
-		(*ptr)[r] = NULL;
-	}
+	// free array contents
+	if (pony->gnss != NULL)
+		for (r = 0; r < pony->gnss_count; r++) {
+			// requires gnss gps structure initialized
+			if (pony->gnss[r].gps == NULL)
+				continue;
+			for (s = 0; s < pony->gnss[r].gps->max_sat_count; s++)
+				if ( (*ptr)[r][s] != NULL ) {
+					free( (*ptr)[r][s] );
+					(*ptr)[r][s] = NULL;
+				}
+			free( (*ptr)[r] );
+			(*ptr)[r] = NULL;
+		}
+	// free array
 	free(*ptr);
 	*ptr = NULL;
-
 }
 
-void pony_gnss_sat_free_pppointer_gnss_count_sat_count_glo(void ****ptr) 
+void pony_gnss_sat_free_pppointer_gnss_count_sat_count_glo(void ****ptr)
 {
-
 	size_t r, s;
 
-	if (*ptr == NULL) 
+	// validate
+	if (ptr == NULL || *ptr == NULL)
 		return;
-	
-	for (r = 0; r < pony->gnss_count; r++) {
-		// requires gnss glo structure initialized
-		if (pony->gnss[r].glo == NULL)
-			continue;
-		for (s = 0; s < pony->gnss[r].glo->max_sat_count; s++)
-			if ( (*ptr)[r][s] != NULL ) {
-				free( (*ptr)[r][s] );
-				(*ptr)[r][s] = NULL;
-			}
-		free( (*ptr)[r] );
-		(*ptr)[r] = NULL;
-	}
+	// free array contents
+	if (pony->gnss != NULL)
+		for (r = 0; r < pony->gnss_count; r++) {
+			// requires gnss glo structure initialized
+			if (pony->gnss[r].glo == NULL)
+				continue;
+			for (s = 0; s < pony->gnss[r].glo->max_sat_count; s++)
+				if ( (*ptr)[r][s] != NULL ) {
+					free( (*ptr)[r][s] );
+					(*ptr)[r][s] = NULL;
+				}
+			free( (*ptr)[r] );
+			(*ptr)[r] = NULL;
+		}
+	// free array
 	free(*ptr);
 	*ptr = NULL;
-
 }
 
-void pony_gnss_sat_free_pppointer_gnss_count_sat_count_gal(void ****ptr) 
+void pony_gnss_sat_free_pppointer_gnss_count_sat_count_gal(void ****ptr)
 {
-
 	size_t r, s;
 
-	if (*ptr == NULL) 
+	// validate
+	if (ptr == NULL || *ptr == NULL)
 		return;
-	
-	for (r = 0; r < pony->gnss_count; r++) {
-		// requires gnss gal structure initialized
-		if (pony->gnss[r].gal == NULL)
-			continue;
-		for (s = 0; s < pony->gnss[r].gal->max_sat_count; s++)
-			if ( (*ptr)[r][s] != NULL ) {
-				free( (*ptr)[r][s] );
-				(*ptr)[r][s] = NULL;
-			}
-		free( (*ptr)[r] );
-		(*ptr)[r] = NULL;
-	}
+	// free array contents
+	if (pony->gnss != NULL)
+		for (r = 0; r < pony->gnss_count; r++) {
+			// requires gnss gal structure initialized
+			if (pony->gnss[r].gal == NULL)
+				continue;
+			for (s = 0; s < pony->gnss[r].gal->max_sat_count; s++)
+				if ( (*ptr)[r][s] != NULL ) {
+					free( (*ptr)[r][s] );
+					(*ptr)[r][s] = NULL;
+				}
+			free( (*ptr)[r] );
+			(*ptr)[r] = NULL;
+		}
+	// free array
 	free(*ptr);
 	*ptr = NULL;
-
 }
 
-void pony_gnss_sat_free_pppointer_gnss_count_sat_count_bds(void ****ptr) 
+void pony_gnss_sat_free_pppointer_gnss_count_sat_count_bds(void ****ptr)
 {
-
 	size_t r, s;
 
-	if (*ptr == NULL) 
+	// validate
+	if (ptr == NULL || *ptr == NULL)
 		return;
-	
-	for (r = 0; r < pony->gnss_count; r++) {
-		// requires gnss bds structure initialized
-		if (pony->gnss[r].bds == NULL)
-			continue;
-		for (s = 0; s < pony->gnss[r].bds->max_sat_count; s++)
-			if ( (*ptr)[r][s] != NULL ) {
-				free( (*ptr)[r][s] );
-				(*ptr)[r][s] = NULL;
-			}
-		free( (*ptr)[r] );
-		(*ptr)[r] = NULL;
-	}
+	// free array contents
+	if (pony->gnss != NULL)
+		for (r = 0; r < pony->gnss_count; r++) {
+			// requires gnss bds structure initialized
+			if (pony->gnss[r].bds == NULL)
+				continue;
+			for (s = 0; s < pony->gnss[r].bds->max_sat_count; s++)
+				if ( (*ptr)[r][s] != NULL ) {
+					free( (*ptr)[r][s] );
+					(*ptr)[r][s] = NULL;
+				}
+			free( (*ptr)[r] );
+			(*ptr)[r] = NULL;
+		}
+	// free array
 	free(*ptr);
 	*ptr = NULL;
-
 }
 
 
 
 		// allocate memory
-char pony_gnss_sat_alloc_ppointer_gnss_count_sat_count_gps(double ***ptr) 
+char pony_gnss_sat_alloc_ppointer_gnss_count_sat_count_gps(double ***ptr)
 {
 	size_t r;
 
+	// validate
+	if (ptr == NULL)
+		return 0;
+	// check pointer
 	if (*ptr != NULL)
 		return 1; // already allocated
-
 	// requires gnss structure initialized
 	if (pony->gnss == NULL) {
 		*ptr = NULL;
 		return 0;
 	}
-
+	// allocate array
 	*ptr = (double **)calloc( pony->gnss_count, sizeof(double *) );
 	if (*ptr == NULL)
 		return 0;
-
+	// allocate array contents
 	for (r = 0; r < pony->gnss_count; r++) {
 		// requires gps structure initialized
 		if (pony->gnss[r].gps == NULL)
@@ -1755,21 +1797,24 @@ char pony_gnss_sat_alloc_ppointer_gnss_count_sat_count_gps(double ***ptr)
 	return 1;
 }
 
-char pony_gnss_sat_alloc_pppointer_gnss_count_sat_count_gps(double ****ptr, const size_t internal_size) 
+char pony_gnss_sat_alloc_pppointer_gnss_count_sat_count_gps(double ****ptr, const size_t internal_size)
 {
 	size_t i, r;
 
+	// validate
+	if (ptr == NULL)
+		return 0;
+	// check pointer
 	if (*ptr != NULL)
 		return 1; // already allocated
-
+	// allocate array
 	*ptr = (double ***)calloc( pony->gnss_count, sizeof(double **) );
 	if (*ptr == NULL)
 		return 0;
-
 	// requires gnss structure initialized
 	if (pony->gnss == NULL)
 		return 0;
-
+	// allocate array contents
 	for (r = 0; r < pony->gnss_count; r++) {
 		// requires gps structure initialized
 		if (pony->gnss[r].gps == NULL)
@@ -1779,7 +1824,7 @@ char pony_gnss_sat_alloc_pppointer_gnss_count_sat_count_gps(double ****ptr, cons
 		(*ptr)[r] = (double **)calloc( pony->gnss[r].gps->max_sat_count, sizeof(double *) );
 		if ( (*ptr)[r] == NULL )
 			return 0;
-		
+
 		for (i = 0; i < pony->gnss[r].gps->max_sat_count; i++) {
 			(*ptr)[r][i] = NULL;
 			(*ptr)[r][i] = (double *)calloc( internal_size, sizeof(double) );
@@ -1791,23 +1836,26 @@ char pony_gnss_sat_alloc_pppointer_gnss_count_sat_count_gps(double ****ptr, cons
 	return 1;
 }
 
-char pony_gnss_sat_alloc_dppointer_gnss_count_sat_count_glo(double ***ptr) 
+char pony_gnss_sat_alloc_dppointer_gnss_count_sat_count_glo(double ***ptr)
 {
 	size_t r;
 
+	// validate
+	if (ptr == NULL)
+		return 0;
+	// check pointer
 	if (*ptr != NULL)
 		return 1; // already allocated
-
 	// requires gnss structure initialized
 	if (pony->gnss == NULL) {
 		*ptr = NULL;
 		return 0;
 	}
-
+	// allocate array
 	*ptr = (double **)calloc( pony->gnss_count, sizeof(double *) );
 	if (*ptr == NULL)
 		return 0;
-
+	// allocate array contents
 	for (r = 0; r < pony->gnss_count; r++) {
 		// requires glo structure initialized
 		if (pony->gnss[r].glo == NULL)
@@ -1820,23 +1868,26 @@ char pony_gnss_sat_alloc_dppointer_gnss_count_sat_count_glo(double ***ptr)
 	return 1;
 }
 
-char pony_gnss_sat_alloc_ippointer_gnss_count_sat_count_glo(int ***ptr) 
+char pony_gnss_sat_alloc_ippointer_gnss_count_sat_count_glo(int ***ptr)
 {
 	size_t r;
 
+	// validate
+	if (ptr == NULL)
+		return 0;
+	// check pointer
 	if (*ptr != NULL)
 		return 1; // already allocated
-
 	// requires gnss structure initialized
 	if (pony->gnss == NULL) {
 		*ptr = NULL;
 		return 0;
 	}
-
+	// allocate array
 	*ptr = (int **)calloc( pony->gnss_count, sizeof(int *) );
 	if (*ptr == NULL)
 		return 0;
-
+	// allocate array contents
 	for (r = 0; r < pony->gnss_count; r++) {
 		// requires glo structure initialized
 		if (pony->gnss[r].glo == NULL)
@@ -1849,21 +1900,24 @@ char pony_gnss_sat_alloc_ippointer_gnss_count_sat_count_glo(int ***ptr)
 	return 1;
 }
 
-char pony_gnss_sat_alloc_dpppointer_gnss_count_sat_count_glo(double ****ptr, const size_t internal_size) 
+char pony_gnss_sat_alloc_dpppointer_gnss_count_sat_count_glo(double ****ptr, const size_t internal_size)
 {
 	size_t i, r;
 
+	// validate
+	if (ptr == NULL)
+		return 0;
+	// check pointer
 	if (*ptr != NULL)
 		return 1; // already allocated
-
-	*ptr = (double ***)calloc( pony->gnss_count, sizeof(double **) );
-	if (*ptr == NULL)
-		return 0;
-
 	// requires gnss structure initialized
 	if (pony->gnss == NULL)
 		return 0;
-
+	// allocate array
+	*ptr = (double ***)calloc( pony->gnss_count, sizeof(double **) );
+	if (*ptr == NULL)
+		return 0;
+	// allocate array contents
 	for (r = 0; r < pony->gnss_count; r++) {
 		// requires glo structure initialized
 		if (pony->gnss[r].glo == NULL)
@@ -1873,7 +1927,7 @@ char pony_gnss_sat_alloc_dpppointer_gnss_count_sat_count_glo(double ****ptr, con
 		(*ptr)[r] = (double **)calloc( pony->gnss[r].glo->max_sat_count, sizeof(double *) );
 		if ( (*ptr)[r] == NULL )
 			return 0;
-		
+
 		for (i = 0; i < pony->gnss[r].glo->max_sat_count; i++) {
 			(*ptr)[r][i] = NULL;
 			(*ptr)[r][i] = (double *)calloc( internal_size, sizeof(double) );
@@ -1885,23 +1939,26 @@ char pony_gnss_sat_alloc_dpppointer_gnss_count_sat_count_glo(double ****ptr, con
 	return 1;
 }
 
-char pony_gnss_sat_alloc_ppointer_gnss_count_sat_count_gal(double ***ptr) 
+char pony_gnss_sat_alloc_ppointer_gnss_count_sat_count_gal(double ***ptr)
 {
 	size_t r;
 
+	// validate
+	if (ptr == NULL)
+		return 0;
+	// check pointer
 	if (*ptr != NULL)
 		return 1; // already allocated
-
 	// requires gnss structure initialized
 	if (pony->gnss == NULL) {
 		*ptr = NULL;
 		return 0;
 	}
-
+	// allocate array
 	*ptr = (double **)calloc( pony->gnss_count, sizeof(double *) );
 	if (*ptr == NULL)
 		return 0;
-
+	// allocate array contents
 	for (r = 0; r < pony->gnss_count; r++) {
 		// requires gal structure initialized
 		if (pony->gnss[r].gal == NULL)
@@ -1914,21 +1971,24 @@ char pony_gnss_sat_alloc_ppointer_gnss_count_sat_count_gal(double ***ptr)
 	return 1;
 }
 
-char pony_gnss_sat_alloc_pppointer_gnss_count_sat_count_gal(double ****ptr, const size_t internal_size) 
+char pony_gnss_sat_alloc_pppointer_gnss_count_sat_count_gal(double ****ptr, const size_t internal_size)
 {
 	size_t i, r;
 
+	// validate
+	if (ptr == NULL)
+		return 0;
+	// check pointer
 	if (*ptr != NULL)
 		return 1; // already allocated
-
-	*ptr = (double ***)calloc( pony->gnss_count, sizeof(double **) );
-	if (*ptr == NULL)
-		return 0;
-
 	// requires gnss structure initialized
 	if (pony->gnss == NULL)
 		return 0;
-
+	// allocate array
+	*ptr = (double ***)calloc( pony->gnss_count, sizeof(double **) );
+	if (*ptr == NULL)
+		return 0;
+	// allocate array contents
 	for (r = 0; r < pony->gnss_count; r++) {
 		// requires gal structure initialized
 		if (pony->gnss[r].gal == NULL)
@@ -1938,7 +1998,7 @@ char pony_gnss_sat_alloc_pppointer_gnss_count_sat_count_gal(double ****ptr, cons
 		(*ptr)[r] = (double **)calloc( pony->gnss[r].gal->max_sat_count, sizeof(double *) );
 		if ( (*ptr)[r] == NULL )
 			return 0;
-		
+
 		for (i = 0; i < pony->gnss[r].gal->max_sat_count; i++) {
 			(*ptr)[r][i] = NULL;
 			(*ptr)[r][i] = (double *)calloc( internal_size, sizeof(double) );
@@ -1950,23 +2010,26 @@ char pony_gnss_sat_alloc_pppointer_gnss_count_sat_count_gal(double ****ptr, cons
 	return 1;
 }
 
-char pony_gnss_sat_alloc_ppointer_gnss_count_sat_count_bds(double ***ptr) 
+char pony_gnss_sat_alloc_ppointer_gnss_count_sat_count_bds(double ***ptr)
 {
 	size_t r;
 
+	// validate
+	if (ptr == NULL)
+		return 0;
+	// check pointer
 	if (*ptr != NULL)
 		return 1; // already allocated
-
 	// requires gnss structure initialized
 	if (pony->gnss == NULL) {
 		*ptr = NULL;
 		return 0;
 	}
-
+	// allocate array
 	*ptr = (double **)calloc( pony->gnss_count, sizeof(double *) );
 	if (*ptr == NULL)
 		return 0;
-
+	// allocate array contents
 	for (r = 0; r < pony->gnss_count; r++) {
 		// requires bds structure initialized
 		if (pony->gnss[r].bds == NULL)
@@ -1979,21 +2042,24 @@ char pony_gnss_sat_alloc_ppointer_gnss_count_sat_count_bds(double ***ptr)
 	return 1;
 }
 
-char pony_gnss_sat_alloc_pppointer_gnss_count_sat_count_bds(double ****ptr, const size_t internal_size) 
+char pony_gnss_sat_alloc_pppointer_gnss_count_sat_count_bds(double ****ptr, const size_t internal_size)
 {
 	size_t i, r;
 
+	// validate
+	if (ptr == NULL)
+		return 0;
+	// check pointer
 	if (*ptr != NULL)
 		return 1; // already allocated
-
-	*ptr = (double ***)calloc( pony->gnss_count, sizeof(double **) );
-	if (*ptr == NULL)
-		return 0;
-
 	// requires gnss structure initialized
 	if (pony->gnss == NULL)
 		return 0;
-
+	// allocate array
+	*ptr = (double ***)calloc( pony->gnss_count, sizeof(double **) );
+	if (*ptr == NULL)
+		return 0;
+	// allocate array contents
 	for (r = 0; r < pony->gnss_count; r++) {
 		// requires bds structure initialized
 		if (pony->gnss[r].bds == NULL)
@@ -2003,7 +2069,7 @@ char pony_gnss_sat_alloc_pppointer_gnss_count_sat_count_bds(double ****ptr, cons
 		(*ptr)[r] = (double **)calloc( pony->gnss[r].bds->max_sat_count, sizeof(double *) );
 		if ( (*ptr)[r] == NULL )
 			return 0;
-		
+
 		for (i = 0; i < pony->gnss[r].bds->max_sat_count; i++) {
 			(*ptr)[r][i] = NULL;
 			(*ptr)[r][i] = (double *)calloc( internal_size, sizeof(double) );
@@ -2019,23 +2085,27 @@ char pony_gnss_sat_alloc_pppointer_gnss_count_sat_count_bds(double ****ptr, cons
 
 
 		// difference between two epochs not further than 1 day apart
-double pony_gnss_sat_epoch_diff_within_day(pony_time_epoch *t1, pony_time_epoch *t2) {
-
+double pony_gnss_sat_epoch_diff_within_day(pony_time_epoch *t1, pony_time_epoch *t2)
+{
 	double t1s, t2s;
 
+	// validate
+	if (t1 == NULL || t2 == NULL)
+		return pony->gnss_const.sec_in_w; // invalid input
+	// calculate seconds
 	t1s = t1->h*3600.0 + t1->m*60 + t1->s;
 	t2s = t2->h*3600.0 + t2->m*60 + t2->s;
-
+	// calculate difference
 	if (t1->D == t2->D)
 		return t1s - t2s;
 	else if (t1s < t2s) // t1 is assumed in the next day after t2
 		return t1s - t2s + pony->gnss_const.sec_in_d;
 	else				// t1 is assumed in the previous day before t2
 		return t2s - t1s + pony->gnss_const.sec_in_d;
-
 }
 
 		// round to the nearest integer
-int pony_gnss_sat_round(double x) {
+int pony_gnss_sat_round(double x)
+{
 	return ( (int)( x >= 0.0 ? (x + 0.5) : (x - 0.5) ) );
 }

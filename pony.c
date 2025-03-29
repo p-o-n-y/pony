@@ -1,4 +1,4 @@
-// Aug-2022
+// Feb-2025
 // PONY core source code
 
 #include <stdlib.h>
@@ -13,7 +13,7 @@ char pony_add_plugin(void(*newplugin)(void));                                // 
 char pony_init      (char*                 );                                // initialize the bus, except for core,                                 input: configuration string (see description),           output: OK/not OK (1/0)
 char pony_step      (void                  );                                // step through the plugin execution list,                                                                                       output: OK/not OK (1/0)
 char pony_terminate (void                  );                                // terminate operation,                                                                                                          output: OK/not OK (1/0)
-	
+
 	// advanced scheduling
 char pony_remove_plugin    (void(*plugin   )(void)                        ); // remove all instances of the plugin from the plugin execution list,   input: pointer to plugin function,                       output: OK/not OK (1/0)
 char pony_replace_plugin   (void(*oldplugin)(void), void(*newplugin)(void)); // replace all instances of the plugin by another one,                  input: pointers to old and new plugin functions,         output: OK/not OK (1/0)
@@ -53,7 +53,8 @@ pony_struct* pony = &pony_bus;
 		allocate memory with size validation and NULL-assignment
 		input:
 			void**       ptr            --- pointer to a pointer to the desired memory block
-			const int    specified size --- specified array size to be validated
+			const size_t specified size --- specified array size to be validated
+			char         valid          --- logical flag to check specified size validity
 			size_t*      actual_size    --- pointer to store actual (validated and allocated) array size, provided non-NULL pointer
 			const size_t element_size   --- size of each array element, e.g. sizeof(double)
 			const size_t default_size   --- default array size if validation fails
@@ -62,7 +63,7 @@ pony_struct* pony = &pony_bus;
 			1 if successful
 			0 otherwise (ptr==NULL or memory allocation failed)
 	 */
-char pony_alloc_null(void** ptr, const int specified_size, size_t* actual_size, const size_t element_size, const size_t default_size, const size_t max_size)
+char pony_alloc_null(void** ptr, const size_t specified_size, char valid, size_t* actual_size, const size_t element_size, const size_t default_size, const size_t max_size)
 {
 	size_t size;
 	char   res;
@@ -71,11 +72,13 @@ char pony_alloc_null(void** ptr, const int specified_size, size_t* actual_size, 
 	size = 0;
 	res  = 0;
 	if (ptr != NULL) {
-		// validate size
-		if      (specified_size >  max_size)
-			size = max_size;
-		else if (specified_size >= 0       )
-			size = specified_size;
+		// validate specified size
+		if (valid) {
+			if (specified_size < max_size)
+				size = specified_size;
+			else
+				size = max_size;
+		}
 		else
 			size = default_size;
 		// allocate memory
@@ -99,15 +102,15 @@ char pony_alloc_null(void** ptr, const int specified_size, size_t* actual_size, 
 		input:
 			void** ptr --- pointer to a pointer to the desired memory block
 	*/
-void pony_free_null(void** ptr) 
+void pony_free_null(void** ptr)
 {
-	if (*ptr == NULL)
+	if (ptr == NULL || *ptr == NULL)
 		return;
 	free(*ptr);
 	*ptr = NULL;
 }
 
-	/* 
+	/*
 		locate parameter group within a configuration string
 		input:
 			char*  groupname --- pointer to a group identifier (see documentation) or empty string to locate a substring that is outside of any group
@@ -130,17 +133,19 @@ char pony_locatecfggroup(const char* groupname, char* cfgstr, const size_t cfgle
 	int group_layer;
 	char group_found = 0;
 
+	// validate
+	if (groupname == NULL || cfgstr == NULL || groupptr == NULL || grouplen == NULL)
+		return 0;
+
+	// default values
 	*groupptr = NULL;
 	*grouplen = 0;
 
-	if (cfgstr == NULL)
-		return 0;
-
 	// locate configuration substring that is outside of any group
-	if (groupname[0] == '\0') {
+	if (groupname[0] == 0) {
 		for (i = 0; i < cfglen && cfgstr[i]; i++) {
 			// skip all non-printable characters, blank spaces and commas between groups
-			for (; i < cfglen && cfgstr[i] && (cfgstr[i] <= ' ' || cfgstr[i] == ','); i++); 
+			for (; i < cfglen && cfgstr[i] && (cfgstr[i] <= ' ' || cfgstr[i] == ','); i++);
 			// if no group started at this point
 			if (cfgstr[i] != '{')
 				break;
@@ -171,12 +176,12 @@ char pony_locatecfggroup(const char* groupname, char* cfgstr, const size_t cfgle
 		i = 0;
 		while (i < cfglen && cfgstr[i] && !group_found) {
 			// skip all non-printable characters, blank spaces and commas between groups
-			for (; i < cfglen && cfgstr[i] && (cfgstr[i] <= ' ' || cfgstr[i] == ','); i++); 
+			for (; i < cfglen && cfgstr[i] && (cfgstr[i] <= ' ' || cfgstr[i] == ','); i++);
 			// if a group started
 			if (cfgstr[i] == '{') {
 				group_layer = 1;
 				// skip all non-printable characters and blank spaces at the beginning of the group
-				for (i++; i < cfglen && cfgstr[i] && (cfgstr[i] <= ' '); i++); 
+				for (i++; i < cfglen && cfgstr[i] && (cfgstr[i] <= ' '); i++);
 
 				// check if the group is the one that has been requested
 				group_found = 1;
@@ -205,7 +210,7 @@ char pony_locatecfggroup(const char* groupname, char* cfgstr, const size_t cfgle
 					if (group_found && group_layer > 0)
 						(*grouplen)++;
 				}
-			} 
+			}
 			// skip characters outside groups (common part for those groups)
 			else
 				i++;
@@ -255,15 +260,15 @@ void pony_init_epoch(pony_time_epoch* epoch)
 	*/
 char pony_init_sol(pony_sol* sol, char* settings, const size_t len)
 {
-	const size_t 
+	const size_t
 		metrics_count_default = 2,   // default number of metrics in solution structures
 		metrics_count_limit   = 255; // maximum number of metrics in solution structures
 
 	const char metrics_count_token[] = "metrics_count"; // token to look for in settings
 
-	size_t i;
-	int    size;
-	char*  cfgptr;
+	size_t i, size;
+	char *cfgptr, *endptr;
+
 
 	// validate
 	if (sol == NULL)
@@ -293,11 +298,12 @@ char pony_init_sol(pony_sol* sol, char* settings, const size_t len)
 	sol->dt         = 0;
 	sol->dt_valid   = 0;
 	// metrics
-	size = -1;
 	cfgptr = pony_locate_token(metrics_count_token, settings, len, '='); // try to find number of metrics in settings string
-	if (cfgptr != NULL)      // if token found
-		size = atoi(cfgptr); // parse the number
-	return pony_alloc_null((void**)(&(sol->metrics)), size, &(sol->metrics_count), sizeof(double), metrics_count_default, metrics_count_limit);
+	if (cfgptr != NULL)                     // if token found
+		size = strtoul(cfgptr, &endptr, 0); // parse the number
+	else
+		size = 0, endptr = cfgptr;
+	return pony_alloc_null((void**)(&(sol->metrics)), size, (endptr != cfgptr), &(sol->metrics_count), sizeof(double), metrics_count_default, metrics_count_limit);
 }
 
 	/*
@@ -322,23 +328,23 @@ void pony_free_sol(pony_sol* sol)
 	/*
 		initialize inertial navigation constants
 	*/
-void pony_init_imu_const()
+void pony_init_imu_const(void)
 {
 	pony->imu_const.pi      = 3.14159265358979323846264338327950288; // pi with maximum quad-precision floating point digits as in IEEE 754-2008 (binary128)
 	pony->imu_const.pi2     = pony->imu_const.pi*2;                  // pi x 2
 	pony->imu_const.pi_2    = pony->imu_const.pi/2;                  // pi / 2
 	pony->imu_const.rad2deg = 180/pony->imu_const.pi;                // 180/pi
-	
+
 	// Earth parameters as in Section 4 of GRS-80 by H. Moritz, Journal of Geodesy (2000) 74 (1): pp. 128-162
 	pony->imu_const.u       = 7.292115e-5;                           // Earth's rotation rate, rad/s
 	pony->imu_const.a       = 6378137.0;                             // Earth's ellipsoid semi-major axis, m
 	pony->imu_const.mu      = 3986005e8;                             // Earth's geocentric gravitational constant (including the atmosphere)
-	pony->imu_const.J2      = 1.08263e-3;                            // Earth's dynamical form factor 
+	pony->imu_const.J2      = 1.08263e-3;                            // Earth's dynamical form factor
 	pony->imu_const.e2      = 6.6943800229e-3;                       // Earth's ellipsoid first eccentricity squared
 	pony->imu_const.ge      = 9.7803267715;                          // Earth's normal gravity at the equator, m/s^2
 	pony->imu_const.fg      = 5.302440112e-3;                        // Earth's normal gravity flattening
 }
-	
+
 	/*
 		initialize IMU structure
 		input:
@@ -350,14 +356,13 @@ void pony_init_imu_const()
 char pony_init_imu(pony_imu* imu)
 {
 	const size_t
-	temp_count_default = 3,   // default number of additional temperature sensors
-	temp_count_limit   = 255; // maximum number of additional temperature sensors
+		temp_count_default = 3,               // default number of additional temperature sensors
+		temp_count_limit   = 255;             // maximum number of additional temperature sensors
+	const char
+		temp_count_token[] = "temp_count"; // token to look for in settings
 
-	const char metrics_count_token[] = "temp_count"; // token to look for in settings
-
-	size_t i;
-	int    size;
-	char*  cfgptr;
+	size_t i, size;
+	char *cfgptr, *endptr;
 
 
 	// validate
@@ -387,12 +392,13 @@ char pony_init_imu(pony_imu* imu)
 	if (!pony_init_sol(&(imu->sol), imu->cfg, imu->cfglength))
 		return 0;
 	// init additional temperature sensors
-	size = -1;
-	cfgptr = pony_locate_token(metrics_count_token, imu->cfg, imu->cfglength, '='); // try to find number of additional temperature sensors in configuration string
-	if (cfgptr != NULL)      // if token found
-		size = atoi(cfgptr); // parse the number
 	imu->T_valid = 0;
-	return pony_alloc_null((void**)(&(imu->T)), size, &(imu->T_count), sizeof(double), temp_count_default, temp_count_limit);
+	cfgptr = pony_locate_token(temp_count_token, imu->cfg, imu->cfglength, '='); // try to find number of additional temperature sensors in configuration string
+	if (cfgptr != NULL)                     // if token found
+		size = strtoul(cfgptr, &endptr, 0); // parse the number
+	else
+		size = 0, endptr = cfgptr;
+	return pony_alloc_null((void**)(&(imu->T)), size, (endptr != cfgptr), &(imu->T_count), sizeof(double), temp_count_default, temp_count_limit);
 }
 
 	/*
@@ -437,7 +443,7 @@ void pony_init_gnss_settings(pony_gnss* gnss)
 	gnss->settings.  phase_sigma  =   0.01;
 	gnss->settings.doppler_sigma  =   0.5;
 	// antenna position
-	for (i = 0; i < 3; i++)			 
+	for (i = 0; i < 3; i++)
 		gnss->settings.ant_pos[i] =   0;
 	gnss->settings.ant_pos_tol    =  -1;
 }
@@ -453,9 +459,10 @@ void pony_init_gnss_leap_sec(pony_gnss* gnss)
 
 	char* cfg_ptr;
 
+
+	// validate
 	if (gnss == NULL)
 		return;
-
 	// default values
 	gnss->leap_sec       = 0;
 	gnss->leap_sec_valid = 0;
@@ -512,15 +519,16 @@ void pony_init_gnss_sat(pony_gnss_sat* sat)
 		free satellite data
 		input:
 			pony_gnss_sat** sat       --- pointer to a GNSS satellite data structure
-			const size_t    sat_count --- number of sattelites
+			const size_t    sat_count --- number of satellites
 	*/
 void pony_free_gnss_sat(pony_gnss_sat** sat, const size_t sat_count)
 {
 	size_t s;
 
-	if (*sat == NULL) 
+	// validate
+	if (sat == NULL || *sat == NULL)
 		return;
-
+	//free satellite data
 	for (s = 0; s < sat_count; s++) {
 		// ephemeris
 		pony_free_null((void**)(&((*sat)[s].eph)));
@@ -528,7 +536,7 @@ void pony_free_gnss_sat(pony_gnss_sat** sat, const size_t sat_count)
 		pony_free_null((void**)(&((*sat)[s].obs)));
 		pony_free_null((void**)(&((*sat)[s].obs_valid)));
 	}
-	
+	// free array
 	free((void*)(*sat));
 	*sat = NULL;
 }
@@ -537,7 +545,7 @@ void pony_free_gnss_sat(pony_gnss_sat** sat, const size_t sat_count)
 		initialize GNSS GPS structure
 		input:
 			pony_gnss_gps* gps           --- pointer to a GPS constellation data structure
-			const size_t   max_sat_count --- maximum number of sattelites
+			const size_t   max_sat_count --- maximum number of satellites
 			const size_t   max_eph_count --- maximum number of ephemeris per satellite
 		return value:
 			1 if successful
@@ -547,20 +555,21 @@ char pony_init_gnss_gps(pony_gnss_gps* gps, const size_t max_sat_count, const si
 {
 	size_t i;
 
+	// validate
+	if (gps == NULL)
+		return 0;
+	// default values
 	gps->sat = NULL;
 	gps->max_sat_count = 0;
 	gps->max_eph_count = 0;
-
 	// try to allocate memory for satellite data
 	gps->sat = (pony_gnss_sat*)calloc(max_sat_count, sizeof(pony_gnss_sat));
 	if (gps->sat == NULL)
 		return 0;
 	gps->max_sat_count = max_sat_count;
-
 	// initialize satellite data
-	for (i = 0; i < gps->max_sat_count; i++) 
+	for (i = 0; i < gps->max_sat_count; i++)
 		pony_init_gnss_sat(gps->sat + i);
-
 	// try to allocate memory for each satellite ephemeris
 	for (i = 0; i < gps->max_sat_count; i++) {
 		gps->sat[i].eph = (double*)calloc(max_eph_count, sizeof(double));
@@ -568,11 +577,9 @@ char pony_init_gnss_gps(pony_gnss_gps* gps, const size_t max_sat_count, const si
 			return 0;
 	}
 	gps->max_eph_count = max_eph_count;
-
 	// observation types
 	gps->obs_types = NULL;
 	gps->obs_count = 0;
-
 	// validity flags
 	gps->iono_valid = 0;
 	gps->clock_corr_valid = 0;
@@ -587,21 +594,18 @@ char pony_init_gnss_gps(pony_gnss_gps* gps, const size_t max_sat_count, const si
 	*/
 void pony_free_gnss_gps(pony_gnss_gps* gps)
 {
+	// validate
 	if (gps == NULL)
 		return;
-	
 	//configuration
 	gps->cfg = NULL;
 	gps->cfglength = 0;
-	
 	// satellites
 	pony_free_gnss_sat(&(gps->sat), gps->max_sat_count);
 	gps->max_sat_count = 0;
-	
 	// observation types
 	pony_free_null((void**)(&(gps->obs_types)));
 	gps->obs_count = 0;
-	
 	// gnss_gps structure
 	free((void*)gps);
 }
@@ -628,7 +632,7 @@ void pony_init_gnss_glo_const(pony_glo_const* glo_const)
 		initialize GNSS GLONASS structure
 		input:
 			pony_gnss_glo* glo           --- pointer to a GLONASS constellation data structure
-			const size_t   max_sat_count --- maximum number of sattelites
+			const size_t   max_sat_count --- maximum number of satellites
 			const size_t   max_eph_count --- maximum number of ephemeris per satellite
 		return value:
 			1 if successful
@@ -638,22 +642,23 @@ char pony_init_gnss_glo(pony_gnss_glo* glo, const size_t max_sat_count, const si
 {
 	size_t i;
 
+	// validate
+	if (glo == NULL)
+		return 0;
+	// default values
 	glo->sat = NULL;
 	glo->freq_slot = NULL;
 	glo->max_sat_count = 0;
 	glo->max_eph_count = 0;
-
 	// try to allocate memory for satellite data
 	glo->sat = (pony_gnss_sat*)calloc(max_sat_count, sizeof(pony_gnss_sat));
 	if (glo->sat == NULL)
 		return 0;
 	glo->freq_slot = (int*)calloc(max_sat_count, sizeof(int));
 	glo->max_sat_count = max_sat_count;
-
 	// initialize satellite data
 	for (i = 0; i < glo->max_sat_count; i++)
 		pony_init_gnss_sat(glo->sat + i);
-
 	// try to allocate memory for each satellite ephemeris
 	for (i = 0; i < glo->max_sat_count; i++) {
 		glo->sat[i].eph = (double*)calloc(max_eph_count, sizeof(double));
@@ -661,7 +666,6 @@ char pony_init_gnss_glo(pony_gnss_glo* glo, const size_t max_sat_count, const si
 			return 0;
 	}
 	glo->max_eph_count = max_eph_count;
-
 	// observation types
 	glo->obs_types = NULL;
 	glo->obs_count = 0;
@@ -676,24 +680,20 @@ char pony_init_gnss_glo(pony_gnss_glo* glo, const size_t max_sat_count, const si
 	*/
 void pony_free_gnss_glo(pony_gnss_glo* glo)
 {
+	// validate
 	if (glo == NULL)
 		return;
-	
 	//configuration
 	glo->cfg = NULL;
 	glo->cfglength = 0;
-	
 	// satellites
 	pony_free_gnss_sat(&(glo->sat), glo->max_sat_count);
 	glo->max_sat_count = 0;
-	
 	// observation types
 	pony_free_null((void**)(&(glo->obs_types)));
 	glo->obs_count = 0;
-	
 	// frequency slots
 	pony_free_null((void**)(&(glo->freq_slot)));
-	
 	// gnss glonass structure
 	free((void*)glo);
 }
@@ -702,7 +702,7 @@ void pony_free_gnss_glo(pony_gnss_glo* glo)
 		initialize GNSS Galileo constants
 		input:
 			pony_gal_const* gal_const --- pointer to a Galileo system constants structure
-	*/	
+	*/
 void pony_init_gnss_gal_const(pony_gal_const* gal_const)
 {
 	gal_const->mu  =  3.986004418e14;                    // Earth gravity constant as in Galileo OS SIS ICD Issue 1.2 (November 2015), m^3/s^2
@@ -724,7 +724,7 @@ void pony_init_gnss_gal_const(pony_gal_const* gal_const)
 		initialize GNSS Galileo structure
 		input:
 			pony_gnss_gal* gal           --- pointer to a Galileo constellation data structure
-			const size_t   max_sat_count --- maximum number of sattelites
+			const size_t   max_sat_count --- maximum number of satellites
 			const size_t   max_eph_count --- maximum number of ephemeris per satellite
 
 		return value:
@@ -735,20 +735,21 @@ char pony_init_gnss_gal(pony_gnss_gal* gal, const size_t max_sat_count, const si
 {
 	size_t i;
 
+	// validate
+	if (gal == NULL)
+		return 0;
+	// default values
 	gal->sat = NULL;
 	gal->max_sat_count = 0;
 	gal->max_eph_count = 0;
-
 	// try to allocate memory for satellite data
 	gal->sat = (pony_gnss_sat*)calloc(max_sat_count, sizeof(pony_gnss_sat));
 	if (gal->sat == NULL)
 		return 0;
 	gal->max_sat_count = max_sat_count;
-
 	// initialize satellite data
-	for (i = 0; i < gal->max_sat_count; i++) 
+	for (i = 0; i < gal->max_sat_count; i++)
 		pony_init_gnss_sat(gal->sat + i);
-
 	// try to allocate memory for each satellite ephemeris
 	for (i = 0; i < gal->max_sat_count; i++) {
 		gal->sat[i].eph = (double*)calloc(max_eph_count, sizeof(double));
@@ -756,11 +757,9 @@ char pony_init_gnss_gal(pony_gnss_gal* gal, const size_t max_sat_count, const si
 			return 0;
 	}
 	gal->max_eph_count = max_eph_count;
-
 	// observation types
 	gal->obs_types = NULL;
 	gal->obs_count = 0;
-
 	// validity flags
 	gal->iono_valid = 0;
 	gal->clock_corr_valid = 0;
@@ -775,21 +774,18 @@ char pony_init_gnss_gal(pony_gnss_gal* gal, const size_t max_sat_count, const si
 	*/
 void pony_free_gnss_gal(pony_gnss_gal* gal)
 {
+	// validate
 	if (gal == NULL)
 		return;
-
 	//configuration
 	gal->cfg = NULL;
 	gal->cfglength = 0;
-	
 	// satellites
 	pony_free_gnss_sat(&(gal->sat), gal->max_sat_count);
 	gal->max_sat_count = 0;
-	
 	// observation types
 	pony_free_null((void**)(&(gal->obs_types)));
 	gal->obs_count = 0;
-	
 	// gnss galileo structure
 	free((void*)gal);
 }
@@ -817,7 +813,7 @@ void pony_init_gnss_bds_const(pony_bds_const* bds_const)
 		initialize GNSS BeiDou structure
 		input:
 			pony_gnss_bds* bds           --- pointer to a BeiDou constellation data
-			const size_t   max_sat_count --- maximum number of sattelites
+			const size_t   max_sat_count --- maximum number of satellites
 			const size_t   max_eph_count --- maximum number of ephemeris per satellite
 		return value:
 			1 if successful
@@ -827,20 +823,20 @@ char pony_init_gnss_bds(pony_gnss_bds* bds, const size_t max_sat_count, const si
 {
 	size_t i;
 
+	// validate
+	if (bds == NULL)
+		return 0;
 	bds->sat = NULL;
 	bds->max_sat_count = 0;
 	bds->max_eph_count = 0;
-
 	// try to allocate memory for satellite data
 	bds->sat = (pony_gnss_sat*)calloc(max_sat_count, sizeof(pony_gnss_sat));
 	if (bds->sat == NULL)
 		return 0;
 	bds->max_sat_count = max_sat_count;
-
 	// initialize satellite data
-	for (i = 0; i < bds->max_sat_count; i++) 
+	for (i = 0; i < bds->max_sat_count; i++)
 		pony_init_gnss_sat(bds->sat + i);
-
 	// try to allocate memory for each satellite ephemeris
 	for (i = 0; i < bds->max_sat_count; i++) {
 		bds->sat[i].eph = (double*)calloc(max_eph_count, sizeof(double));
@@ -848,11 +844,9 @@ char pony_init_gnss_bds(pony_gnss_bds* bds, const size_t max_sat_count, const si
 			return 0;
 	}
 	bds->max_eph_count = max_eph_count;
-
 	// observation types
 	bds->obs_types = NULL;
 	bds->obs_count = 0;
-
 	// validity flags
 	bds->iono_valid = 0;
 	bds->clock_corr_valid = 0;
@@ -867,21 +861,18 @@ char pony_init_gnss_bds(pony_gnss_bds* bds, const size_t max_sat_count, const si
 	*/
 void pony_free_gnss_bds(pony_gnss_bds* bds)
 {
+	// validate
 	if (bds == NULL)
 		return;
-	
 	//configuration
 	bds->cfg = NULL;
 	bds->cfglength = 0;
-	
 	// satellites
 	pony_free_gnss_sat(&(bds->sat), bds->max_sat_count);
 	bds->max_sat_count = 0;
-	
 	// observation types
 	pony_free_null((void**)(&(bds->obs_types)));
 	bds->obs_count = 0;
-	
 	// gnss beidou structure
 	free((void*)bds);
 }
@@ -889,7 +880,7 @@ void pony_free_gnss_bds(pony_gnss_bds* bds)
 	/*
 		initialize GNSS constants
 	*/
-void pony_init_gnss_const()
+void pony_init_gnss_const(void)
 {
 	pony->gnss_const.pi       = 3.1415926535898; // pi, circumference to diameter ratio, as in as in IS-GPS-200J, Galileo OS SIS ICD Issue 1.2 (November 2015), BeiDou SIS ICD OSS Version 2.1 (November 2016)
 	pony->gnss_const.c        = 299792458;       // speed of light as in IS-GPS-200J (22 May 2018), ICD GLONASS Edition 5.1 2008, Galileo OS SIS ICD Issue 1.2 (November 2015), BeiDou SIS ICD OSS Version 2.1 (November 2016), m/s
@@ -922,79 +913,73 @@ char pony_init_gnss(pony_gnss* gnss)
 	size_t grouplen;
 	char*  groupptr;
 
+
+	// validate
 	if (gnss == NULL)
 		return 0;
-
 	// gps
 	gnss->gps = NULL;
 	if (pony_locatecfggroup("gps:", gnss->cfg, gnss->cfglength, &groupptr, &grouplen)) {
 		gnss->gps = (pony_gnss_gps*)calloc(1, sizeof(pony_gnss_gps));
-		
+
 		if (gnss->gps == NULL)
 			return 0;
-		
+
 		gnss->gps->cfg       = groupptr;
 		gnss->gps->cfglength = grouplen;
 
 		if (!pony_init_gnss_gps(gnss->gps, max_sat_count[gps], max_eph_count[gps]))
 			return 0;
 	}
-
 	// glonass
 	gnss->glo = NULL;
 	if (pony_locatecfggroup( "glo:", gnss->cfg, gnss->cfglength, &groupptr, &grouplen)) {
 		gnss->glo = (pony_gnss_glo*)calloc(1, sizeof(pony_gnss_glo));
-		
+
 		if (gnss->glo == NULL)
 			return 0;
-		
+
 		gnss->glo->cfg       = groupptr;
 		gnss->glo->cfglength = grouplen;
 
 		if (!pony_init_gnss_glo(gnss->glo, max_sat_count[glo], max_eph_count[glo]))
 			return 0;
 	}
-
 	// galileo
 	gnss->gal = NULL;
 	if (pony_locatecfggroup("gal:", gnss->cfg, gnss->cfglength, &groupptr, &grouplen)) {
 		gnss->gal = (pony_gnss_gal*)calloc(1, sizeof(pony_gnss_gal));
-		
+
 		if (gnss->gal == NULL)
 			return 0;
-		
+
 		gnss->gal->cfg       = groupptr;
 		gnss->gal->cfglength = grouplen;
 
 		if (!pony_init_gnss_gal(gnss->gal, max_sat_count[gal], max_eph_count[gal]))
 			return 0;
 	}
-
 	// beidou
 	gnss->bds = NULL;
 	if (pony_locatecfggroup("bds:", gnss->cfg, gnss->cfglength, &groupptr, &grouplen)) {
 		gnss->bds = (pony_gnss_bds*)calloc(1, sizeof(pony_gnss_bds));
-		
+
 		if (gnss->bds == NULL)
 			return 0;
-		
+
 		gnss->bds->cfg       = groupptr;
 		gnss->bds->cfglength = grouplen;
 
 		if (!pony_init_gnss_bds(gnss->bds, max_sat_count[bds], max_eph_count[bds]))
 			return 0;
 	}
-
 	// gnss settings
 	pony_init_gnss_settings(gnss);
-
 	// gnss solution
 	if (!pony_init_sol(&(gnss->sol), gnss->cfg_settings, gnss->settings_length))
 		return 0;
-
 	// gnss epoch
 	pony_init_epoch(&(gnss->epoch));
-
 	// leap seconds
 	pony_init_gnss_leap_sec(gnss);
 
@@ -1008,31 +993,27 @@ char pony_init_gnss(pony_gnss* gnss)
 	*/
 void pony_free_gnss(pony_gnss* gnss)
 {
+	// validate
 	if (gnss == NULL)
 		return;
-
 	// configuration
 	gnss->cfg = NULL;
 	gnss->cfglength = 0;
 	gnss->cfg_settings = NULL;
 	gnss->settings_length = 0;
-	
 	// gps data
 	pony_free_gnss_gps(gnss->gps);
 	gnss->gps = NULL;
-	
 	// glonass data
 	pony_free_gnss_glo(gnss->glo);
 	gnss->glo = NULL;
-	
 	// galileo data
 	pony_free_gnss_gal(gnss->gal);
 	gnss->gal = NULL;
-	
 	// beidou data
 	pony_free_gnss_bds(gnss->bds);
 	gnss->bds = NULL;
-
+	// gnss solution
 	pony_free_sol(&(gnss->sol));
 }
 
@@ -1046,21 +1027,23 @@ void pony_free_gnss(pony_gnss* gnss)
 		input:
 			pony_air* air --- pointer to an air data structure
 		return value:
-			1
+			1 if successful
+			0 otherwise
 	*/
 char pony_init_air(pony_air* air)
 {
-	// values
+	// validate
+	if (air == NULL)
+		return 0;
+	// default values
 	air->t     = 0;
 	air->alt   = 0;
 	air->vv    = 0;
 	air->speed = 0;
-	
-	// stdev 
+	// stdev
 	air->alt_std   = 30.0; // barometric altitude stdev
 	air->vv_std    =  0.5; // barometric altitude trend stdev
 	air->speed_std =  1.5; // airspeed measurement stdev
-	
 	// validity flags
 	air->alt_valid   = 0;
 	air->vv_valid    = 0;
@@ -1071,18 +1054,20 @@ char pony_init_air(pony_air* air)
 
 	/*
 		free air data memory
+		input:
+			pony_air* air --- pointer to an air data structure
 	*/
-void pony_free_air(void)
+void pony_free_air(pony_air** air)
 {
-	if (pony->air == NULL)
+	// validate
+	if (air == NULL || *air == NULL)
 		return;
-	
 	// configuration
-	pony->air->cfg = NULL;
-	pony->air->cfglength = 0;
-	
+	(*air)->cfg = NULL;
+	(*air)->cfglength = 0;
 	// air data
-	free((void*)(pony->air));
+	free((void*)(*air));
+	*air = NULL;
 }
 
 
@@ -1100,6 +1085,9 @@ void pony_free_air(void)
 	*/
 char pony_init_ref(pony_ref* ref)
 {
+	// validate
+	if (ref == NULL)
+		return 0;
 	// time
 	ref->t = 0;
 	// default gravity acceleration vector
@@ -1116,22 +1104,22 @@ char pony_init_ref(pony_ref* ref)
 
 	/*
 		free reference data memory
+		input:
+			pony_ref* ref --- pointer to a reference data structure
 	*/
-void pony_free_ref(void)
+void pony_free_ref(pony_ref** ref)
 {
-	if (pony->ref == NULL)
+	// validate
+	if (ref == NULL || *ref == NULL)
 		return;
-
 	// configuration
-	pony->ref->cfg = NULL;
-	pony->ref->cfglength = 0;
-
+	(*ref)->cfg = NULL;
+	(*ref)->cfglength = 0;
 	// solution
-	pony_free_sol(&(pony->ref->sol));
-	
+	pony_free_sol(&((*ref)->sol));
 	// pony_ref structure
-	free((void*)(pony->ref));
-	pony->ref = NULL;
+	free((void*)(*ref));
+	*ref = NULL;
 }
 
 
@@ -1140,9 +1128,9 @@ void pony_free_ref(void)
 
 // general handling routines
 	/*
-		free all alocated memory and set pointers and counters to NULL
+		free all allocated memory and set pointers and counters to NULL
 	*/
-void pony_free()
+void pony_free(void)
 {
 	size_t i;
 
@@ -1175,10 +1163,10 @@ void pony_free()
 	pony->gnss_count = 0;
 
 	// air data
-	pony_free_air();
+	pony_free_air(&(pony->air));
 
 	// reference data
-	pony_free_ref();
+	pony_free_ref(&(pony->ref));
 
 	// solution
 	pony_free_sol(&(pony->sol));
@@ -1196,30 +1184,35 @@ void pony_free()
 //                        CORE PONY FUNCTIONS FOR HOST APPLICATION
 
 // basic functions
-	/* 
-		add plugin to the plugin execution list	
+	/*
+		add plugin to the plugin execution list
 		input:
 			newplugin --- pointer to plugin function (no arguments, no return value)
-		return value: 
+		return value:
 			1 if successful
-			0 otherwise (failed to allocate/realocate memory, plugin limit reached)
+			0 otherwise (failed to allocate/reallocate memory, plugin limit reached)
 	*/
 char pony_add_plugin(void(*newplugin)(void))
 {
 	pony_plugin* reallocated_pointer;
 
-	if (pony->core.plugin_count + 1 >= (size_t)UINT_MAX)
+	// validate
+	if (0 // for code alignment, removed by optimizer
+		|| newplugin == NULL                               // null pointer cannot be added to the main cycle, as its futher calls invoke undefined behavior
+		|| pony->core.plugin_count + 1 >= (size_t)UINT_MAX // maximum number of plugins reached, UINT_MAX indicates invalid plugin or void plugin index
+		)
 		return 0;
 
+	// reallocate plugin array
 	reallocated_pointer = (pony_plugin*)realloc((void*)(pony->core.plugins), (pony->core.plugin_count + 1)*sizeof(pony_plugin));
-
-	if (reallocated_pointer == NULL) { // failed to allocate/realocate memory
+	if (reallocated_pointer == NULL) { // failed to allocate/reallocate memory
 		pony_free();
 		return 0;
-	} 
+	}
 	else
 		pony->core.plugins = reallocated_pointer;
 
+	// initialize new plugin
 	pony->core.plugins[pony->core.plugin_count].func  = newplugin;
 	pony->core.plugins[pony->core.plugin_count].cycle = 1;
 	pony->core.plugins[pony->core.plugin_count].shift = 0;
@@ -1231,22 +1224,22 @@ char pony_add_plugin(void(*newplugin)(void))
 
 	/*
 		initialize the bus, except for core
-		input: 
+		input:
 			char* cfg --- pointer to a configuration string (see pony description)
-		return value: 
+		return value:
 			1 if successful
 			0 otherwise (memory allocation or partial init failed)
 	*/
 char pony_init(char* cfg)
 {
-	const size_t 
+	const size_t
 		max_imu_count  = 10, // maximum number of imu data structures
 		max_gnss_count = 10; // maximum number of gnss receiver data structures
 
-	char 
+	char
 		multi_imu_token [] = "imu[0]:",
 		multi_gnss_token[] = "gnss[0]:";
-	const size_t 
+	const size_t
 		multi_imu_index_position = 4,
 		multi_gnss_index_position = 5;
 
@@ -1266,7 +1259,7 @@ char pony_init(char* cfg)
 		return 0;
 	for (i = 0; i < pony->cfglength; i++)
 		pony->cfg[i] = cfg[i];
-	pony->cfg[pony->cfglength] = '\0';
+	pony->cfg[pony->cfglength] = 0;
 
 	// fetch a part of configuration that is outside of any group
 	pony->cfg_settings = NULL;
@@ -1476,7 +1469,7 @@ char pony_terminate(void)
 		return 1; // termination is due in the next step
 	}
 
-	return 0; // had been already terminated by host or by plugin 
+	return 0; // had been already terminated by host or by plugin
 }
 
 
@@ -1485,7 +1478,7 @@ char pony_terminate(void)
 
 // advanced scheduling functions
 	/*
-		remove all instances of a given plugin from the plugin execution list	
+		remove all instances of a given plugin from the plugin execution list
 		input:
 			plugin --- pointer to a plugin function to remove from execution list
 		return value:
@@ -1495,10 +1488,11 @@ char pony_terminate(void)
 char pony_remove_plugin(void(*plugin)(void))
 {
 	size_t       i, j;
-	char         flag = 0;
+	char         flag;
 	pony_plugin* reallocated_pointer;
 
-	for (i = 0; i < pony->core.plugin_count; i++) { // go through the execution list
+	// go through the execution list
+	for (i = 0, flag = 0; i < pony->core.plugin_count; i++) {
 		if (pony->core.plugins[i].func != plugin)   // if not the requested plugin, do nothing
 			continue;
 		// otherwise, remove the current plugin from the execution list
@@ -1515,7 +1509,7 @@ char pony_remove_plugin(void(*plugin)(void))
 			flag++;
 	}
 
-	// reallocate memory
+	// reallocate plugin array
 	reallocated_pointer = (pony_plugin*)realloc((void*)(pony->core.plugins), pony->core.plugin_count*sizeof(pony_plugin));
 	if (pony->core.plugin_count > 0 && reallocated_pointer == NULL) { // memory reallocation somehow failed
 		pony_free();
@@ -1534,13 +1528,13 @@ char pony_remove_plugin(void(*plugin)(void))
 		return value:
 			1 if successful
 			0 otherwise (no instances found)
-	*/	
+	*/
 char pony_replace_plugin(void(*oldplugin)(void), void(*newplugin)(void))
 {
 	size_t i;
 	char flag;
 
-	for (i = 0, flag = 0; i < pony->core.plugin_count; i++) {
+	for (i = 0, flag = 0; newplugin != NULL && i < pony->core.plugin_count; i++) { // null pointer cannot be added to the main cycle, as its futher calls invoke undefined behavior
 		if (pony->core.plugins[i].func != oldplugin)
 			continue;
 		pony->core.plugins[i].func = newplugin;
@@ -1560,7 +1554,7 @@ char pony_replace_plugin(void(*oldplugin)(void), void(*newplugin)(void))
 			shift     --- shift from the beginning of the cycle, automatically shrunk to [0..cycle-1]
 		return value:
 			1 if successful
-			0 otherwise (failed to allocate/realocate memory)
+			0 otherwise (failed to allocate/reallocate memory)
 	*/
 char pony_schedule_plugin(void(*newplugin)(void), int cycle, int shift)
 {
@@ -1652,7 +1646,7 @@ char pony_suspend_plugin(void(*plugin)(void))
 }
 
 	/*
-		resume all instances of the plugin in the plugin execution list	
+		resume all instances of the plugin in the plugin execution list
 		input:
 			plugin --- pointer to a plugin function
 		return value:
@@ -1680,7 +1674,7 @@ char pony_resume_plugin(void(*plugin)(void))
 
 
 
-// basic parsing	
+// basic parsing
 	/*
 		locate a token (and delimiter, when given) within a configuration string
 		skips groups enclosed in braces {...} and strings within quotes ("...")
@@ -1710,8 +1704,9 @@ char* pony_locate_token(const char* token, char* src, const size_t len, const ch
 	len1 = len - n;
 
 	// look for the token
-	for (i = 0, j = 0, k = 0; i <= len1 && src[i]; i++) // go throughout the string
-		if (src[i] == quote) // skip quoted values
+	for (i = 0, j = 0, k = 0; i < len1 && src[i]; i++) // go throughout the string
+		if (0); // for code alignment, removed by optimizer
+		else if (src[i] == quote     ) // skip quoted values
 			for (i++; i < len1 && src[i] && src[i] != quote; i++);
 		else if (src[i] == brace_open) // skip groups
 			for (i++; i < len1 && src[i] && src[i] != brace_close; i++);
@@ -1727,7 +1722,7 @@ char* pony_locate_token(const char* token, char* src, const size_t len, const ch
 		return (src + k);
 
 	// check for delimiter
-	for (i = k; i < len && src[i] && src[i] <= blank; i++); // skip all non-printables		
+	for (i = k; i < len && src[i] && src[i] <= blank; i++); // skip all non-printables
 	if (i >= len || src[i] != delim) // no delimiter found
 		return NULL;
 	else
@@ -1794,11 +1789,11 @@ long pony_time_days_between_dates(pony_time_epoch epoch_from, pony_time_epoch ep
 	// calculate difference between two Rata Die day numbers
 	return
 		(epoch_to  .Y - epoch_from.Y)*yr_len_d +                                                                                                                                                           // full years
-		(epoch_to  .Y/leap_yr_short_cycle - epoch_to  .Y/leap_yr_med_cycle + epoch_to  .Y/leap_yr_long_cycle + (days_of_yr_approx_1_num*epoch_to  .M - days_of_yr_approx_0_num)/days_of_yr_approx_denom) - // leap days 
+		(epoch_to  .Y/leap_yr_short_cycle - epoch_to  .Y/leap_yr_med_cycle + epoch_to  .Y/leap_yr_long_cycle + (days_of_yr_approx_1_num*epoch_to  .M - days_of_yr_approx_0_num)/days_of_yr_approx_denom) - // leap days
 		(epoch_from.Y/leap_yr_short_cycle - epoch_from.Y/leap_yr_med_cycle + epoch_from.Y/leap_yr_long_cycle + (days_of_yr_approx_1_num*epoch_from.M - days_of_yr_approx_0_num)/days_of_yr_approx_denom) + // and current year
 		(epoch_to.D - epoch_from.D);                                                                                                                                                                       // remaining days
 	// original Rata Die calculation:
-	// (365*epoch_to.  Y + epoch_to.  Y/4 - epoch_to  .Y/100 + epoch_to  .Y/400 + (153*epoch_to  .M - 457)/5 + epoch_to  .D - 306) - 
+	// (365*epoch_to.  Y + epoch_to.  Y/4 - epoch_to  .Y/100 + epoch_to  .Y/400 + (153*epoch_to  .M - 457)/5 + epoch_to  .D - 306) -
 	// (365*epoch_from.Y + epoch_from.Y/4 - epoch_from.Y/100 + epoch_from.Y/400 + (153*epoch_from.M - 457)/5 + epoch_from.D - 306);
 }
 
@@ -1906,7 +1901,7 @@ char pony_time_epoch2gps(unsigned int* week, double* sec, pony_time_epoch* epoch
 				const size_t  n --- dimension
 			return value:
 				dot product u^T*v
-		*/	
+		*/
 double pony_linal_dot(const double* u, const double* v, const size_t n)
 {
 	double res;
@@ -1948,13 +1943,13 @@ void pony_linal_cross3x1(double* res, const double* u, const double* v)
 }
 
 		/*
-			multiply two matrices 
+			multiply two matrices
 			input:
-				const double* a        --- pointer to the first n x n1 matrix 
+				const double* a        --- pointer to the first n x n1 matrix
 				const double* b        --- pointer to the second n1 x m matrix
 				const size_t  n, n1, m --- dimensions
 			output:
-				double* res            --- pointer to a n x m matrix, 
+				double* res            --- pointer to a n x m matrix,
 				                           res = a*b
 		*/
 void pony_linal_mmul(double* res, const double* a, const double* b, const size_t n, const size_t n1, const size_t m)
@@ -1975,8 +1970,8 @@ void pony_linal_mmul(double* res, const double* a, const double* b, const size_t
 		/*
 			multiply two matrices (first matrix is transposed)
 			input:
-				const double* a        --- pointer to the first n x m matrix 
-				const double* b        --- pointer to the second n x n1 matrix 
+				const double* a        --- pointer to the first n x m matrix
+				const double* b        --- pointer to the second n x n1 matrix
 				const size_t  n, n1, m --- dimensions
 			output:
 				double* res            --- pointer to a m x n1 matrix,
@@ -2000,8 +1995,8 @@ void pony_linal_mmul1T(double* res, const double* a, const double* b, const size
 		/*
 			multiply two matrices (second matrix is transposed)
 			input:
-				const double* a       --- pointer to the first n x m matrix 
-				const double* b       --- pointer to the second n1 x m matrix 
+				const double* a       --- pointer to the first n x m matrix
+				const double* b       --- pointer to the second n1 x m matrix
 				const size_t n, n1, m --- dimensions
 			output:
 				double* res           --- pointer to a n x n1 matrix,
@@ -2028,7 +2023,7 @@ void pony_linal_mmul2T(double* res, const double* a, const double* b, const size
 				const double* q --- pointer to the first  4x1 quaternion
 				const double* r --- pointer to the second 4x1 quaternion
 			output:
-				double* res     --- pointer to a 4x1 quaternion, 
+				double* res     --- pointer to a 4x1 quaternion,
 				                res = q x r, with res0, q0, r0 being scalar parts
 		*/
 void pony_linal_qmul(double* res, const double* q, const double* r)
@@ -2038,7 +2033,41 @@ void pony_linal_qmul(double* res, const double* q, const double* r)
 	res[2] = q[0]*r[2] + q[2]*r[0] + q[3]*r[1] - q[1]*r[3];
 	res[3] = q[0]*r[3] + q[3]*r[0] + q[1]*r[2] - q[2]*r[1];
 }
-	
+
+		/*
+			multiply 4x1 quaternions with first quaternion conjugated
+			input:
+				const double* q --- pointer to the first  4x1 quaternion
+				const double* r --- pointer to the second 4x1 quaternion
+			output:
+				double* res     --- pointer to a 4x1 quaternion,
+				                res = q* x r, with res0, q0, r0 being scalar parts
+		*/
+void pony_linal_qmul1conj(double* res, const double* q, const double* r)
+{
+	res[0] = q[0]*r[0] + q[1]*r[1] + q[2]*r[2] + q[3]*r[3];
+	res[1] = q[0]*r[1] - q[1]*r[0] - q[2]*r[3] + q[3]*r[2];
+	res[2] = q[0]*r[2] - q[2]*r[0] - q[3]*r[1] + q[1]*r[3];
+	res[3] = q[0]*r[3] - q[3]*r[0] - q[1]*r[2] + q[2]*r[1];
+}
+
+		/*
+			multiply 4x1 quaternions with second quaternion conjugated
+			input:
+				const double* q --- pointer to the first  4x1 quaternion
+				const double* r --- pointer to the second 4x1 quaternion
+			output:
+				double* res     --- pointer to a 4x1 quaternion,
+				                res = q x r*, with res0, q0, r0 being scalar parts
+		*/
+void pony_linal_qmul2conj(double* res, const double* q, const double* r)
+{
+	res[0] =  q[0]*r[0] + q[1]*r[1] + q[2]*r[2] + q[3]*r[3];
+	res[1] = -q[0]*r[1] + q[1]*r[0] - q[2]*r[3] + q[3]*r[2];
+	res[2] = -q[0]*r[2] + q[2]*r[0] - q[3]*r[1] + q[1]*r[3];
+	res[3] = -q[0]*r[3] + q[3]*r[0] - q[1]*r[2] + q[2]*r[1];
+}
+
 	// space rotation representation
 		/*
 			calculate quaternion q corresponding to 3x3 attitude matrix R
@@ -2144,19 +2173,24 @@ void pony_linal_rpy2mat(double* R, const double* rpy)
 
 		/*
 			calculate roll, pitch and yaw corresponding to 3x3 transition matrix R from E-N-U
+			for pitch angles close to +/- pi/2 tested to produce matrices
+			within 0.005 arc sec from the original one when the output is fed into rpy2mat
 			input:
 				const double* R --- pointer to a 3x3 transition matrix R from E-N-U
 			output:
-				double* rpy     --- pointer to a roll, pitch and yaw (radians, airborne frame: X longitudinal, Z right-wing)
+				double* rpy     --- pointer to a roll, pitch and yaw array (radians, airborne frame: X longitudinal, Z right-wing)
 		*/
 void pony_linal_mat2rpy(double* rpy, const double* R)
 {
-	const double pi2 = 6.283185307179586476925286766559005768; // pi*2, IEEE-754 quadruple precision
+	const double
+		pi  = 3.141592653589793238462643383279502884, // pi  , IEEE-754 quadruple precision
+		pi2 = 6.283185307179586476925286766559005768, // pi*2, IEEE-754 quadruple precision
+		pi3 = 9.424777960769379715387930149838508652; // pi*3, IEEE-754 quadruple precision
 	double dp, dm;
 
 	rpy[1] = atan2(R[2], sqrt(R[5]*R[5] + R[8]*R[8])); // pitch angle
 
-	if (fabs(R[2]) < 0.5) {          // pitch magnitude below 30 deg
+	if (fabs(R[2]) < 0.875) {        // pitch magnitude below 61 deg
 		rpy[0] = -atan2(R[8], R[5]); // roll angle
 		rpy[2] =  atan2(R[0], R[1]); // yaw  angle
 	}
@@ -2164,13 +2198,14 @@ void pony_linal_mat2rpy(double* rpy, const double* R)
 		dp =  atan2(R[3]-R[7], R[6]+R[4]);
 		dm = -atan2(R[3]+R[7], R[6]-R[4]);
 
-		if (R[0] <= 0 && -R[8] <= 0 && dp > 0)      dp -= pi2;
+		if (0); // code alignment
+		else if (R[0] <= 0 && -R[8] <= 0 && dp > 0) dp -= pi2;
 		else if (R[0] >= 0 && -R[8] >= 0 && dp < 0) dp += pi2;
 		else if (R[0] <= 0 && -R[8] >= 0 && dm > 0) dm -= pi2;
 		else if (R[0] >= 0 && -R[8] <= 0 && dm < 0) dm += pi2;
 
-		rpy[0] = (dp - dm)/2; // roll angle
-		rpy[2] = (dp + dm)/2; // yaw  angle
+		rpy[0] = fmod((dp-dm)/2 + pi3, pi2) - pi; // roll angle
+		rpy[2] = fmod((dp+dm)/2 + pi3, pi2) - pi; // yaw  angle
 	}
 }
 
@@ -2206,7 +2241,7 @@ void pony_linal_eul2mat(double* R, const double* e)
 	else {
 		// Taylor expansion for sin(x)/x, (1-cos(x))/x^2 up to the defined degree (only even powers in each series)
 		s = 1, c = 1/2.;
-		for (i = 2, ps = -e02/6, pc = -e02/24; i < taylor_deg && ps != 0.0; i += 2, ps *= -e02/(i*(i+1.0)), pc *= -e02/((i+1.0)*(i+2.0)))
+		for (i = 2, ps = -e02/6, pc = -e02/24; i < taylor_deg && (0.5+ps) != 0.5; i += 2, ps *= -e02/(i*(i+1.0)), pc *= -e02/((i+1.0)*(i+2.0)))
 			s += ps, c += pc;
 	}
 
@@ -2223,7 +2258,7 @@ void pony_linal_eul2mat(double* R, const double* e)
 			output:
 				double* q       --- pointer to a 4x1 quaternion with q0 being scalar part
 		*/
-void pony_linal_eul2quat(double* q, const double* e  )
+void pony_linal_eul2quat(double* q, const double* e)
 {
 	const size_t taylor_deg = 12;  // yields expansion error of 2^-124, which falls below IEEE 754-2008 quad precision rounding error
 	const double eps = 1.0/0x0100; // 2^-8, guaranteed non-zero value in IEEE754 half-precision format
@@ -2234,7 +2269,7 @@ void pony_linal_eul2quat(double* q, const double* e  )
 		ps, pc;     // Taylor expansion terms
 	unsigned char i;
 
-	// e[i]^2, |e|^2, |e|
+	// (|e/2|)^2, |e/2|
 	e02 = (e[0]*e[0] + e[1]*e[1] + e[2]*e[2])/4;
 	e0  = sqrt(e02);
 	// sin|e/2|/|e/2|, cos|e/2|
@@ -2245,7 +2280,7 @@ void pony_linal_eul2quat(double* q, const double* e  )
 	else {
 		// Taylor expansion for sin(x)/x, cos(x) up to the defined degree (only even powers in each series)
 		s = 1, c = 1;
-		for (i = 2, ps = -e02/6, pc = -e02/24; i < taylor_deg && ps != 0.0; i += 2, ps *= -e02/(i*(i+1.0)), pc *= -e02/((i+1.0)*(i+2.0)))
+		for (i = 2, ps = -e02/6, pc = -e02/2; i < taylor_deg && (0.5+ps) != 0.5; i += 2, ps *= -e02/(i*(i+1.0)), pc *= -e02/((i+1.0)*(i+2.0)))
 			s += ps, c += pc;
 	}
 
@@ -2261,6 +2296,7 @@ void pony_linal_eul2quat(double* q, const double* e  )
 			input:
 				const size_t i, j --- row and column indexes in upper-triangular matrix,
 				                      i,j = 0,1,...,n-1
+				                      for i > j, upper part of symmetric matrix is assumed, and the result is (j,i) -> k
 				const size_t n    --- upper-triangular matrix dimension
 			output:
 				size_t* k         --- pointer to an index in one-dimensional array,
@@ -2268,7 +2304,10 @@ void pony_linal_eul2quat(double* q, const double* e  )
 		*/
 void pony_linal_u_ij2k(size_t* k, const size_t i, const size_t j, const size_t n)
 {
-	*k = i*(2*n - 1 - i)/2 + j;
+	if (k != NULL)
+		*k = (i > j) ?                // first case assumes symmetrix matrix indexing
+			(j*(2*n - 1 - j)/2 + i) :
+			(i*(2*n - 1 - i)/2 + j);
 }
 
 		/*
@@ -2340,7 +2379,7 @@ void pony_linal_u_mul(double* res, const double* u, const double* v, const size_
 		/*
 			multiply transposed upper-triangular matrix lined up in one-dimensional array of n(n+1)/2 x 1, by a regular matrix
 			input:
-				const double* u   --- pointer to an upper-triangular matrix 
+				const double* u   --- pointer to an upper-triangular matrix
 				                      lined up in one-dimensional array of n(n+1)/2 x 1
 				const double* v   --- pointer to a regular n x m matrix
 				const size_t  n,m --- dimensions
@@ -2379,8 +2418,8 @@ void pony_linal_uT_mul(double* res, const double* u, const double* v, const size
 		*/
 void pony_linal_mul_u(double* res, const double* v, const double* u, const size_t m, const size_t n)
 {
-	size_t 
-		i, j, k, k0, r, r0, 
+	size_t
+		i, j, k, k0, r, r0,
 		nj, mn, nn1;
 
 	mn = m*n;
@@ -2395,7 +2434,7 @@ void pony_linal_mul_u(double* res, const double* v, const double* u, const size_
 		}
 		if (r0 < n)
 			break;
-	}		
+	}
 }
 
 		/*
@@ -2423,8 +2462,8 @@ void pony_linal_mul_uT(double* res, const double* v, const double* u, const size
 		}
 }
 
-		/* 
-			multiply a regular matrix by itself transposed, storing upper part of the result lined up in one-dimensional array of n(n+1)/2 x 1 
+		/*
+			multiply a regular matrix by itself transposed, storing upper part of the result lined up in one-dimensional array of n(n+1)/2 x 1
 			input:
 				const double* v    --- pointer to a regular n x m matrix
 				const size_t  n, m --- dimensions
@@ -2437,14 +2476,14 @@ void pony_linal_msq2T_u(double* res, const double* v, const size_t n, const size
 {
 	size_t i, i1, j, k, im, i1m;
 
-	for (i = 0, i1 = 0, k = 0; i < n; i++)
+	for (i = 0, k = 0; i < n; i++)
 		for (i1 = i, im = i*m; i1 < n; i1++, k++)
 			for (j = 0, i1m = i1*m, res[k] = 0; j < m; j++)
 				res[k] += v[im + j]*v[i1m + j];
 }
 
-		/* 
-			multiply a transposed regular matrix by itself, storing upper part of the result lined up in one-dimensional array of n(n+1)/2 x 1 
+		/*
+			multiply a transposed regular matrix by itself, storing upper part of the result lined up in one-dimensional array of n(n+1)/2 x 1
 			input:
 				const double* v    --- pointer to a regular m x n matrix
 				const size_t  m, n --- dimensions
@@ -2458,7 +2497,7 @@ void pony_linal_msq1T_u(double* res, const double* v, const size_t m, const size
 	size_t j, j1, i, k, mn;
 
 	mn = m*n;
-	for (j = 0, j1 = 0, k = 0; j < n; j++)
+	for (j = 0, k = 0; j < n; j++)
 		for (j1 = j; j1 < n; j1++, k++)
 			for (i = 0, res[k] = 0; i < mn; i += n)
 				res[k] += v[i+j]*v[i+j1];
@@ -2496,7 +2535,7 @@ void pony_linal_u_inv(double* res, const double* u, const size_t n)
 		/*
 			calculate square (with right transposition) of upper-triangular matrix lined up in one-dimensional array of n(n+1)/2 x 1
 			input:
-				const double* u --- pointer to an upper-triangular matrix 
+				const double* u --- pointer to an upper-triangular matrix
 				                    lined up in one-dimensional array of n(n+1)/2 x 1
 				const size_t  n --- dimension
 			output:
@@ -2521,7 +2560,7 @@ void pony_linal_uuT(double* res, const double* u, const size_t n)
 		/*
 			calculate square (with left transposition) of upper-triangular matrix lined up in one-dimensional array of n(n+1)/2 x 1
 			input:
-				const double* u --- pointer to an upper-triangular matrix 
+				const double* u --- pointer to an upper-triangular matrix
 				                    lined up in one-dimensional array of n(n+1)/2 x 1
 				const size_t  n --- dimension
 			output:
@@ -2557,7 +2596,7 @@ void pony_linal_uTu(double* res, const double* u, const size_t n)
 			note:
 				overwriting input (double* P = double* S) is allowed
 		*/
-void pony_linal_chol(double* S, const double* P, const size_t n)
+void pony_linal_chol(double* S,  const double* P, const size_t n)
 {
 	size_t i, j, k, k0, p, q, p0;
 	double s;
@@ -2575,12 +2614,13 @@ void pony_linal_chol(double* S, const double* P, const size_t n)
 	}
 }
 
+
 	// square root Kalman filtering
 		/*
 			check measurement residual magnitude against predicted covariance level
 			input:
 				double*      x       --- pointer to a current estimate of n x 1 state vector
-				double*      S       --- pointer to an upper-truangular part of the Cholesky factor of current covariance matrix
+				double*      S       --- pointer to an upper-triangular part of the Cholesky factor of current covariance matrix
 				                         lined in one-dimensional array n(n+1)/2 x 1
 				double       z       --- scalar measurement value
 				double*      h       --- pointer to a linear measurement model matrix, so that z = h*x + r
@@ -2588,7 +2628,7 @@ void pony_linal_chol(double* S, const double* P, const size_t n)
 				double       k_sigma --- confidence coefficient, 3 for 3-sigma (99.7%), 2 for 2-sigma (95%), etc.
 				const size_t n       --- state vector size
 			return value:
-				1 if measurement residual magnitude lies below the predicted covariance level, 
+				1 if measurement residual magnitude lies below the predicted covariance level,
 				  i.e. |z - h*x| < k_sigma*sqrt(h*S*S^T*h^T + sigma^2)
 				0 otherwise
 		*/
@@ -2602,7 +2642,7 @@ char pony_linal_check_measurement_residual(double* x, double* S, double z, doubl
 	for (i = 0; i < n; i++) {
 		// dz = z - h*x: residual
 		z -= h[i]*x[i];
-		// s = h*S*S^T*h^T: predicted variance 
+		// s = h*S*S^T*h^T: predicted variance
 		for (j = 0, k = i, s = 0; j <= i; j++, k += n-j)
 			s += h[j]*S[k];
 		sigma += s*s;
@@ -2616,7 +2656,7 @@ char pony_linal_check_measurement_residual(double* x, double* S, double z, doubl
 			perform square root Kalman filter update phase
 			input:
 				double*      x     --- pointer to a current estimate of n x 1 state vector
-				double*      S     --- pointer to an upper-truangular part of the Cholesky factor of current covariance matrix
+				double*      S     --- pointer to an upper-triangular part of the Cholesky factor of current covariance matrix
 				                       lined in one-dimensional array n(n+1)/2 x 1
 				double       z     --- scalar measurement value
 				double*      h     --- pointer to a linear measurement model matrix, so that z = h*x + r
@@ -2624,7 +2664,7 @@ char pony_linal_check_measurement_residual(double* x, double* S, double z, doubl
 				const size_t n     --- state vector size
 			output:
 				double* x --- pointer to an updated estimate of state vector (overwrites input)
-				double* S --- pointer to an upper-truangular part of the Cholesky factor of updated covariance matrix
+				double* S --- pointer to an upper-triangular part of the Cholesky factor of updated covariance matrix
 				              lined in one-dimensional array n(n+1)/2 x 1 (overwrites input)
 				double* K --- pointer to a Kalman gain
 			return value:
@@ -2639,11 +2679,14 @@ double pony_linal_kalman_update(double* x, double* S, double* K, double z, doubl
 	for (i = 0; i < n; i++)
 		K[i] = 0;
 
-	// d0
+	// d0, sqrt(d0)
 	d = sigma*sigma;
+	sd = sigma;
 
-	// S
+	// z-hx, S
 	for (i = 0; i < n; i++) {
+		// dz
+		z -= h[i]*x[i];
 		// f = S^T*h
 		f = S[i]*h[0];
 		for (j = 1, k = i+n-1; j <= i; j++, k += n-j)
@@ -2652,7 +2695,6 @@ double pony_linal_kalman_update(double* x, double* S, double* K, double z, doubl
 			continue; // optimization for sparse matrices
 		// d
 		d1 = d + f*f;
-		sd = sqrt(d);
 		sd1 = sqrt(d1);
 		// S^+, e
 		for (j = 0, k = i; j <= i; j++, k += n-j) {
@@ -2663,9 +2705,7 @@ double pony_linal_kalman_update(double* x, double* S, double* K, double z, doubl
 				S[k] -= e*f/(sd*sd1); // d = 0 (sigma = 0) allowed only if e = 0
 		}
 		d = d1;
-
-		// dz
-		z -= h[i]*x[i];
+		sd = sd1;
 	}
 
 	// K, x
@@ -2682,12 +2722,12 @@ double pony_linal_kalman_update(double* x, double* S, double* K, double z, doubl
 			perform square root Kalman filter prediction phase: identity state transition, scalar process noise covariance
 			Q = q^2*I = E[(x_i - x_i-1)*(x_i - x_i-1)^T]
 			input:
-				double*      S  --- pointer to an upper-truangular part of the Cholesky factor of current covariance matrix
+				double*      S  --- pointer to an upper-triangular part of the Cholesky factor of current covariance matrix
 				                    lined in one-dimensional array n(n+1)/2 x 1
 				double       q2 --- process noise variance, q2 = q^2 >= 0
 				const size_t n  --- state vector size
 			output:
-				double* S --- pointer to an upper-truangular part of a Cholesky factor of predicted covariance matrix
+				double* S --- pointer to an upper-triangular part of a Cholesky factor of predicted covariance matrix
 				              lined in one-dimensional array n(n+1)/2 x 1 (overwrites input)
 		*/
 void pony_linal_kalman_predict_I_qI(double* S, double q2, const size_t n)
@@ -2702,17 +2742,17 @@ void pony_linal_kalman_predict_I_qI(double* S, double q2, const size_t n)
 
 		/*
 			perform square root Kalman filter prediction phase: identity state transition, reduced scalar process noise covariance
-			    [q^2*I 0 0]                                     
+			    [q^2*I 0 0]
 			Q = [  0   0 0] = E[(x_i - x_i-1)*(x_i - x_i-1)^T]
 			    [  0   0 0]
 			input:
-				double*      S  --- pointer to an upper-truangular part of the Cholesky factor of current covariance matrix
+				double*      S  --- pointer to an upper-triangular part of the Cholesky factor of current covariance matrix
 				                    lined in one-dimensional array n(n+1)/2 x 1
 				double       q2 --- nonzero process noise variance, q2 = q^2 >= 0
 				const size_t n  --- state vector size
 				const size_t m  --- nonzero process noise vector size
 			output:
-				double* S --- pointer to an upper-truangular part of the Cholesky factor of predicted covariance matrix
+				double* S --- pointer to an upper-triangular part of the Cholesky factor of predicted covariance matrix
 				              lined in one-dimensional array n(n+1)/2 x 1 (overwrites input)
 		*/
 void pony_linal_kalman_predict_I_qIr(double* S, double q2, const size_t n, const size_t m)
@@ -2727,19 +2767,19 @@ void pony_linal_kalman_predict_I_qIr(double* S, double q2, const size_t n, const
 
 		/*
 			perform square root Kalman filter prediction phase: identity state transition, diagonal process noise covariance
-			    [q_1^2  0   0 0]  
+			    [q_1^2  0   0 0]
 			    [  .    .   . .]
 			Q = [  0  q_m^2 0 0] = E[(x_i - x_i-1)*(x_i - x_i-1)^T]
 			    [  0    0   0 0]
 			    [  0    0   0 0]
 			input:
-				double*      S  --- pointer to an upper-truangular part of the Cholesky factor of current covariance matrix
+				double*      S  --- pointer to an upper-triangular part of the Cholesky factor of current covariance matrix
 				                    lined in one-dimensional array n(n+1)/2 x 1
 				double*      q2 --- pointer to a nonzero process noise variance vector, q2[i] = q_i^2 >= 0, i = 1..m
 				const size_t n  --- state vector size
 				const size_t m  --- nonzero process noise vector size
 			output:
-				double* S --- pointer to an upper-truangular part of the Cholesky factor of predicted covariance matrix
+				double* S --- pointer to an upper-triangular part of the Cholesky factor of predicted covariance matrix
 				              lined in one-dimensional array n(n+1)/2 x 1 (overwrites input)
 		*/
 void pony_linal_kalman_predict_I_diag(double* S, double* q2, const size_t n, const size_t m)
@@ -2754,21 +2794,21 @@ void pony_linal_kalman_predict_I_diag(double* S, double* q2, const size_t n, con
 
 		/*
 			perform square root Kalman filter prediction phase: identity state transition
-			          [q_11 .. q_1m 0 0]  
+			          [q_11 .. q_1m 0 0]
 			[Q 0 0]   [  .  ..   .  . .]
 			[0 0 0] = [q_1m .. q_mm 0 0] = E[(x_i - x_i-1)*(x_i - x_i-1)^T]
 			[0 0 0]   [  0  ..   0  0 0]
 			          [  0  ..   0  0 0]
 			input:
-				double*      S --- pointer to an upper-truangular part of the Cholesky factor of current covariance matrix
+				double*      S --- pointer to an upper-triangular part of the Cholesky factor of current covariance matrix
 				                   lined in one-dimensional array n(n+1)/2 x 1
-				double*      Q --- upper triangular part of the nonzero process noise covariance, lined in one-dimensional array m(m+1)/2 x 1 
+				double*      Q --- upper triangular part of the nonzero process noise covariance, lined in one-dimensional array m(m+1)/2 x 1
 
 				const size_t n --- state vector size
 				const size_t m --- nonzero process noise vector size
 			output:
-				double* S --- pointer to an upper-truangular part of the Cholesky factor of predicted covariance matrix
-				              lined in one-dimensional array n(n+1)/2 x 1 (overwrites input)		
+				double* S --- pointer to an upper-triangular part of the Cholesky factor of predicted covariance matrix
+				              lined in one-dimensional array n(n+1)/2 x 1 (overwrites input)
 		*/
 void pony_linal_kalman_predict_I(double* S, double* Q, const size_t n, const size_t m)
 {
@@ -2789,30 +2829,30 @@ void pony_linal_kalman_predict_I(double* S, double* Q, const size_t n, const siz
 			                         [U11 . U1n]
 			x_i = F*x_i-1,       F = [ 0  .  . ]
 			                         [ 0  0 Unn]
-			      [q_1^2  0   0 0]  
+			      [q_1^2  0   0 0]
 			      [  .    .   . .]
 			Q   = [  0  q_m^2 0 0] = E[(x_i - x_i-1)*(x_i - x_i-1)^T]
 			      [  0    0   0 0]
 			      [  0    0   0 0]
 			input:
 				double*      x  --- pointer to a current estimate of n x 1 state vector
-				double*      S  --- pointer to an upper-truangular part of the Cholesky factor of current covariance matrix
+				double*      S  --- pointer to an upper-triangular part of the Cholesky factor of current covariance matrix
 				                    lined in one-dimensional array n(n+1)/2 x 1
-				double*      U  --- pointer to an upper-truangular state transition matrix
+				double*      U  --- pointer to an upper-triangular state transition matrix
 				                    lined in one-dimensional array m(m+1)/2 x 1
 				double*      q2 --- pointer to a nonzero process noise variance vector, q2[i] = q_i^2 >= 0, i = 1..r
 				const size_t n  --- state vector size
 				const size_t m  --- nonzero process noise vector size
 			output:
 				double* x --- pointer to a predicted estimate of state vector (overwrites input)
-				double* S --- pointer to an upper-truangular part of the Cholesky factor of predicted covariance matrix
+				double* S --- pointer to an upper-triangular part of the Cholesky factor of predicted covariance matrix
 				              lined in one-dimensional array n(n+1)/2 x 1 (overwrites input)
 		*/
 void pony_linal_kalman_predict_U_diag(double* x, double* S, double* U, double* q2, const size_t n, const size_t m)
 {
 	size_t i, j, j1, k0, k1, k2, k, k10, j10;
 
-	pony_linal_u_mul(x, U, x, n, 1);    // x = F*x  	
+	pony_linal_u_mul(x, U, x, n, 1);    // x = F*x
 	for (i = 0, k0 = 0; i < n; i++) {
 		k10 = i*(2*n-i+1)/2;            // start from the diagonal in U
 		j10 = n-i-1;
@@ -2833,33 +2873,33 @@ void pony_linal_kalman_predict_U_diag(double* x, double* S, double* U, double* q
 		/*
 			perform square root Kalman filter prediction phase: upper triangular state transition
 			                               [U11 . U1n]
-			x_i     = F*x_i-1,         F = [ 0  .  . ] 
+			x_i     = F*x_i-1,         F = [ 0  .  . ]
 			                               [ 0  0 Unn]
-			          [q_11 .. q_1m 0 0]  
+			          [q_11 .. q_1m 0 0]
 			[Q 0 0]   [  .  ..   .  . .]
 			[0 0 0] = [q_1m .. q_mm 0 0] = E[(x_i - x_i-1)*(x_i - x_i-1)^T]
 			[0 0 0]   [  0  ..   0  0 0]
 			          [  0  ..   0  0 0]
 			input:
 				double*      x --- pointer to a current estimate of n x 1 state vector
-				double*      S --- pointer to an upper-truangular part of the Cholesky factor of current covariance matrix
+				double*      S --- pointer to an upper-triangular part of the Cholesky factor of current covariance matrix
 				                   lined in one-dimensional array n(n+1)/2 x 1
-				double*      U --- pointer to an upper-truangular state transition matrix
+				double*      U --- pointer to an upper-triangular state transition matrix
 				                   lined in one-dimensional array n(n+1)/2 x 1
 				double*      Q --- pointer to an upper triangular part of the nonzero process noise covariance
-				                   lined in one-dimensional array m(m+1)/2 x 1 
+				                   lined in one-dimensional array m(m+1)/2 x 1
 				const size_t n --- nonzero process noise vector size
 				const size_t m --- state vector size
 			output:
 				double* x --- pointer to a predicted estimate of state vector (overwrites input)
-				double* S --- pointer to an upper-truangular part of the Cholesky factor of predicted covariance matrix
+				double* S --- pointer to an upper-triangular part of the Cholesky factor of predicted covariance matrix
 				              lined in one-dimensional array n(n+1)/2 x 1 (overwrites input)
 		*/
 void pony_linal_kalman_predict_U(double* x, double* S, double* U, double* Q, const size_t n, const size_t m)
 {
 	size_t i, j, j1, k0, k1, k2, k, k10, j10;
 
-	pony_linal_u_mul(x, U, x, n, 1);    // x = F*x  	
+	pony_linal_u_mul(x, U, x, n, 1);    // x = F*x
 	for (i = 0, k0 = 0; i < n; i++) {
 		k10 = i*(2*n-i+1)/2;            // start from the diagonal in U
 		j10 = n-i-1;

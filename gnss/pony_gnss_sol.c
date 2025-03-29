@@ -1,12 +1,12 @@
-// Aug-2022
-/*	pony_gnss_sol 
-	
+// Jan-2025
+/*	pony_gnss_sol
+
 	pony plugins that provide GNSS navigation solutions:
 
 	- pony_gnss_sol_pos_code
-		Computes conventional least-squares standalone position and clock error from code pseudoranges 
+		Computes conventional least-squares standalone position and clock error from code pseudoranges
 		for all available receivers/antennas. Also checks if estimated covariances fall inside 500-sigma
-		interval with sigma taken from gnss settings for code pseudoranges. Clock errors are obtained 
+		interval with sigma taken from gnss settings for code pseudoranges. Clock errors are obtained
 		separately for each constellation. Their average value goes into GNSS solution.
 	- pony_gnss_sol_check_elevation_mask
 		Checks if satellites are below elevation mask and drop their measurement validity flags if the case.
@@ -63,17 +63,17 @@ void   pony_gnss_sol_free_null(void **ptr);                                     
 // plugin definitions
 
 /* pony_gnss_sol_pos_code - pony plugin
-	
-	Computes conventional least-squares standalone position and clock error from code pseudoranges 
+
+	Computes conventional least-squares standalone position and clock error from code pseudoranges
 	for all available receivers/antennas. Also checks if estimated covariances fall inside 500-sigma
-	interval with sigma taken from gnss settings for code pseudoranges. Clock errors are obtained 
+	interval with sigma taken from gnss settings for code pseudoranges. Clock errors are obtained
 	separately for each constellation. Their average value goes into GNSS solution.
 
 	description:
 		- drops validity flag if estimated covariance exceeds 500 x gnss[].settings.code_sigma;
 		- puts estimated covariance into sol.x_std;
 		- sets sol.x_valid flag to the number of valid measurements used in position estimate;
-		- estimates receiver clock error for each satellite constellation separately, 
+		- estimates receiver clock error for each satellite constellation separately,
 		  then puts average value into sol.dt;
 		- calculates both ECEF and geographical coordinates.
 	uses:
@@ -101,16 +101,17 @@ void   pony_gnss_sol_free_null(void **ptr);                                     
 	cfg parameters:
 		none
 */
-void pony_gnss_sol_pos_code(void) {
-
+void pony_gnss_sol_pos_code(void)
+{
 	const size_t sys_count = 4;    // gps, glonass, galileo and beidou supported
 	const size_t m = 3+sys_count, maxk = (m*m+m)/2;
 
-	static double 
+	static double
 		**x = NULL, **S = NULL,	// least squares and covariance square root matrix
 		**h = NULL, **K = NULL;	// current observation coefficients in measurement model and Kalman gain
 
 	size_t i, k, r;
+
 
 	// requires gnss structure initialized
 	if (pony->gnss == NULL)
@@ -127,15 +128,6 @@ void pony_gnss_sol_pos_code(void) {
 			pony->mode = -1;
 			return;
 		}
-
-		for (r = 0; r < pony->gnss_count; r++)
-			if (pony->gnss[r].cfg == NULL)
-				continue;
-			else 
-				for (i = 0; i < m; i++) {
-					pony_linal_u_ij2k(&k, i, i, m);
-					S[r][k] = PONY_GNSS_SOL_MAX_COORD; // initial covariance for solution
-				}
 
 	}
 
@@ -154,7 +146,7 @@ void pony_gnss_sol_pos_code(void) {
 
 	// regular processing
 	else {
-		
+
 		// run through all receivers
 		for (r = 0; r < pony->gnss_count; r++)
 			if (pony->gnss[r].cfg == NULL)
@@ -167,7 +159,7 @@ void pony_gnss_sol_pos_code(void) {
 }
 
 /* pony_gnss_sol_check_elevation_mask - pony plugin
-	
+
 	Checks if satellites are below elevation mask and drop their measurement validity flags if the case.
 	Multi-receiver/multi-system capable. Stores separate value for each receiver in gnss->settings structure.
 
@@ -190,8 +182,8 @@ void pony_gnss_sol_pos_code(void) {
 			example: {gnss: elev_mask = 10}
 
 */
-void pony_gnss_sol_check_elevation_mask(void) {
-
+void pony_gnss_sol_check_elevation_mask(void)
+{
 	enum system_id {gps, glo, gal, bds, sys_count};
 
 	const char   elev_mask_token[] = "elev_mask"; // elevation mask parameter name in configuration
@@ -201,19 +193,20 @@ void pony_gnss_sol_check_elevation_mask(void) {
 	size_t r, sys, s, i, maxsat, maxobs;
 	pony_gnss_sat *sat;
 
+
 	// requires gnss structure initialized
 	if (pony->gnss == NULL)
 		return;
 
 	// init
 	if (pony->mode == 0) {
-		
+
 		for (r = 0; r < pony->gnss_count; r++)
 			if (pony->gnss[r].cfg != NULL) {
 				// parse elevation angle mask from configuration string
 				cfg_ptr = pony_locate_token(elev_mask_token, pony->gnss[r].cfg_settings, pony->gnss[r].settings_length, '=');
 				if (cfg_ptr != NULL)
-					pony->gnss[r].settings.sinEl_mask = atof(cfg_ptr);		
+					pony->gnss[r].settings.sinEl_mask = atof(cfg_ptr);
 				// if not found or invalid, set to default
 				if (cfg_ptr == NULL || pony->gnss[r].settings.sinEl_mask < -90 || 90 < pony->gnss[r].settings.sinEl_mask)
 					pony->gnss[r].settings.sinEl_mask = elev_mask_default;
@@ -230,11 +223,9 @@ void pony_gnss_sol_check_elevation_mask(void) {
 
 	// regular processing
 	else {
-		
+
 		for (r = 0; r < pony->gnss_count; r++)
-			if (pony->gnss[r].cfg == NULL)
-				continue;
-			else
+			if (pony->gnss[r].cfg != NULL)
 				for (sys = 0; sys < sys_count; sys++) {
 					maxsat = 0;
 					maxobs = 0;
@@ -281,16 +272,16 @@ void pony_gnss_sol_check_elevation_mask(void) {
 }
 
 /* pony_gnss_sol_select_observables - pony plugin
-	
+
 	Sets validity flags for specific observables according to templates in configuration.
 	Template set 'obs_use' enumerates the exclusive selection of observable types to stay valid.
 	Template set 'obs_off' lists observable types subject to exclusion from further calculations.
 
 	description:
 		Designation of observable types must comply with RINEX specifications, case-sensitive, with e.g.
-		- C1C for code pseudoranges on L1 frequency, C/A channel, 
-		- L2X for carrier phase on L2 frequency, codeless, 
-		- ... etc. 
+		- C1C for code pseudoranges on L1 frequency, C/A channel,
+		- L2X for carrier phase on L2 frequency, codeless,
+		- ... etc.
 		See Section 5.1 Observation codes of RINEX v3.02, or similar sections in other versions.
 		'?' (question mark) for wildcard (any character).
 	uses:
@@ -310,8 +301,8 @@ void pony_gnss_sol_check_elevation_mask(void) {
 		{gnss: {gal: obs_use}} -                      --"-- galileo --"--
 		and/or
 		{gnss: {bds: obs_use}} -                      --"-- beidou  --"--
-			type   : square brackets-enclosed, space-separated list of three-character templates 
-				     with question marks (? symbols) as wildcards, and any extra printable 
+			type   : square brackets-enclosed, space-separated list of three-character templates
+				     with question marks (? symbols) as wildcards, and any extra printable
 					 characters (like commas, semicolons, etc.) being ignored
 			range  : as of RINEX specification
 			default: none
@@ -328,15 +319,15 @@ void pony_gnss_sol_check_elevation_mask(void) {
 		and/or
 		{gnss: {bds: obs_off}} - beidou  --"--
 			type   : square brackets-enclosed, space-separated list of three-character templates
-				     with question marks (? symbols) as wildcards, and any extra printable 
+				     with question marks (? symbols) as wildcards, and any extra printable
 					 characters (like commas, semicolons, etc.) being ignored
 			range  : as of RINEX specification
 			default: none
 			example: {gnss:       obs_off = [C2?, L1C] } - exclude code pseudoranges on L2 and C/A carrier phase on L1
 			         {gnss: {glo: obs_off = [??X]      } - exclude all codeless glonass measurements
 */
-void pony_gnss_sol_select_observables(void) {
-
+void pony_gnss_sol_select_observables(void)
+{
 	enum system_id {gps, glo, gal, bds, sys_count};
 	const char obs_use_token[] = "obs_use", obs_off_token[] = "obs_off";
 	const size_t wildcard_len = 3;
@@ -348,8 +339,9 @@ void pony_gnss_sol_select_observables(void) {
 	char *cfg, (*obstypes)[4];
 	pony_gnss_sat *sat;
 
+
 	// requires gnss initialized
-	if (pony->gnss == NULL) 
+	if (pony->gnss == NULL)
 		return;
 
 	// init
@@ -360,9 +352,9 @@ void pony_gnss_sol_select_observables(void) {
 		obs_off_wildcards	= (char  ***)calloc( pony->gnss_count, sizeof(char  **) );
 		obs_use_count		= (size_t **)calloc( pony->gnss_count, sizeof(size_t *) );
 		obs_off_count		= (size_t **)calloc( pony->gnss_count, sizeof(size_t *) );
-		if (   obs_use_wildcards	== NULL 
-			|| obs_off_wildcards	== NULL 
-			|| obs_use_count		== NULL 
+		if (   obs_use_wildcards	== NULL
+			|| obs_off_wildcards	== NULL
+			|| obs_use_count		== NULL
 			|| obs_off_count		== NULL) {
 			pony->mode = -1;
 			return;
@@ -375,9 +367,9 @@ void pony_gnss_sol_select_observables(void) {
 			obs_off_wildcards[r] = (char  **)calloc( sys_count, sizeof(char *) );
 			obs_use_count    [r] = (size_t *)calloc( sys_count, sizeof(size_t) );
 			obs_off_count    [r] = (size_t *)calloc( sys_count, sizeof(size_t) );
-			if (   obs_use_wildcards[r] == NULL 
-				|| obs_off_wildcards[r] == NULL 
-				|| obs_use_count	[r] == NULL 
+			if (   obs_use_wildcards[r] == NULL
+				|| obs_off_wildcards[r] == NULL
+				|| obs_use_count	[r] == NULL
 				|| obs_off_count	[r] == NULL) {
 				pony->mode = -1;
 				return;
@@ -423,7 +415,7 @@ void pony_gnss_sol_select_observables(void) {
 
 				obs_use_wildcards[r][sys] = (char *)calloc( obs_use_count[r][sys]*wildcard_len+1, sizeof(char) );
 				obs_off_wildcards[r][sys] = (char *)calloc( obs_off_count[r][sys]*wildcard_len+1, sizeof(char) );
-				if (   obs_use_wildcards[r][sys] == NULL 
+				if (   obs_use_wildcards[r][sys] == NULL
 					|| obs_off_wildcards[r][sys] == NULL) {
 					pony->mode = -1;
 					return;
@@ -445,7 +437,7 @@ void pony_gnss_sol_select_observables(void) {
 
 	// terminate
 	if (pony->mode < 0) {
-		
+
 		// free memory
 		for (r = 0; r < pony->gnss_count; r++) {
 			if (pony->gnss[r].cfg == NULL)
@@ -474,14 +466,12 @@ void pony_gnss_sol_select_observables(void) {
 
 	// regular processing
 	else {
-		
+
 		if (pony->gnss == NULL) // requires gnss initialized
 			return;
 
 		for (r = 0; r < pony->gnss_count; r++)
-			if (pony->gnss[r].cfg == NULL)
-				continue;
-			else
+			if (pony->gnss[r].cfg != NULL)
 				for (sys = 0; sys < sys_count; sys++) {
 					switch (sys) {
 						case gps:
@@ -523,14 +513,14 @@ void pony_gnss_sol_select_observables(void) {
 					for (i = 0; i < maxobs; i++) {
 						// select only those present in obs_use list
 						for (j = 0; j < obs_use_count[r][sys]*wildcard_len; j += wildcard_len)
-							if (pony_gnss_sol_select_observables_match_wildcard(obstypes[i], obs_use_wildcards[r][sys] + j) ) // does match one of mandatory wildcard
+							if (pony_gnss_sol_select_observables_match_wildcard(obstypes[i], obs_use_wildcards[r][sys] + j))   // does match one of mandatory wildcard
 								break;
 						if (obs_use_count[r][sys] && j >= obs_use_count[r][sys]*wildcard_len) // none matching wildcards found
 							for (s = 0; s < maxsat; s++) // drop validity for all satellites
 								sat[s].obs_valid[i] = 0;
 						// exclude those present in obs_off list
 						for (j = 0; j < obs_off_count[r][sys]*wildcard_len; j += wildcard_len)
-							if (pony_gnss_sol_select_observables_match_wildcard(obstypes[i], obs_off_wildcards[r][sys] + j) ) { // does match exclusion wildcard
+							if (pony_gnss_sol_select_observables_match_wildcard(obstypes[i], obs_off_wildcards[r][sys] + j)) { // does match exclusion wildcard
 								for (s = 0; s < maxsat; s++) // drop validity for all satellites
 									sat[s].obs_valid[i] = 0;
 								break;
@@ -549,8 +539,8 @@ void pony_gnss_sol_select_observables(void) {
 
 // internal routines
 	// gnss calculations
-void pony_gnss_sol_pos_code_single_receiver(pony_gnss *gnss, double *x, double *S, double *h, double *K, const size_t m, const size_t maxk) {
-
+void pony_gnss_sol_pos_code_single_receiver(pony_gnss *gnss, double *x, double *S, double *h, double *K, const size_t m, const size_t maxk)
+{
 	enum sys_index {gps, glo, gal, bds, sys_count};
 
 	const char code_id = 'C';
@@ -560,8 +550,13 @@ void pony_gnss_sol_pos_code_single_receiver(pony_gnss *gnss, double *x, double *
 
 	size_t i, j, k, s, n, sys, maxsat, maxobs, sys_obs[sys_count];
 	pony_gnss_sat *sat;
-	double z, rho, r, sigma, sigma_pos, sigma_clock[sys_count];
+	double z, rho, r, sigma, sigma_pos, sigma_clock[sys_count]; // sigma_clock is range error std due to clock drift
 	char (*obs_types)[4];
+
+
+	// validate
+	if (gnss == NULL || x == NULL || S == NULL || h == NULL || K == NULL)
+		return;
 
 	// check if current coordinates fall within specified range
 	for (k = 0; k < 3 && fabs(gnss->sol.x[k]) <= PONY_GNSS_SOL_MAX_COORD; k++);
@@ -586,20 +581,20 @@ void pony_gnss_sol_pos_code_single_receiver(pony_gnss *gnss, double *x, double *
 		for (k = 0; k < maxk; k++)
 			S[k] = 0;
 		for (j = 0; j < m; j++) {
-				pony_linal_u_ij2k(&k, j, j, m);
-				S[k] = PONY_GNSS_SOL_MAX_COORD; // reset estimated coordinate covariances
+			pony_linal_u_ij2k(&k, j, j, m);
+			S[k] = PONY_GNSS_SOL_MAX_COORD; // reset estimated coordinate covariances
 		}
 
 		// process measurements
 		for (sys = 0; sys < sys_count; sys++) {
 			sys_obs[sys] = 0;
-			maxsat = 0; 
+			maxsat = 0;
 			maxobs = 0;
 			obs_types = NULL;
 			sat = NULL;
 			switch (sys) {
 				case gps:
-					if (gnss->gps == NULL) 
+					if (gnss->gps == NULL)
 						continue;
 					maxsat		= gnss->gps->max_sat_count;
 					sat			= gnss->gps->sat;
@@ -642,7 +637,7 @@ void pony_gnss_sol_pos_code_single_receiver(pony_gnss *gnss, double *x, double *
 
 				// calculated distance from current solution to satellite
 				rho = 0;
-				for (k = 0; k < 3; k++) 
+				for (k = 0; k < 3; k++)
 					rho += (sat[s].x[k] - gnss->sol.x[k])*(sat[s].x[k] - gnss->sol.x[k]);
 				rho = sqrt(rho);
 
@@ -708,79 +703,85 @@ void pony_gnss_sol_pos_code_single_receiver(pony_gnss *gnss, double *x, double *
 	else
 		return; // regard position as invalid also, if clock error covariance is too large
 
-	if ( sigma_pos > k_sigma*gnss->settings.code_sigma)
+	if (sigma_pos > k_sigma*gnss->settings.code_sigma)
 		return; // position considered invalid
 
 	gnss->sol.  x_std   = sigma_pos;
 	gnss->sol.  x_valid = (char)n;
 	gnss->sol.llh_valid = pony_gnss_sol_ecef2llh(gnss->sol.x, gnss->sol.llh, pony->gnss_const.gps.a, pony->gnss_const.gps.e2); // geodetic solution
-
 }
 
 	// models
-double pony_gnss_sol_noise_coeff_from_elev(double sinEl) {
-
+double pony_gnss_sol_noise_coeff_from_elev(double sinEl)
+{
 	return 20*(sqrt(0.1 + sinEl*sinEl) - sinEl);
-
 }
 		// ecef cartesian to longitude-latitude-height
 		// a - the Earth ellipsoid semimajor axis, e2 - its eccentricity squared
 		// return value - llh valid/not valid
-char pony_gnss_sol_ecef2llh(double *ecef, double *llh, const double a, const double e2) 
+char pony_gnss_sol_ecef2llh(double *ecef, double *llh, const double a, const double e2)
 {
-
 	const double dr2 = PONY_GNSS_SOL_POS_PRECISION*PONY_GNSS_SOL_POS_PRECISION;
 
 	int i;
 	double	r_e2, r_e, a2,
-			s_phi, c_phi, 
-			dphi, dh, 
+			s_phi, c_phi,
+			dphi, dh,
 			R2, f1, f2;
 
+	// validate
+	if (ecef == NULL || llh == NULL)
+		return 0;
+	// calculate
 	r_e2 = ecef[0]*ecef[0] + ecef[1]*ecef[1];
 	r_e = sqrt(r_e2);
 	a2 = a*a;
-
 	// starting approximation
-	llh[0] = atan2(ecef[1],ecef[0]);	
+	llh[0] = atan2(ecef[1],ecef[0]);
 	llh[1] = atan2(ecef[2],r_e);
 	llh[2] = sqrt(r_e2 + ecef[2]*ecef[2]) - a;
-
 	// solve f1 = 0, f2 = 0 by iterations
 	for (i = 0; i < PONY_GNSS_SOL_POS_MAX_ITERATIONS; i++) {
-
 		// intermediate quantities
 		s_phi = sin(llh[1]);
 		c_phi = cos(llh[1]);
 		R2 = a/sqrt(1-e2*s_phi*s_phi);
 		f1 = r_e - (R2+llh[2])*c_phi;
 		f2 = ecef[2] - ((1-e2)*R2+llh[2])*s_phi;
-
 		// increments
 		dphi	= (f1*s_phi - f2*c_phi)/(R2 + llh[2]);
 		dh		=  f1*c_phi + f2*s_phi;
-
 		llh[1] -= dphi;
 		llh[2] += dh;
-
+		// iteration condition
 		if (dphi*dphi*a2 + dh*dh < dr2)
 			break;
-
 	}
 
 	return (i < PONY_GNSS_SOL_POS_MAX_ITERATIONS && fabs(llh[2]) < PONY_GNSS_SOL_MAX_COORD) ? 1 : 0;
-
 }
 
 	// observable codes
 		// read 3-character observable wildcards from src to dest, returns number of wildcards found, dest == NULL only counts wildcards
-size_t pony_gnss_sol_select_observables_read_wildcards(char *dest,  char *src, const size_t src_len, const char *token) {
+size_t pony_gnss_sol_select_observables_read_wildcards(char *dest,  char *src, const size_t src_len, const char *token)
+{
+	enum {wildcard_len = 3};
 
-	const char delim = '=', quote = '"', brace_open = '{', brace_close = '}', bracket_open = '[', bracket_close = ']';
-	const size_t wildcard_len = 3;
+	const char
+		delim         = '=',
+		quote         = '"',
+		brace_open    = '{',
+		brace_close   = '}',
+		bracket_open  = '[',
+		bracket_close = ']';
 
 	size_t i, j, k, n, len1;
 
+
+	// validate
+	if (src == NULL || token == NULL)
+		return 0;
+	// parse
 	for (n = 0; token[n]; n++); // determine token length
 	if (n == 0)
 		return 0;
@@ -789,9 +790,9 @@ size_t pony_gnss_sol_select_observables_read_wildcards(char *dest,  char *src, c
 	// look for the token
 	for (i = 0, j = 0, k = 0; i < len1 && src[i]; i++) // throughout the string
 		if (src[i] == quote) // skip quoted values
-			for (i++; src[i] && i < len1 && src[i] != quote; i++);
+			for (i++; i < len1 && src[i] && src[i] != quote; i++);
 		else if (src[i] == brace_open) // skip groups
-			for (i++; src[i] && i < len1 && src[i] != brace_close; i++);
+			for (i++; i < len1 && src[i] && src[i] != brace_close; i++);
 		else {
 			for (j = 0, k = i; j < n && src[k] == token[j]; j++, k++); // check token
 			if (j == n) // token found
@@ -803,11 +804,11 @@ size_t pony_gnss_sol_select_observables_read_wildcards(char *dest,  char *src, c
 	// try to parse
 	for (i = k+1; i < src_len && src[i] && src[i] <= ' '; i++); // skip all non-printables
 	if (i >= src_len || src[i] != delim) // no delimiter found
-		return 0; 
+		return 0;
 
 	for (i++; i < src_len && src[i] && src[i] <= ' '; i++); // skip delimiter and all non-printables
 	if (i >= src_len || src[i] != bracket_open) // no opening bracket found
-		return 0; 
+		return 0;
 
 	for (i++; i < src_len && src[i] && src[i] <= ' '; i++); // skip opening bracket and all non-printables
 	for (n = 0; i < src_len && src[i] && src[i] != bracket_close; ) { // collecting 3-character wildcards
@@ -821,49 +822,57 @@ size_t pony_gnss_sol_select_observables_read_wildcards(char *dest,  char *src, c
 		for (; i < src_len && src[i] && src[i] <= ' '; i++); // skip all non-printables
 	}
 
-	if (src[i] != bracket_close)
+	if (i >= src_len || src[i] != bracket_close)
 		return 0; // no closing bracket found
 
 	return n;
-
 }
 
 		// check if the obstype matched 3-character wildcard
-char pony_gnss_sol_select_observables_match_wildcard(char *obstype, char *wildcard) {
-
-	const size_t wildcard_len = 3;
+char pony_gnss_sol_select_observables_match_wildcard(char *obstype, char *wildcard)
+{
+	enum {wildcard_len = 3};
 	const char anychar = '?';
 
 	size_t i;
 
+
+	// validate
+	if (obstype == NULL || wildcard == NULL)
+		return 0;
+	// check
 	for (i = 0; i < wildcard_len && obstype[i] && wildcard[i] && (wildcard[i] == anychar || obstype[i] == wildcard[i]); i++);
-	
-	return (i == wildcard_len)? 1 : 0;
+
+	return (i == wildcard_len) ? 1 : 0;
 }
 
 	// memory handling
 		// free memory with NULL-check and NULL-assignment
-void pony_gnss_sol_free_null(void **ptr) {
-	
-	if (*ptr == NULL)
+void pony_gnss_sol_free_null(void **ptr)
+{
+	// validate
+	if (ptr == NULL || *ptr == NULL)
 		return;
-	
+	// free memory
 	free(*ptr);
 	*ptr = NULL;
-
 }
 		// allocate [gnss_count x internal_size ] double array
-char pony_gnss_sol_alloc_ppointer_gnss_count(double ***ptr, const size_t internal_size) {
-
+char pony_gnss_sol_alloc_ppointer_gnss_count(double ***ptr, const size_t internal_size)
+{
 	size_t r;
 
+	// validate
+	if (ptr == NULL)
+		return 0;
+	// check pointer
 	if (*ptr != NULL)
 		return 1; // already allocated
-
+	// allocate array
 	*ptr = (double **)calloc( pony->gnss_count, sizeof(double *) );
 	if (*ptr == NULL)
 		return 0;
-
+	// allocate array contents
 	for (r = 0; r < pony->gnss_count; r++) {
 		(*ptr)[r] = NULL;
 		(*ptr)[r] = (double *)calloc( internal_size, sizeof(double) );
@@ -874,15 +883,17 @@ char pony_gnss_sol_alloc_ppointer_gnss_count(double ***ptr, const size_t interna
 	return 1;
 }
 
-void pony_gnss_sol_free_ppointer_gnss_count(void ***ptr) {
-
+void pony_gnss_sol_free_ppointer_gnss_count(void ***ptr)
+{
 	size_t r;
 
-	if (*ptr == NULL) 
+	// validate
+	if (ptr == NULL || *ptr == NULL)
 		return;
-	
+	// free array contents
 	for (r = 0; r < pony->gnss_count; r++)
 		pony_gnss_sol_free_null( &((*ptr)[r]) );
+	// free array
 	free(*ptr);
 	*ptr = NULL;
 

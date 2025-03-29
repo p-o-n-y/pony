@@ -1,4 +1,4 @@
-// Aug-2022
+// Feb-2025
 // PONY core header file
 
 #ifndef PONY_H_
@@ -32,26 +32,26 @@ typedef struct {
 	double  x[3];          // cartesian coordinates, meters
 	char    x_valid;       // validity flag (0/1), or a number of valid measurements used, or a bitfield
 	double  x_std;         // coordinate RMS ("standard") deviation estimate, meters
-						   
+
 	double  llh[3];        // geodetic coordinates: longitude (rad), latitude (rad), height (meters)
 	char    llh_valid;     // validity flag (0/1), or a number of valid measurements used, or a bitfield
-						   
+
 	double  v[3];          // relative-to-Earth velocity vector coordinates in local-level geodetic cartesian frame, meters per second
 	char    v_valid;       // validity flag (0/1), or a number of valid measurements used, or a bitfield
 	double  v_std;         // velocity RMS ("standard") deviation estimate, meters per second
-						   
+
 	double  q[4];          // attitude quaternion, relative to local-level geodetic cartesian frame
 	char    q_valid;       // validity flag (0/1), or a number of valid measurements used
-						   
+
 	double  L[9];          // attitude matrix for the transition from local-level geodetic cartesian frame, row-wise: L[0] = L_11, L[1] = L_12, ..., L[8] = L[33]
 	char    L_valid;       // validity flag (0/1), or a number of valid measurements used
-						   
+
 	double  rpy[4];        // attitude angles relative to local-level geodetic cartesian frame: roll (rad), pitch (rad), yaw (rad), optional gyroscope heading (rad) or other azimuth angle
 	char    rpy_valid;     // validity flag (0/1), or a number of valid measurements used, or a bitfield
-						   
+
 	double  dt;            // clock bias
 	char    dt_valid;      // validity flag (0/1), or a number of valid measurements used
-						   
+
 	double* metrics;       // application-specific solution metrics
 	size_t  metrics_count; // number of application-specific metrics, given in cfg ("metrics_count = ..."), 2 by default, 255 max
 } pony_sol;
@@ -72,7 +72,7 @@ typedef struct {
 		u,       // Earth rotation rate, rad/s
 		a,       // Earth ellipsoid semi-major axis, m
 		mu,      // Earth geocentric gravitational constant (including the atmosphere)
-		J2,      // Earth's dynamical form factor
+		J2,      // Earth's dynamical form factor, second order
 		e2,      // Earth ellipsoid first eccentricity squared
 		ge,      // Earth normal gravity at the equator, m/s^2
 		fg;      // Earth normal gravity flattening
@@ -102,10 +102,10 @@ typedef struct {
 	char     T_valid;   // validity flag (0/1), or a number of valid components, or a bitfield
 
 	double   W [3];     // angular velocity of the local level reference frame
-	char     W_valid;   // validity flag (0/1), or a number of valid components
+	char     W_valid;   // validity flag (0/1), or a number of valid components, or a bitfield
 
 	double   g [3];     // current gravity acceleration vector
-	char     g_valid;   // validity flag (0/1), or a number of valid components
+	char     g_valid;   // validity flag (0/1), or a number of valid components, or a bitfield
 
 	pony_sol sol;       // inertial solution
 } pony_imu;
@@ -121,7 +121,7 @@ typedef struct {
 	char    eph_valid;   // validity flag (0/1)
 	long    eph_counter; // counter or bitfield used to indicate whether all navigation subframes/ephemeris are collected, if needed;
 
-	double  Deltatsv;    // SV PRN code phase time offset (seconds), SV slock correction term to be subtracted: 
+	double  Deltatsv;    // SV PRN code phase time offset (seconds), SV clock correction term to be subtracted:
 	                     // GPS as in Section 20.3.3.3.3.1 of IS-GPS-200J (22 May 2018) p. 96
 	                     // GLONASS as in Section 3.3.3 of ICD GLONASS Edition 5.1 2008, minus sign, tau_c if present in pony_gnss_glo.clock_corr[0]
 
@@ -266,7 +266,7 @@ typedef struct {
 	// BeiDou constellation data
 typedef struct {
 	char*          cfg;              // BeiDou configuration substring
-	size_t         cfglength;        // BeiDouconfiguration substring length
+	size_t         cfglength;        // BeiDou configuration substring length
 
 	size_t         max_sat_count;    // maximum supported number of satellites
 	size_t         max_eph_count;    // maximum supported number of ephemeris
@@ -394,7 +394,7 @@ typedef struct {
 	char(*init)      (char* cfg        );                                 // initialize the bus, except for core,                                 input: configuration string (see description),           output: OK/not OK (1/0)
 	char(*step)      (void             );                                 // step through the plugin execution list,                                                                                       output: OK/not OK (1/0)
 	char(*terminate) (void             );                                 // terminate operation,                                                                                                          output: OK/not OK (1/0)
-		
+
 		// advanced scheduling
 	char(*remove_plugin)    (void(*func   )(void)                      ); // remove all instances of a plugin from the plugin execution list,     input: pointer to plugin function to be removed,         output: OK/not OK (1/0)
 	char(*replace_plugin)   (void(*oldfunc)(void), void(*newfunc)(void)); // replace all instances of the plugin by another one,                  input: pointers to old and new plugin functions,         output: OK/not OK (1/0)
@@ -402,7 +402,7 @@ typedef struct {
 	char(*reschedule_plugin)(void(*func   )(void), int cycle, int shift); // reschedule all instances of the plugin in the plugin execution list, input: pointer to plugin function, new cycle, new shift, output: OK/not OK (1/0)
 	char(*suspend_plugin)   (void(*func   )(void)                      ); // suspend all instances of the plugin in the plugin execution list,    input: pointer to plugin function,                       output: OK/not OK (1/0)
 	char(*resume_plugin)    (void(*func   )(void)                      ); // resume all instances of the plugin in the plugin execution list,     input: pointer to plugin function,                       output: OK/not OK (1/0)
-	
+
 	pony_core       core;            // core instances
 
 	char*           cfg;             // full configuration string
@@ -452,22 +452,24 @@ char pony_time_epoch2gps         (unsigned int* week, double* sec, pony_time_epo
 
 // linear algebra functions
 	// conventional operations
-double pony_linal_dot     (const double* u,   const double* v,                  const size_t n                                 ); // calculate dot product
-double pony_linal_vnorm   (const double* u,                                     const size_t n                                 ); // calculate l_2 vector norm, i.e. sqrt(u^T*u)
-void   pony_linal_cross3x1(      double* res, const double* u, const double* v                                                 ); // calculate cross product for 3x1 vectors
-void   pony_linal_mmul    (      double* res, const double* a, const double* b, const size_t n, const size_t n1, const size_t m); // multiply two matrices:                        res = a*b,   where a is n x n1, b is n1 x m, res is n x m
-void   pony_linal_mmul1T  (      double* res, const double* a, const double* b, const size_t n, const size_t m, const size_t n1); // multiply two matrices ( first is transposed): res = a^T*b, where a is n x m,  b is n x n1, res is m x n1
-void   pony_linal_mmul2T  (      double* res, const double* a, const double* b, const size_t n, const size_t m, const size_t n1); // multiply two matrices (second is transposed): res = a*b^T, where a is n x m,  b is n1 x m, res is n x n1
-void   pony_linal_qmul    (      double* res, const double* q, const double* r                                                 ); // multiply 4x1 quaternions:                     res = q x r, with res0, q0, r0 being scalar parts
-	
+double pony_linal_dot      (const double* u,   const double* v,                  const size_t n                                 ); // calculate dot product
+double pony_linal_vnorm    (const double* u,                                     const size_t n                                 ); // calculate l_2 vector norm, i.e. sqrt(u^T*u)
+void   pony_linal_cross3x1 (      double* res, const double* u, const double* v                                                 ); // calculate cross product for 3x1 vectors
+void   pony_linal_mmul     (      double* res, const double* a, const double* b, const size_t n, const size_t n1, const size_t m); // multiply two matrices:                           res = a*b,   where a is n x n1, b is n1 x m, res is n x m
+void   pony_linal_mmul1T   (      double* res, const double* a, const double* b, const size_t n, const size_t m, const size_t n1); // multiply two matrices with first  transposed:    res = a^T*b, where a is n x m,  b is n x n1, res is m x n1
+void   pony_linal_mmul2T   (      double* res, const double* a, const double* b, const size_t n, const size_t m, const size_t n1); // multiply two matrices with second transposed:    res = a*b^T, where a is n x m,  b is n1 x m, res is n x n1
+void   pony_linal_qmul     (      double* res, const double* q, const double* r                                                 ); // multiply 4x1 quaternions:                        res = q  x r,  with res0, q0, r0 being scalar parts
+void   pony_linal_qmul1conj(      double* res, const double* q, const double* r                                                 ); // multiply 4x1 quaternions with first  conjugated: res = q* x r,  with res0, q0, r0 being scalar parts
+void   pony_linal_qmul2conj(      double* res, const double* q, const double* r                                                 ); // multiply 4x1 quaternions with second conjugated: res = q  x r*, with res0, q0, r0 being scalar parts
+
 	// space rotation representation
 void pony_linal_mat2quat(double* q,   const double* R  ); // calculate quaternion q (with q0 being scalar part) corresponding to 3x3 attitude matrix R
 void pony_linal_quat2mat(double* R,   const double* q  ); // calculate 3x3 attitude matrix R corresponding to quaternion q (with q0 being scalar part)
 void pony_linal_rpy2mat (double* R,   const double* rpy); // calculate 3x3 transition matrix R from E-N-U corresponding to roll, pitch and yaw (radians, airborne frame: X longitudinal, Z right-wing)
 void pony_linal_mat2rpy (double* rpy, const double* R  ); // calculate roll, pitch and yaw (radians, airborne frame: X longitudinal, Z right-wing) corresponding to 3x3 transition matrix R from E-N-U
-void pony_linal_eul2mat (double* R,   const double* e  ); // calculate 3x3 rotation matrix R for 3x1 Euler vector e via Rodrigues' formula: R = E + sin|e|/|e|*[e,] + (1-cos|e|)/|e|^2*[e,]^2 
-void pony_linal_eul2quat(double* q,   const double* e  ); // calculate quaternion q (with q0 being scalar part) for 3x1 Euler vector e 
-	
+void pony_linal_eul2mat (double* R,   const double* e  ); // calculate 3x3 rotation matrix R for 3x1 Euler vector e via Rodrigues' formula: R = E + sin|e|/|e|*[e,] + (1-cos|e|)/|e|^2*[e,]^2
+void pony_linal_eul2quat(double* q,   const double* e  ); // calculate quaternion q (with q0 being scalar part) for 3x1 Euler vector e
+
 	// routines for n x n upper-triangular matrices U lined up in one-dimensional array u
 		// element manipulations
 void pony_linal_u_ij2k(size_t* k, const size_t i, const size_t j, const size_t n); // convert index for upper-triangular matrix lined up in one-dimensional array: (i,j) ->  k
@@ -486,7 +488,7 @@ void pony_linal_uuT    (double* res, const double* u,                           
 void pony_linal_uTu    (double* res, const double* u,                                  const size_t n); // calculate square (with left  transposition) of upper-triangular matrix lined up in one-dimensional array of n(n+1)/2 x 1: res = U^T*U
 
 	// matrix factorizations
-void pony_linal_chol(double* S, const double* P, const size_t n); // calculate Cholesky upper-triangular factorization P = S*S^T, where P is symmetric positive-definite matrix
+void pony_linal_chol(double* S,  const double* P, const size_t n); // calculate Cholesky upper-triangular factorization P = S*S^T, where P is n x n symmetric semipositive-definite matrix
 
 	// square root Kalman filtering
 char   pony_linal_check_measurement_residual(double* x, double* S, double z, double* h, double sigma, double k_sigma, const size_t n); // check measurement residual magnitude against predicted covariance level

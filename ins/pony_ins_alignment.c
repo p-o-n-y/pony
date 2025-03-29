@@ -1,8 +1,8 @@
-// Aug-2022
-/*	pony_ins_alignment 
-	
+// Feb-2025
+/*	pony_ins_alignment
+
 	pony plugins for ins initial alignment (initial attitude matrix determination):
-	
+
 	- pony_ins_alignment_static
 		Conventional averaging of accelerometer and gyroscope outputs.
 		Then constructing the attitude matrix out of those averages.
@@ -13,13 +13,13 @@
 		e.g. turntable or stabilized plate.
 
 	- pony_ins_alignment_rotating
-		Approximation of gravity vector rotating along with the Earth in an inertial reference frame.
-		Then estimating northern direction via gravity vector displacement.
+		Approximation of ground reaction force rotating along with the Earth in an inertial reference frame.
+		Then estimating northern direction via ground reaction force displacement.
 		Also calculates attitude angles (roll, pitch, yaw=true heading), and quaternion.
-		Sets velocity vector to zero, as it is assumed for this type of initial alignment.
+		Sets velocity vector to zero and its validity flag up, as this is assumed for this type of initial alignment.
 		Performs the alignment for all initialized IMU devices.
-		Recommended for navigation-grade systems on a rotating base, 
-		allowing vibrations with precisely zero average acceleration,
+		Recommended for navigation-grade systems on a rotating base,
+		allowing vibrations with zero average acceleration,
 		e.g. an airplane standing still on the ground with engine(s) running.
 
 	- pony_ins_alignment_rotating_rpy
@@ -50,7 +50,7 @@ void pony_ins_alignment_free_null(void** ptr);
 
 
 /* pony_ins_alignment_static - pony plugin
-	
+
 	Conventional averaging of accelerometer and gyroscope outputs.
 	Then constructing the attitude matrix out of those averages.
 	Also calculates attitude angles (roll, pitch, yaw=true heading), and quaternion.
@@ -64,9 +64,9 @@ void pony_ins_alignment_free_null(void** ptr);
 		L = [ ----------- | ----------------- | ----- ],
 		    [ |<w> x <f>| | |<f>| |<w> x <f>| | |<f>| ]
 		where <w> and <f> are the angular rate and specific force vectors, respectively,
-		as measured by gyroscopes and accelerometers, averaged over an initial alignment period 
+		as measured by gyroscopes and accelerometers, averaged over an initial alignment period
 		specified in the configuration string, u x v is vector cross product
-	
+
 	uses:
 		pony->imu->t
 		pony->imu->w
@@ -87,27 +87,28 @@ void pony_ins_alignment_free_null(void** ptr);
 	cfg parameters:
 		alignment
 		or
-		{imu: alignment} - imu initial alignment duration, sec
+		{imu: alignment} - imu initial alignment end time, sec
 			type :   floating point
 			range:   0+ to +inf (positive decimal)
 			default: 300
 			example: {imu: alignment = 900}
 			note:    if specified for the particular IMU device, the value overrides one from the common configuration settings (outside of groups)
 */
-void pony_ins_alignment_static(void) {
+void pony_ins_alignment_static(void)
+{
 
-	const char   t0_token[] = "alignment"; // alignment duration parameter name in configuration
-	const double t0_default = 300;         // default alignment duration
+	const char   t0_token[] = "alignment"; // alignment end time parameter name in configuration
+	const double t0_default = 300;         // default alignment end time
 
 	static size_t ndev;    // number of IMU devices
-	static double 
+	static double
 		(*w0)[3] = NULL,    // average angular rate measured by gyroscopes <w>              for each device
 		(*f0)[3] = NULL,    // average specific force vector measured by accelerometers <f> for each device
-		 *t0     = NULL,    // alignment duration                                           for each device
+		 *t0     = NULL,    // alignment end time                                            for each device
 		  v [3]  = {0,0,0}, // cross product <w> x <f>
 		  vv[3]  = {0,0,0}, // double cross product <f> x (<w> x <f>)
 		  d [3]  = {0,0,0}; // vector magnitudes
-	static unsigned long 
+	static unsigned long
 		 *n      = NULL;    // measurement counter for each device                          for each device
 
 	double *L;              // pointer to attitude matrix in solution
@@ -146,7 +147,7 @@ void pony_ins_alignment_static(void) {
 	}
 
 	else if (pony->mode < 0) {	// terminate
-		
+
 		// free allocated memory
 		pony_ins_alignment_free_null((void**)(&w0));
 		pony_ins_alignment_free_null((void**)(&f0));
@@ -162,7 +163,7 @@ void pony_ins_alignment_static(void) {
 			// skip uninitialized subsystems
 			if (pony->imu[dev].cfg == NULL)
 				continue;
-			// check if alignment duration exceeded 
+			// check if alignment end time exceeded
 			if (pony->imu[dev].t > t0[dev])
 				return;
 			// drop validity flags
@@ -211,23 +212,23 @@ void pony_ins_alignment_static(void) {
 }
 
 /* pony_ins_alignment_rotating - pony plugin
-	
-	Approximation of gravity vector rotating along with the Earth in an inertial reference frame.
-	Then estimating northern direction via gravity vector displacement.
+
+	Approximation of ground reaction force rotating along with the Earth in an inertial reference frame.
+	Then estimating northern direction via ground reaction force displacement.
 	Also calculates attitude angles (roll, pitch, yaw=true heading), and quaternion.
-	Sets velocity vector to zero, as it is assumed for this type of initial alignment.
+	Sets velocity vector to zero and its validity flag up, as this is assumed for this type of initial alignment.
 	Performs the alignment for all initialized IMU devices.
-	Recommended for navigation-grade systems on a rotating base, 
+	Recommended for navigation-grade systems on a rotating base,
 	allowing vibrations with zero average acceleration,
 	e.g. an airplane standing still on the ground with engine(s) running.
 
 	description:
 		algorithm may be found in a separate document [A. Kozlov]
 
-		takes latitude from imu solution, if valid
-		else takes latitude from hybrid solution
-		otherwise quits
-	
+		          takes current latitude from IMU solution,    if valid,
+		otherwise takes current latitude from hybrid solution, if valid,
+		otherwise provides approximate azimuth which has error growing with time and validity flag down
+
 	uses:
 		pony->imu->t
 		pony->imu->w
@@ -252,65 +253,62 @@ void pony_ins_alignment_static(void) {
 	cfg parameters:
 		alignment
 		or
-		{imu: alignment} - imu initial alignment duration, sec
+		{imu: alignment} - imu initial alignment end time, sec
 			type :   floating point
 			range:   0+ to +inf (positive decimal)
 			default: 300
 			example: {imu: alignment = 300}
 			note:    if specified for the particular IMU device, the value overrides one from the common configuration settings (outside of groups)
 */
-void pony_ins_alignment_rotating(void) {
+void pony_ins_alignment_rotating(void)
+{
 
 	enum dim {
+		E, N, U,
 		m   = 3,         // approximation coefficient count
 		mm  = m*(m+1)/2, // upper-triangular matrix elements
-		lat = 1         // latitude index in coordinates array 
 	};
 
-	const char   
-		t1_token[] = "alignment"; // alignment duration parameter name in configuration
-	const double 
-		t1_default = 300,         // default alignment duration
+	const char
+		t1_token[] = "alignment"; // alignment end time parameter name in configuration
+	const double
+		t1_default = 300,         // default alignment end time
 		v_std      = 1,           // velocity integral standard deviation
 		k_sigma    = 3,           // measurement residual criterion coefficient
 		S0         = 6e6;         // starting covariances
 
-	static size_t ndev;                         // number of IMU devices
-	static double 
-		 *t0           = NULL,                  // alignment start time                                                       for each device
-		 *t1           = NULL,                  // alignment end time                                                         for each device
-		 *t_           = NULL,                  // previous time                                                              for each device
-		 *slt          = NULL,                  //   sine of latitude                                                         for each device
-		 *clt          = NULL,                  // cosine of latitude                                                         for each device
-		(* vz0)[3]     = NULL,                  // velocity integral                                                          for each device
-		(*Azz0)[9]     = NULL,                  // transition matrix from inertial to instrumental reference frame            for each device
-		(*x   )[3][m ] = NULL,                  // approximation coefficients                                                 for each device
-		(*S   )[3][mm] = NULL,                  // upper-triangular part of covariance's Cholesky factorization of covariance for each device
-		  K      [m]   = {0,0,0},               // approximation Kalman gain
-		  h      [m]   = {0,0,0},               // approximation model matrix
-		 fz0   [3]     = {0,0,0},               // accelerometers output and their approximation in inertial frame
-		 fz0a0 [3]     = {0,0,0},               // approximation at t0
-		 fza   [3]     = {0,0,0},               // approximation at current time in instrumental frame
-		 fxf   [3]     = {0,0,0},               // cross-product orthogonal vector
-		 fxfxf [3]     = {0,0,0},               // double cross product
-		 a     [3]     = {0,0,0},               // Euler vector of rotation from inertial to instrumental reference frame
-		 C     [9]     = {1,0,0, 0,1,0, 0,0,1}, // intermediate transition matrix
-		 D     [9]     = {1,0,0, 0,1,0, 0,0,1}, // intermediate transition matrix
-		 L0    [9]     = {1,0,0, 0,1,0, 0,0,1}, // estimated attitude at t0
-		 Lt    [9]     = {1,0,0, 0,1,0, 0,0,1}, // estimated attitude at t
-		 u, u2;                                 // Earth's rotation rate, and squared, shortcuts
-					    
+	static size_t ndev;           // number of IMU devices
+	static double
+		 *t0           = NULL,    // alignment start time                                                       for each device
+		 *t1           = NULL,    // alignment end time                                                         for each device
+		 *t_           = NULL,    // previous time                                                              for each device
+		(* vz0)[3]     = NULL,    // velocity integral                                                          for each device
+		(*Azz0)[9]     = NULL,    // transition matrix from inertial to instrumental reference frame            for each device
+		(*x   )[3][m ] = NULL,    // approximation coefficients                                                 for each device
+		(*S   )[3][mm] = NULL,    // upper-triangular part of covariance's Cholesky factorization of covariance for each device
+		  K       [m ] = {0,0,0}, // approximation Kalman gain
+		  h       [m ] = {0,0,0}, // approximation model coefficients
+		  hd      [m ] = {1,0,0}, // approximation model derivative coefficients for base epoch
+		 u, _u2;                  // Earth's rotation rate, and reciprocal square
+
 	double
-		  t,        // time since the alignment has started
-		 dt,        // time increment
-		 ut,        // Earth rotation angle
-		sut,  cut,  // sine and cosine of Earth rotation angle
-		schi, cchi, // azimuth rottion angle
+		fz0   [3],  // accelerometers output and their approximation
+		fza   [3],  // approximation at current time in instrumental frame
+		fxf   [3],  // cross-product orthogonal vector
+		fxfxf [3],  // double cross product
+		a     [3],  // Euler vector of rotation from inertial to instrumental reference frame
+		Lt    [6],  // estimated attitude at t, two first columns
+		C[9], D[9], // intermediate transition matrices
+		  t,  dt,   // time since the alignment has started and time increment
+		 ut, sut_u, // Earth rotation angle and its normalized sine
+		sut,  cut,  // sine and cosine of the Earth's rotation angle
+		schi, cchi, // azimuth rotation angle's trig functions
+		lat, slat,  // latitude and its sine
 		n;          // vector norm
 	char valid;     // validity flag
-	size_t 			
+	size_t
 		dev,        // current IMU device index
-		i, j, k;    // common indexing variables
+		i, j;       // common indexing variables
 
 
 	// check if imu data has been initialized
@@ -324,15 +322,12 @@ void pony_ins_alignment_rotating(void) {
 		t0   = (double  *        )calloc(ndev, sizeof(double       ));
 		t1   = (double  *        )calloc(ndev, sizeof(double       ));
 		t_   = (double  *        )calloc(ndev, sizeof(double       ));
-		slt  = (double  *        )calloc(ndev, sizeof(double       ));
-		clt  = (double  *        )calloc(ndev, sizeof(double       ));
 		 vz0 = (double (*)[3]    )calloc(ndev, sizeof(double[3]    ));
 		Azz0 = (double (*)[9]    )calloc(ndev, sizeof(double[9]    ));
 		x    = (double (*)[3][m ])calloc(ndev, sizeof(double[3][m ]));
 		S    = (double (*)[3][mm])calloc(ndev, sizeof(double[3][mm]));
-		if (   t0  == NULL || t1  == NULL || t_ == NULL 
-			|| slt == NULL || clt == NULL 
-			|| x   == NULL || S   == NULL
+		if (   t0   == NULL || t1  == NULL || t_ == NULL
+			|| x    == NULL || S   == NULL
 			|| Azz0 == NULL) {
 			pony->mode = -1;
 			return;
@@ -350,19 +345,17 @@ void pony_ins_alignment_rotating(void) {
 			t_[dev] = -1;
 		}
 		// constants
-		u  = pony->imu_const.u;
-		u2 = u*u;
+		u   = pony->imu_const.u;
+		_u2 = 1/(u*u);
 
 	}
 
 	else if (pony->mode < 0) {	// terminate
-		
+
 		// free allocated memory
 		pony_ins_alignment_free_null((void**)(&t0  ));
 		pony_ins_alignment_free_null((void**)(&t1  ));
 		pony_ins_alignment_free_null((void**)(&t_  ));
-		pony_ins_alignment_free_null((void**)(&slt ));
-		pony_ins_alignment_free_null((void**)(&clt ));
 		pony_ins_alignment_free_null((void**)(&x   ));
 		pony_ins_alignment_free_null((void**)(&S   ));
 		pony_ins_alignment_free_null((void**)(&Azz0));
@@ -384,12 +377,10 @@ void pony_ins_alignment_rotating(void) {
 			pony->imu[dev].sol.q_valid		= 0;
 			pony->imu[dev].sol.rpy_valid	= 0;
 			// check for required data present
-			if (    !pony->imu[dev].      w_valid   // check if angular rate measurements are available
-				||  !pony->imu[dev].      f_valid   // check if accelerometer measurements are available
-				|| (!pony->imu[dev].sol.llh_valid   // check if imu coordinates are available
-				&&  !pony->         sol.llh_valid)) // or if hybrid solution coordinates are available
+			if (   !pony->imu[dev].w_valid   // check if angular rate measurements are available
+				|| !pony->imu[dev].f_valid)  // check if accelerometer measurements are available
 				continue;
-			// initializtion procedures
+			// initialization procedures
 			if (t_[dev] < 0) {
 				// time init
 				t0[dev] = pony->imu[dev].t;
@@ -408,128 +399,110 @@ void pony_ins_alignment_rotating(void) {
 					// velocity integral
 					vz0[dev][i] = 0;
 				}
-				// latitude
-				if (pony->imu[dev].sol.llh_valid) { // if imu coordinates are available
-					slt[dev] = sin(pony->imu->sol.llh[lat]);
-					clt[dev] = cos(pony->imu->sol.llh[lat]);
-				}
-				else if (pony->sol.llh_valid) { // if hybrid solution coordinates are available
-					slt[dev] = sin(pony->     sol.llh[lat]);
-					clt[dev] = cos(pony->     sol.llh[lat]);
-				}
 				continue;
 			}
 			// set assumed validity (may be dropped later)
 			valid = 1;
 			// time increments
-			dt = pony->imu[dev].t - t_[dev]; 
-			if (dt <= 0) 
+			dt = pony->imu[dev].t - t_[dev];
+			if (dt <= 0)
 				continue; // invalid increment, abort
 			t_[dev] = pony->imu[dev].t;
 			t       = pony->imu[dev].t - t0[dev];
-			// Earth rotation angle
-			 ut = u*t;
-			sut = sin(ut);
-			cut = cos(ut);
-			// transforming into inertial frame fz0 = A^T*fz
-			pony_linal_mmul1T(fz0, Azz0[dev], pony->imu[dev].f, 3, 3, 1);
+			// advance instrumental frame to time step midpoint using Rodrigues' rotation formula:
+			//    D = Azz0(t+dt/2) = (E + [w x]*sin(|w*dt/2|)/|w| + [w x]^2*(1-cos(|w*dt/2|)/|w*dt|^2)*Azz0(t)
+			for (i = 0; i < 3; i++)
+				a[i] = pony->imu[dev].w[i]*dt/2; // a = w*dt/2
+			pony_linal_eul2mat(C,a);             // C = E + [a x]*sin(|a|)/|a| + [a x]^2*(1-cos(|a|)/|a|^2
+			pony_linal_mmul(D, C,Azz0[dev], 3,3,3);
+			// transform accelerometers into inertial frame at time step midpoint fz0 = Azz0(t+dt/2)^T*fz
+			pony_linal_mmul1T(fz0, D,pony->imu[dev].f, 3,3,1);
+			// update instrumental frame to the end of time step using Rodrigues' rotation formula:
+			//    Azz0(t+dt) = (E + [w x]*sin(|w*dt/2|)/|w| + [w x]^2*(1-cos(|w*dt/2|)/|w*dt|^2)*Azz0(t+dt/2)
+			pony_linal_mmul(Azz0[dev], C,D, 3,3,3);
+			// latitude
+			lat = 
+				(pony->imu[dev].sol.llh_valid ? pony->imu[dev].sol.llh[N] : // inertial coordinates
+				(pony->         sol.llh_valid ? pony->         sol.llh[N] : // hybrid coordinates
+					0));                                                    // neither - take zero latitude yielding approximate azimuth
+			slat = sin(lat);
+			// Earth rotation
+			 ut   = u*t;
+			sut   = sin(ut);
+			cut   = cos(ut);
+			sut_u = sut/u;
 			// approximation model coefficients
-			h[0] =        t    ;  
-			h[1] =      sut /u ;  
-			h[2] = (1 - cut)/u2;
+			h[0] =  t             ;
+			h[1] = (1 - cut  )*_u2;
+			h[2] = (t - sut_u)*_u2;
+			// approximation model derivative coefficients for base epoch
+			// after ~6 hours, when ut exceeds pi/2, geometry starts to degrade, i.e. cross products below start decreasing in magnitude,
+			// so base epoch is no longer at t = t0, but at t2 such that u(t-t2) = pi/2, which simplifies calculations and provides roughly the best geometry
+			if (ut <= pony->imu_const.pi_2) {
+				hd[1] = 0; // h0[0] is always one
+				hd[2] = 0;
+				schi = slat*(1-cut);
+				cchi =         sut ;
+			}
+			else {
+				hd[1] =   -cut/u   ; // h0[0] is always one
+				hd[2] = (1-sut)*_u2;
+				schi = slat;
+				cchi = 1   ;
+			}
+			n = sqrt(schi*schi + cchi*cchi); // never zero since 0 < dt <= ut <= pi/2 so that 0 < sin(ut) <= cchi <= 1
+			schi /= n, cchi /= n;
 			// approximation
 			for (i = 0; i < 3; i++) {
-				// velocity interal update
+				// update velocity integral
 				vz0[dev][i] += fz0[i]*dt;
-				// approiximation coefficient estimates
-				if (pony_linal_check_measurement_residual(x[dev][i],S[dev][i], vz0[dev][i],h,v_std, k_sigma, m)) // check measurement residual within 3-sigma with current estimate
-					pony_linal_kalman_update(x[dev][i],S[dev][i],K, vz0[dev][i],h,v_std, m);                // update estimates using v = h*x + dv, v_std = sqrt(E[dv^2])
-				// approximation at t0 in inertial frame
-				fz0a0[i] = x[dev][i][0] + x[dev][i][1];
-				// approximation at t  in inertial frame
-				fz0[i] = x[dev][i][0] + x[dev][i][1]*cut + x[dev][i][2]*h[1];
+				// estimate approximation coefficient
+				if (pony_linal_check_measurement_residual(x[dev][i],S[dev][i], vz0[dev][i],h,v_std, k_sigma, m)) // check measurement residual against 3-sigma with current estimate
+					pony_linal_kalman_update(x[dev][i],S[dev][i],K, vz0[dev][i],h,v_std, m);                     // update estimates using v = h*x + dv, v_std = sqrt(E[dv^2])
+				// average ground reaction specific force approximation at base epoch   in inertial frame
+				fxf[i] = x[dev][i][0] + x[dev][i][1]*hd[1] + x[dev][i][2]*hd[2]; // velocity integral approximation derivative taken at base epoch
+				// average ground reaction specific force approximation at current time in inertial frame
+				fz0[i] = x[dev][i][0] + x[dev][i][1]*sut_u + x[dev][i][2]*h [1]; // velocity integral approximation derivative taken at t
 			}
-			// transition to instrumental frame (fza = Azz0*fz0) and normalization, attitude without azimuth at time t
-			pony_linal_mmul(fza , Azz0[dev], fz0 , 3, 3, 1);
-			n = pony_linal_vnorm(fza,3);                   // n = |fza|
-			if (n > 0) 
-				for (i = 0; i < 3; i++) 
-					fza  [i] /= n, Lt[i*3 + 2] = fza  [i]; // normalize and calculate attitude 3rd column
-			else
-				valid = 0;
-			// normalization, attitude without azimuth at time t0
-			n = pony_linal_vnorm(fz0a0,3);                 // n = |fz0a0|
-			if (n > 0) 
-				for (i = 0; i < 3; i++) 
-					fz0a0[i] /= n, L0[i*3 + 2] = fz0a0[i]; // normalize and calculat attitude 3rd column
-			else
-				valid = 0;
-			// cross-product to obtain orthogonal vector, normalization
-			pony_linal_cross3x1(fxf, fza, fz0a0);
-			n = pony_linal_vnorm(fxf,3);
-			if (n > 0)
-				for (i = 0; i < 3; i++) {
-					fxf[i] /= n;          // normalize
-					Lt[i*3 + 0] = fxf[i]; // calulate attitude matrix 1st columns
-					L0[i*3 + 0] = fxf[i]; // at time t0
-				}
-			else
-				valid = 0;
-			// third ort as a cross-product, at time t
-			pony_linal_cross3x1(fxfxf, fza, fxf);
-			n = pony_linal_vnorm(fxfxf,3);
+			// transition to current instrumental frame (fza = Azz0*fz0)
+			pony_linal_mmul(fza, Azz0[dev],fz0, 3,3,1); // average ground reaction at current time
+			pony_linal_mmul(fz0, Azz0[dev],fxf, 3,3,1); // average ground reaction at base epoch
+			// vertical ort
+			n = pony_linal_vnorm(fza, 3);              // n = |fza|
 			if (n > 0)
 				for (i = 0; i < 3; i++)
-					Lt[i*3 + 1] = fxfxf[i]; // attitude 2nd column
+					pony->imu[dev].sol.L[i*3 + U] = fza[i]/n; // normalize and calculate attitude 3rd column
 			else
 				valid = 0;
-			// third ort as a cross-product, at time t0
-			pony_linal_cross3x1(fxfxf, fz0a0, fxf);
-			n = pony_linal_vnorm(fxfxf,3);
+			// cross-product to obtain orthogonal vector
+			// for ut << 1 (small Earth's rotation angles, i.e. short alignment time) points approximately northward
+			pony_linal_cross3x1(fxf, fz0,fza);
+			n = pony_linal_vnorm(fxf, 3);
 			if (n > 0)
 				for (i = 0; i < 3; i++)
-					L0[i*3 + 1] = fxfxf[i]; // attitude 2nd column
+					Lt[i*2 + 1] = fxf  [i]/n; // normalize and calulate 2nd column of intermediate attitude matrix (subject to azimuth rotation)
 			else
 				valid = 0;
-			// azimuth rotation for fza and fz0a0 match each other
-			if (valid) {
-				pony_linal_mmul1T(D, Lt, Azz0[dev], 3,3,3);
-				pony_linal_mmul  (C, D ,   L0,      3,3,3);
-				// D matrix, only used elements
-				D[2] = -sut*clt[dev];
-				D[5] = (1 - cut)*slt[dev]*clt[dev];
-				// sine and cosine of azimuth rotation angle
-				schi = -C[2]*D[5] + C[5]*D[2];
-				cchi =  C[2]*D[2] + C[5]*D[5];
-				n = sqrt(schi*schi + cchi*cchi); // normalize
-				if (n > 0)
-					schi /= n, cchi /= n;
-				else
-					cchi = 1; // no azimuth rotation
-				// rotate in azimuth
-				C[0] = cchi; C[1] = -schi; C[2] = 0;
-				C[3] = schi; C[4] =  cchi; C[5] = 0;
-				C[6] =  0  ; C[7] =  0   ; C[8] = 1;
-				pony_linal_mmul(pony->imu[dev].sol.L, Lt, C, 3,3,3);
-				pony->imu[dev].sol.L_valid = 1;
-				// renew angles: roll, pitch and yaw=true heading
-				pony_linal_mat2rpy (pony->imu[dev].sol.rpy, pony->imu[dev].sol.L);
-				pony->imu[dev].sol.rpy_valid = 1;
-				// renew quaternion
-				pony_linal_mat2quat(pony->imu[dev].sol.q  , pony->imu[dev].sol.L);
-				pony->imu[dev].sol.q_valid   = 1;
+			// third ort as a cross-product
+			pony_linal_cross3x1(fxfxf, fxf,fza);
+			n = pony_linal_vnorm(fxfxf, 3);
+			if (n > 0)
+				for (i = 0; i < 3; i++)
+					Lt[i*2 + 0] = fxfxf[i]/n; // normalize and calulate 1st column of intermediate attitude matrix (subject to azimuth rotation)
+			else
+				valid = 0;							
+			// rotate in azimuth so that fza and fz0 match
+			for (i = 0; i < 3; i++) {
+				pony->imu[dev].sol.L[i*3+E] =  Lt[i*2+0]*cchi + Lt[i*2+1]*schi;
+				pony->imu[dev].sol.L[i*3+N] = -Lt[i*2+0]*schi + Lt[i*2+1]*cchi;
 			}
-			// update instrumental frame using Rodrigues' rotation formula: Azz0(t+dt) = (E + [w x]*sin(|w*dt|)/|w| + [w x]^2*(1-cos(|w*dt|)/|w*dt|^2)*Azz0(t)
-			for (i = 0; i < 3; i++)
-				a[i] = pony->imu[dev].w[i]*dt; // a = w*dt
-			pony_linal_eul2mat(C,a);           // C = E + [a x]*sin(|a|)/|a| + [a x]^2*(1-cos(|a|)/|a|^2
-			for (i = 0; i < 3; i++) {          // matrix multiplication overwriting Azz0
-				for (j = 0; j < 3; j++)
-					a[j] = Azz0[dev][j*3+i];        // i-th column of Azz0 previous value
-				for (j = 0; j < 3; j++)
-					for (k = 0, Azz0[dev][j*3+i] = 0; k < 3; k++)
-						Azz0[dev][j*3+i] += C[j*3+k]*a[k]; // replace column with matrix product: Azz0(t+dt) = C*Azz0(t)
-			}
+			pony->imu[dev].sol.  L_valid = valid;
+			// renew angles: roll, pitch and yaw=true heading
+			pony_linal_mat2rpy (pony->imu[dev].sol.rpy, pony->imu[dev].sol.L);
+			pony->imu[dev].sol.rpy_valid = valid;
+			// renew quaternion
+			pony_linal_mat2quat(pony->imu[dev].sol.q  , pony->imu[dev].sol.L);
+			pony->imu[dev].sol.  q_valid = valid;
 			// set velocity equal to zero, as the rotating base implies
 			for (i = 0; i < 3; i++)
 				pony->imu[dev].sol.v[i] = 0;
@@ -540,8 +513,8 @@ void pony_ins_alignment_rotating(void) {
 
 }
 
-/* pony_ins_alignment_rotating_rpy - pony plugin
-	
+/* pony_ins_alignment_rotating_rpy - pony plugin, legacy version, not worked on anymore
+
 	The same as pony_ins_alignment_rotating, but attitude matrix is calculated using attitude angles
 	(roll, pitch and yaw=true heading). Does not allow the first instrumental axis to point upwards.
 	Sets velocity vector to zero, as it is assumed for this type of initial alignment.
@@ -553,7 +526,7 @@ void pony_ins_alignment_rotating(void) {
 		takes latitude from imu solution, if valid
 		else takes latitude from hybrid solution
 		otherwise quits
-	
+
 	uses:
 		pony->imu->t
 		pony->imu->w
@@ -578,31 +551,32 @@ void pony_ins_alignment_rotating(void) {
 	cfg parameters:
 		alignment
 		or
-		{imu: alignment} - imu initial alignment duration, sec
+		{imu: alignment} - imu initial alignment end time, sec
 			type :   floating point
 			range:   0+ to +inf (positive decimal)
 			default: 300
 			example: {imu: alignment = 300}
 			note:    if specified for the particular IMU device, the value overrides one from the common configuration settings (outside of groups)
 */
-void pony_ins_alignment_rotating_rpy(void) {
+void pony_ins_alignment_rotating_rpy(void)
+{
 
 	enum dim {
 		m   = 3,         // approximation coefficient count
 		mm  = m*(m+1)/2, // upper-triangular matrix elements
-		lat = 1         // latitude index in coordinates array 
+		lat = 1          // latitude index in coordinates array
 	};
 
-	const char   
-		t1_token[] = "alignment"; // alignment duration parameter name in configuration
-	const double 
-		t1_default = 300,         // default alignment duration
+	const char
+		t1_token[] = "alignment"; // alignment end time parameter name in configuration
+	const double
+		t1_default = 300,         // default alignment end time
 		v_std      = 1,           // velocity integral standard deviation
 		k_sigma    = 3,           // measurement residual criterion coefficient
 		S0         = 6e6;         // starting covariances
 
 	static size_t ndev;                         // number of IMU devices
-	static double 
+	static double
 		 *t0           = NULL,                  // alignment start time                                                       for each device
 		 *t1           = NULL,                  // alignment end time                                                         for each device
 		 *t_           = NULL,                  // previous time                                                              for each device
@@ -612,8 +586,8 @@ void pony_ins_alignment_rotating_rpy(void) {
 		(*Azz0)[9]     = NULL,                  // transition matrix from inertial to instrumental reference frame            for each device
 		(*x   )[3][m ] = NULL,                  // approximation coefficients                                                 for each device
 		(*S   )[3][mm] = NULL,                  // upper-triangular part of covariance's Cholesky factorization of covariance for each device
-		  K      [m]   = {0,0,0},               // approximation Kalman gain
-		  h      [m]   = {0,0,0},               // approximation model matrix
+		  K       [m ] = {0,0,0},               // approximation Kalman gain
+		  h       [m ] = {0,0,0},               // approximation model matrix
 		 fz0   [3]     = {0,0,0},               // accelerometers output and their approximation in inertial frame
 		 fz0a0 [3]     = {0,0,0},               // approximation at t0
 		 fza   [3]     = {0,0,0},               // approximation at current time in instrumental frame
@@ -630,12 +604,12 @@ void pony_ins_alignment_rotating_rpy(void) {
 		 dt,        // time increment
 		 ut,        // Earth rotation angle
 		sut, cut,   // sine and cosine of Earth rotation angle
-		schi, cchi, // azimuth rottion angle
-		n2;         // vectorm norm squared
+		schi, cchi, // azimuth rotation angle
+		n2;         // vector norm squared
 	char valid;     // validity flag
-	size_t 
+	size_t
 		dev,        // current IMU device index
-		i, j, k;    // common indexing variables
+		i, j;       // common indexing variables
 
 
 	// check if imu data has been initialized
@@ -655,9 +629,9 @@ void pony_ins_alignment_rotating_rpy(void) {
 		Azz0 = (double (*)[9]    )calloc(ndev, sizeof(double[9]    ));
 		x    = (double (*)[3][m ])calloc(ndev, sizeof(double[3][m ]));
 		S    = (double (*)[3][mm])calloc(ndev, sizeof(double[3][mm]));
-		if (   t0  == NULL || t1  == NULL || t_ == NULL 
-			|| slt == NULL || clt == NULL 
-			|| x   == NULL || S   == NULL
+		if (   t0   == NULL || t1  == NULL || t_ == NULL
+			|| slt  == NULL || clt == NULL
+			|| x    == NULL || S   == NULL
 			|| Azz0 == NULL) {
 			pony->mode = -1;
 			return;
@@ -681,7 +655,7 @@ void pony_ins_alignment_rotating_rpy(void) {
 	}
 
 	else if (pony->mode < 0) {	// terminate
-		
+
 		// free allocated memory
 		pony_ins_alignment_free_null((void**)(&t0  ));
 		pony_ins_alignment_free_null((void**)(&t1  ));
@@ -735,8 +709,8 @@ void pony_ins_alignment_rotating_rpy(void) {
 				}
 				// latitude
 				if (pony->imu[dev].sol.llh_valid) { // if imu coordinates are available
-					slt[dev] = sin(pony->imu->sol.llh[lat]);
-					clt[dev] = cos(pony->imu->sol.llh[lat]);
+					slt[dev] = sin(pony->imu[dev].sol.llh[lat]);
+					clt[dev] = cos(pony->imu[dev].sol.llh[lat]);
 				}
 				else if (pony->sol.llh_valid) { // if hybrid solution coordinates are available
 					slt[dev] = sin(pony->     sol.llh[lat]);
@@ -747,8 +721,8 @@ void pony_ins_alignment_rotating_rpy(void) {
 			// set assumed validity (may be dropped later)
 			valid = 1;
 			// time increments
-			dt = pony->imu[dev].t - t_[dev]; 
-			if (dt <= 0) 
+			dt = pony->imu[dev].t - t_[dev];
+			if (dt <= 0)
 				continue; // invalid increment, abort
 			t_[dev] = pony->imu[dev].t;
 			t       = pony->imu[dev].t - t0[dev];
@@ -756,31 +730,40 @@ void pony_ins_alignment_rotating_rpy(void) {
 			 ut = u*t;
 			sut = sin(ut);
 			cut = cos(ut);
-			// transforming into inertial frame fz0 = A^T*fz
-			pony_linal_mmul1T(fz0, Azz0[dev], pony->imu[dev].f, 3, 3, 1);
+			// update instrumental frame to time midpoint using Rodrigues' rotation formula:
+			//    D = Azz0(t+dt/2) = (E + [w x]*sin(|w*dt/2|)/|w| + [w x]^2*(1-cos(|w*dt/2|)/|w*dt|^2)*Azz0(t)
+			for (i = 0; i < 3; i++)
+				a[i] = pony->imu[dev].w[i]*dt/2; // a = w*dt/2
+			pony_linal_eul2mat(C,a);             // C = E + [a x]*sin(|a|)/|a| + [a x]^2*(1-cos(|a|)/|a|^2
+			pony_linal_mmul(D, C,Azz0[dev], 3,3,3);
+			// transforming accelerometers into inertial frame at time midpoint fz0 = Azz0(t+dt/2)^T*fz
+			pony_linal_mmul1T(fz0, D,pony->imu[dev].f, 3,3,1);
+			// update instrumental frame to time midpoint using Rodrigues' rotation formula:
+			//    Azz0(t+dt) = (E + [w x]*sin(|w*dt/2|)/|w| + [w x]^2*(1-cos(|w*dt/2|)/|w*dt|^2)*Azz0(t+dt/2)
+			pony_linal_mmul(Azz0[dev], C,D, 3,3,3);
 			// approximation model coefficients
-			h[0] =        t    ;  
-			h[1] =      sut /u ;  
-			h[2] = (1 - cut)/u2;
+			h[0] =      sut/u    ;
+			h[1] = (1 - cut  )/u2;
+			h[2] = (t - sut/u)/u2;
 			// approximation
 			for (i = 0; i < 3; i++) {
-				// velocity interal update
+				// velocity integral update
 				vz0[dev][i] += fz0[i]*dt;
-				// approiximation coefficient estimates
+				// approximation coefficient estimates
 				if (pony_linal_check_measurement_residual(x[dev][i],S[dev][i], vz0[dev][i],h,v_std, k_sigma, m)) // check measurement residual within 3-sigma with current estimate
-					pony_linal_kalman_update(x[dev][i],S[dev][i],K, vz0[dev][i],h,v_std, m);                // update estimates using v = h*x + dv, v_std = sqrt(E[dv^2])
+					pony_linal_kalman_update(x[dev][i],S[dev][i],K, vz0[dev][i],h,v_std, m);                     // update estimates using v = h*x + dv, v_std = sqrt(E[dv^2])
 				// approximation at t0 in inertial frame
-				fz0a0[i] = x[dev][i][0] + x[dev][i][1];
+				fz0a0[i] = x[dev][i][0];
 				// approximation at t  in inertial frame
-				fz0[i] = x[dev][i][0] + x[dev][i][1]*cut + x[dev][i][2]*h[1];
+				fz0  [i] = x[dev][i][0]*cut + x[dev][i][1]*h[0] + x[dev][i][2]*h[1];
 			}
 			// transition to instrumental frame (fza = Azz0*fz0) and attitude at time t
-			pony_linal_mmul(fza, Azz0[dev], fz0, 3, 3, 1);
+			pony_linal_mmul(fza, Azz0[dev],fz0, 3,3,1);
 			// roll angle via fza components
 			if (fza[1] != 0 || fza[2] != 0)
 				pony->imu[dev].sol.rpy[0] = -atan2(fza[2], fza[1]);
 			// pitch angle via fza components
-			n2 = pony_linal_dot(fza, fza, 3);
+			n2 = pony_linal_dot(fza,fza, 3);
 			if (n2 > 0)
 				pony->imu[dev].sol.rpy[1] =  atan2(fza[0], sqrt(fza[1]*fza[1] + fza[2]*fza[2]));
 			else
@@ -789,7 +772,7 @@ void pony_ins_alignment_rotating_rpy(void) {
 			// initial roll and pitch, zero heading
 			if (fz0a0[1] !=0 || fz0a0[2] != 0)
 				rpy0[0] = -atan2(fz0a0[2], fz0a0[1]);
-			n2 = pony_linal_dot(fz0a0, fz0a0, 3);
+			n2 = pony_linal_dot(fz0a0,fz0a0, 3);
 			if (n2 > 0)
 				rpy0[1] = atan2(fz0a0[0], sqrt(fz0a0[1]*fz0a0[1] + fz0a0[2]*fz0a0[2]));
 			else
@@ -800,9 +783,9 @@ void pony_ins_alignment_rotating_rpy(void) {
 			pony_linal_rpy2mat(Lt, pony->imu[dev].sol.rpy); // Axz^T(t)
 				// how to produce matrix A_z_x_t0: via angles at either t0, or t `\_("o)_/`
 			pony_linal_rpy2mat(L0, rpy0); // Azx(t0)
-			pony_linal_mmul1T(D, Lt, Azz0[dev], 3,3,3);
-			pony_linal_mmul  (C, D, L0, 3,3,3);
-			// "matrix D" `\_("o)_/`	 // only the elements being used	
+			pony_linal_mmul1T(D, Lt,Azz0[dev], 3,3,3);
+			pony_linal_mmul  (C, D ,L0       , 3,3,3);
+			// "matrix D" `\_("o)_/`	 // only the elements used later
 			D[2] =     -sut *clt[dev];
 			D[5] = (1 - cut)*slt[dev]*clt[dev];
 			// azimuth rotation angle
@@ -819,18 +802,7 @@ void pony_ins_alignment_rotating_rpy(void) {
 			pony->imu[dev].sol.L_valid   = valid;
 			// renew quaternion
 			pony_linal_mat2quat(pony->imu[dev].sol.q, pony->imu[dev].sol.L  );
-			pony->imu[dev].sol.q_valid   = valid;		
-			// update instrumental frame using Rodrigues' rotation formula: Azz0(t+dt) = (E + [w x]*sin(|w*dt|)/|w| + [w x]^2*(1-cos(|w*dt|)/|w*dt|^2)*Azz0(t)
-			for (i = 0; i < 3; i++)
-				a[i] = pony->imu[dev].w[i]*dt; // a = w*dt
-			pony_linal_eul2mat(C,a);           // C = E + [a x]*sin(|a|)/|a| + [a x]^2*(1-cos(|a|)/|a|^2
-			for (i = 0; i < 3; i++) {          // matrix multiplication overwriting Azz0
-				for (j = 0; j < 3; j++)
-					a[j] = Azz0[dev][j*3+i];        // i-th column of Azz0 previous value
-				for (j = 0; j < 3; j++)
-					for (k = 0, Azz0[dev][j*3+i] = 0; k < 3; k++)
-						Azz0[dev][j*3+i] += C[j*3+k]*a[k]; // replace column with matrix product: Azz0(t+dt) = C*Azz0(t)
-			}
+			pony->imu[dev].sol.q_valid   = valid;
 			// set velocity equal to zero, as the rotating base implies
 			for (i = 0; i < 3; i++)
 				pony->imu[dev].sol.v[i] = 0;

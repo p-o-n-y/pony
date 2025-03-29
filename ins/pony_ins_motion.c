@@ -1,6 +1,6 @@
-// Aug-2022
+// Feb-2025
 /*	pony_ins_motion
-	
+
 	pony plugins for ins position and velocity algorithms:
 	
 	- pony_ins_motion_euler
@@ -8,7 +8,8 @@
 		using modified Euler's method (with midpoint for attitude matrix) over the Earth reference ellipsoid. 
 		Updates velocity and geographical coordinates for each initialized IMU device with valid 
 		accelerometer measurements, gravity vector, and current position, velocity and attitude matrix.
-		Not suitable at outer-space altitudes, and/or over-Mach velocities.
+		Not suitable at outer-space altitudes, and/or over-Mach velocities. Note that the plugin initializes
+		coordinates and velocities, and raises their validity even if default values are used.
 		
 	- (planned) pony_ins_motion_sculling
 		Planned for future development
@@ -17,14 +18,14 @@
 		Restrains vertical error exponential growth by either damping
 		vertical velocity to zero, or to an external reference like
 		altitude/rate derived from air data system and/or gnss, etc.
-		Preforms the damping for all initialized IMU devices.
+		Performs the damping for all initialized IMU devices.
 		Recommended when using normal gravity model and/or long navigation timeframe.
 		
 	- pony_ins_motion_size_effect
 		Compensates for accelerometer cluster size effect, i.e. the spatial separation 
 		between accelerometer proof masses, also known as "accelerometer lever arm compensation".
 		Uses angular rate and computed angular acceleration, taken as rate increment over the time step.
-		Preforms the compensation for all initialized IMU devices with accelerometer positions specified.
+		Performs the compensation for all initialized IMU devices with accelerometer positions specified.
 		Recommended only for high-grade systems on dynamically maneuvering carriers.
 */
 
@@ -45,7 +46,7 @@
 // service functions
 	// navigation
 double pony_ins_motion_pos_step_enu (double (*llh  )[3], double (*W    )[3], char *W_valid,    const double v[3], const double dt, const double sin_lat, const double cos_lat); // pre-calculated latitude trigonometry
-void   pony_ins_motion_acc_enu2llazw(double (*dvcor)[3], double (*dvrel)[3], double (*dvg)[3],  const double W[3], const double V[3], const double f[3], const double g[3], const double sin_lat, const double cos_lat, const double sin_chi, const double cos_chi); // pre-calculated trigonometry
+void   pony_ins_motion_acc_enu2llazw(double (*dv)[3],  const double W[3], const double V[3], const double f[3], const double g[3], const double sin_lat, const double cos_lat, const double sin_chi, const double cos_chi); // pre-calculated trigonometry
 	// parsing
 double pony_ins_motion_parse_double(const char* token, char* src, const size_t len, double range[2], const double default_value);
 char   pony_ins_motion_parse_double_2array(double* arr, const size_t outer_size, const size_t inner_size, const char* token, char *src, const size_t len, double range[2], double default_value);
@@ -62,7 +63,8 @@ void pony_ins_motion_free_null(void** ptr);
 	using modified Euler's method (with midpoint for attitude matrix) over the Earth reference ellipsoid. 
 	Updates velocity and geographical coordinates for each initialized IMU device with valid 
 	accelerometer measurements, gravity vector, and current position, velocity and attitude matrix.
-	Not suitable at outer-space altitudes, and/or over-Mach velocities.
+	Not suitable at outer-space altitudes, and/or over-Mach velocities. Note that the plugin initializes
+	coordinates and velocities, and raises their validity even if default values are used.
 
 	description:
 	    
@@ -110,7 +112,7 @@ void pony_ins_motion_free_null(void** ptr);
 		or
 		{imu: lon} - starting longitude, degrees
 			type :   floating point
-			range:   -180..+180
+			range:   -360..+360
 			default: 0
 			example: {imu: lon = 37.6}
 			note:    if specified for the particular IMU device, the value overrides one from the common configuration settings (outside of groups)
@@ -133,7 +135,8 @@ void pony_ins_motion_free_null(void** ptr);
 			example: {imu: alt = 151.3}
 			note:    if specified for the particular IMU device, the value overrides one from the common configuration settings (outside of groups)
 */
-void pony_ins_motion_euler(void) {
+void pony_ins_motion_euler(void)
+{
 
 	enum {E, N, U};
 
@@ -142,10 +145,9 @@ void pony_ins_motion_euler(void) {
 		lat_token[] = "lat",        // starting latitude  parameter name in configuration
 		alt_token[] = "alt";        // starting altitude  parameter name in configuration
 	const double 
-		lon_range[] = {-360, +360},	// longitude range, 0 by default
-		lat_range[] = { -90,  +90},	// latitude  range, 0 by default
-		alt_range[] = {-20e3,50e3};	// altitude  range, 0 by default
-	const char W_valid = 0x07;      // component-wise bitfield: three components
+		lon_range[] = {-360, +360},	// longitude range
+		lat_range[] = { -90,  +90},	// latitude  range
+		alt_range[] = {-20e3,50e3};	// altitude  range
 
 	static size_t ndev; // number of IMU devices
 	static double 
@@ -157,9 +159,7 @@ void pony_ins_motion_euler(void) {
 	double
 		f[3],       // proper acceleration in navigation frame
 		Vx[3],      // relative velocity vector in azimuth wandering reference frame
-		dvcor[3],   // Coriolis acceleration in azimuth wandering frame
-		dvrel[3],   // proper   acceleration in azimuth wandering frame
-		dvg  [3],   // gravity  acceleration in azimuth wandering frame
+		dv[3],      // acceleration in azimuth wandering frame
 		C_2  [9],   // intermediate matrix/vector for midpoint attitude
 		dlon,       // latitude and longitude increment
 		sphi, cphi, // sine and cosine of latitude
@@ -200,7 +200,7 @@ void pony_ins_motion_euler(void) {
 				pony_ins_motion_parse_double_imu_or_settings(lat_token, dev, (double*)lat_range,0)/pony->imu_const.rad2deg; // degrees to radians
 			pony->imu[dev].sol.llh[U] = // starting altitude
 				pony_ins_motion_parse_double_imu_or_settings(alt_token, dev, (double*)alt_range,0);
-			// raise coordinates validity flag
+			// raise coordinates validity flag, for systems with unknown coordinates that should perform integration anyways
 			pony->imu[dev].sol.llh_valid = 1;
 			// zero velocity at start
 			for (i = 0; i < 3; i++)
@@ -262,8 +262,8 @@ void pony_ins_motion_euler(void) {
 				continue;
 			if (pony->imu[dev].w_valid) { // if able, calculate attitude mid-point using gyroscopes
 				for (i = 0; i < 3; i++)
-					dvrel[i] = pony->imu[dev].w[i]*dt/2; // midpoint rotation Euler vector
-				pony_linal_eul2mat(C_2, dvrel); // midpoint attitude matrix factor
+					dv[i] = pony->imu[dev].w[i]*dt/2; // midpoint rotation Euler vector
+				pony_linal_eul2mat(C_2, dv); // midpoint attitude matrix factor
 				for (i = 0; i < 3; i++) // multiply C_2*f, store in the first row of C_2
 					for (j = 1, C_2[i] = C_2[i*3]*pony->imu[dev].f[0]; j < 3; j++)
 						C_2[i] += C_2[i*3+j]*pony->imu[dev].f[j];
@@ -275,14 +275,14 @@ void pony_ins_motion_euler(void) {
 			if (!pony->imu[dev].g_valid)
 				continue;
 			pony_ins_motion_acc_enu2llazw(
-				&dvcor, &dvrel, &dvg, // out
+				&dv, // out
 				pony->imu[dev].W, pony->imu[dev].sol.v, f, pony->imu[dev].g, sphi, cphi, schi[dev], cchi[dev]); // in
 			// velocity update in azimuth wandering frame
 			Vx[0] =  pony->imu[dev].sol.v[E]*cchi[dev] + pony->imu[dev].sol.v[N]*schi[dev];
 			Vx[1] = -pony->imu[dev].sol.v[E]*schi[dev] + pony->imu[dev].sol.v[N]*cchi[dev];
 			Vx[U] =  pony->imu[dev].sol.v[U];
 			for (i = 0; i < 3; i++)
-				Vx[i] += (dvcor[i] + dvrel[i] + dvg[i])*dt;
+				Vx[i] += dv[i]*dt;
 			// update azimuth angle
 			 chi[dev] -= dlon*sphi;
 			schi[dev]  = sin(chi[dev]);
@@ -303,7 +303,7 @@ void pony_ins_motion_euler(void) {
 	Restrains vertical error exponential growth by either damping
 	vertical velocity to zero, or to an external reference like
 	altitude/rate derived from air data system and/or gnss, etc.
-	Preforms the damping for all initialized IMU devices.
+	Performs the damping for all initialized IMU devices.
 	Recommended when using normal gravity model and/or long navigation timeframe.
 
 	description:
@@ -341,7 +341,8 @@ void pony_ins_motion_euler(void) {
 			set vvs = 0 to force zero vertical velocity
 			negative values result in default
 */
-void pony_ins_motion_vertical_damping(void) {
+void pony_ins_motion_vertical_damping(void)
+{
 
 	const char vvs_token[] = "vertical_damping_stdev"; // vertical velocity stdev parameter name in configuration
 
@@ -372,11 +373,10 @@ void pony_ins_motion_vertical_damping(void) {
 		s,       // reference information a priori stdev
 		h[2],    // model coefficients
 		y[2],    // algorithm state vector
-		S[3],    // upper-triangular part of cobariance Cholesky factorization
+		S[3],    // upper-triangular part of covariance Cholesky factorization
 		K[2],    // Kalman gain
 		w;       // weight
 	size_t 
-		i,        // general index
 		r,        // current GNSS receiver id
 		dev;      // current IMU device id
 
@@ -564,7 +564,7 @@ void pony_ins_motion_vertical_damping(void) {
 	Compensates for accelerometer cluster size effect, i.e. the spatial separation 
 	between accelerometer proof masses, also known as "accelerometer lever arm compensation".
 	Uses angular rate and computed angular acceleration, taken as rate increment over the time step.
-	Preforms the compensation for all initialized IMU devices with accelerometer positions specified.
+	Performs the compensation for all initialized IMU devices with accelerometer positions specified.
 	Recommended only for high-grade systems on dynamically maneuvering carriers.
 
 	description:
@@ -704,15 +704,15 @@ double pony_ins_motion_pos_step_enu(
 	double (*llh)[3], double (*W)[3], char *W_valid, // out
 	const double v[3], const double dt, const double sin_lat, const double cos_lat) // in
 {
-	enum {E, N, U};
+	enum {E, N, U, dim};
 
 	const double
 		eps = 1.0/0x0100; // 2^-8, guaranteed non-zero value in IEEE754 half-precision format
 
 	double 
-		dx[3], phi,   // coordinate increment and latitude
+		dx[dim], phi,  // coordinate increment and latitude
 		Rn_h, Re_h,   // south-to-north and east-to-west curvature radii, altitude-adjusted
-		e2s2, e4s4,   // e^2*sin(phi)^2, (e^2*sin(phi)^2)^2
+		e2s2, e4s4,   // e^2*sin^2(phi), (e^2*sin^2(phi))^2
 		l0, l1, dlon; // distances to pole at start and end of the time step
 	size_t i;
 
@@ -720,11 +720,11 @@ double pony_ins_motion_pos_step_enu(
 	// ellipsoid geometry
 	e2s2 = pony->imu_const.e2*sin_lat*sin_lat;
 	e4s4 = e2s2*e2s2;					
-	Re_h = pony->imu_const.a*(1 + e2s2/2 + 3*e4s4/8);                            // Taylor expansion within 0.5 m, not altitude-adjusted
-	Rn_h = Re_h*(1 - pony->imu_const.e2)*(1 + e2s2 + e4s4 + e2s2*e4s4) + (*llh)[U]; // Taylor expansion within 0.5 m
-	Re_h += (*llh)[U];                                                           // adjust for altitude
+	Re_h = pony->imu_const.a*(1 + e2s2/2 + 3*e4s4/8);                               // Taylor expansion within 0.5 m, not adjusted for altitude
+	Rn_h = Re_h*(1 - pony->imu_const.e2)*(1 + e2s2 + e4s4 + e2s2*e4s4) + (*llh)[U]; // Taylor expansion within 0.5 m, altitude-adjusted 
+	Re_h += (*llh)[U];                                                              // adjust for altitude
 	// position increment
-	for (i = 0; i < 3; i++)
+	for (i = 0; i < dim; i++)
 		dx[i] = v[i]*dt;
 	// angular rate of navigation frame relative to the Earth
 	(*W)[E] = -v[N]/Rn_h, *W_valid |= ~(0x01<<E);
@@ -741,7 +741,7 @@ double pony_ins_motion_pos_step_enu(
 		(*W)[U] = 0, *W_valid &= ~(0x01<<U); // freeze, drop validity for the third component
 	}
 	else {
-		// coordinates
+		// geodetic coordinate step
 		dlon = dx[E]/(Re_h*cos_lat);
 		(*llh)[N] += dx[N]/Rn_h;
 		// navigation frame
@@ -758,15 +758,12 @@ double pony_ins_motion_pos_step_enu(
 }
 
 void pony_ins_motion_acc_enu2llazw(
-	double (*dvcor)[3], double (*dvrel)[3], double (*dvg)[3], // out
+	double (*dv)[3], // out
 	const double W[3], const double V[3], const double f[3], const double g[3], const double sin_lat, const double cos_lat, const double sin_chi, const double cos_chi) // in
 {
-	enum {E, N, U, dim, hdim = N+1, hdim2 = hdim*hdim};
+	enum {E, N, U, dim};
 	
-	double 
-		u[dim], Wu2[dim],
-		C[hdim2];
-	size_t i;
+	double u[dim], Wu2[dim], dvE, dvN;
 
 	// Earth angular velocity vector in East-North-Up
 	u[N] = pony->imu_const.u*cos_lat;
@@ -775,19 +772,15 @@ void pony_ins_motion_acc_enu2llazw(
 	Wu2[E] = W[E];
 	Wu2[N] = W[N] + u[N]*2;
 	Wu2[U] =        u[U]*2;
-	pony_linal_cross3x1(u, V, Wu2);
-	// azimuth rotation matrix
-	C[0*hdim + E] =  cos_chi; C[0*hdim + N] = sin_chi;
-	C[1*hdim + E] = -sin_chi; C[1*hdim + N] = cos_chi;
-	// rotate Coriolis acceleration
-	pony_linal_mmul(*dvcor, C, u, hdim, hdim, 1);
-	(*dvcor)[U] = u[U];
-	// proper acceleration
-	pony_linal_mmul(*dvrel, C, f, hdim, hdim, 1);
-	(*dvrel)[U] = f[U];
-	// gravity acceleration
-	pony_linal_mmul(*dvg, C, g, hdim, hdim, 1);
-	(*dvg)[U] = g[U];
+	pony_linal_cross3x1(*dv, V, Wu2);
+	// sum up horizontal acceleration
+	dvE = (*dv)[E] + f[E] + g[E];
+	dvN = (*dv)[N] + f[N] + g[N];
+	// rotate to azimuth wander frame
+	(*dv)[0] =  dvE*cos_chi + dvN*sin_chi;
+	(*dv)[1] = -dvE*sin_chi + dvN*cos_chi;
+	// vertical component
+	(*dv)[U] += f[U] + g[U];
 }
 
 	// parsing
