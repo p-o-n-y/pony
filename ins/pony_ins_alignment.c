@@ -1,4 +1,4 @@
-// Feb-2025
+// Nov-2025
 /*	pony_ins_alignment
 
 	pony plugins for ins initial alignment (initial attitude matrix determination):
@@ -24,8 +24,9 @@
 
 	- pony_ins_alignment_rotating_rpy
 		The same as pony_ins_alignment_rotating, but attitude matrix is calculated using attitude angles
-		(roll, pitch and yaw=true heading). Does not allow the first instrumental axis to point upwards.
-		Also sets velocity vector to zero.
+		(roll, pitch and yaw=true heading). Does not allow the first instrumental axis to point upwards.  
+		This plugin is a legacy one, not worked on anymore.  
+		Also sets velocity vector to zero.  
 */
 
 
@@ -421,7 +422,7 @@ void pony_ins_alignment_rotating(void)
 			//    Azz0(t+dt) = (E + [w x]*sin(|w*dt/2|)/|w| + [w x]^2*(1-cos(|w*dt/2|)/|w*dt|^2)*Azz0(t+dt/2)
 			pony_linal_mmul(Azz0[dev], C,D, 3,3,3);
 			// latitude
-			lat = 
+			lat =
 				(pony->imu[dev].sol.llh_valid ? pony->imu[dev].sol.llh[N] : // inertial coordinates
 				(pony->         sol.llh_valid ? pony->         sol.llh[N] : // hybrid coordinates
 					0));                                                    // neither - take zero latitude yielding approximate azimuth
@@ -490,12 +491,13 @@ void pony_ins_alignment_rotating(void)
 				for (i = 0; i < 3; i++)
 					Lt[i*2 + 0] = fxfxf[i]/n; // normalize and calulate 1st column of intermediate attitude matrix (subject to azimuth rotation)
 			else
-				valid = 0;							
+				valid = 0;
 			// rotate in azimuth so that fza and fz0 match
-			for (i = 0; i < 3; i++) {
-				pony->imu[dev].sol.L[i*3+E] =  Lt[i*2+0]*cchi + Lt[i*2+1]*schi;
-				pony->imu[dev].sol.L[i*3+N] = -Lt[i*2+0]*schi + Lt[i*2+1]*cchi;
-			}
+			if (valid)
+				for (i = 0; i < 3; i++) {
+					pony->imu[dev].sol.L[i*3+E] =  Lt[i*2+0]*cchi + Lt[i*2+1]*schi;
+					pony->imu[dev].sol.L[i*3+N] = -Lt[i*2+0]*schi + Lt[i*2+1]*cchi;
+				}
 			pony->imu[dev].sol.  L_valid = valid;
 			// renew angles: roll, pitch and yaw=true heading
 			pony_linal_mat2rpy (pony->imu[dev].sol.rpy, pony->imu[dev].sol.L);

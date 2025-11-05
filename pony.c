@@ -1,4 +1,4 @@
-// Feb-2025
+// Nov-2025
 // PONY core source code
 
 #include <stdlib.h>
@@ -338,8 +338,8 @@ void pony_init_imu_const(void)
 	// Earth parameters as in Section 4 of GRS-80 by H. Moritz, Journal of Geodesy (2000) 74 (1): pp. 128-162
 	pony->imu_const.u       = 7.292115e-5;                           // Earth's rotation rate, rad/s
 	pony->imu_const.a       = 6378137.0;                             // Earth's ellipsoid semi-major axis, m
-	pony->imu_const.mu      = 3986005e8;                             // Earth's geocentric gravitational constant (including the atmosphere)
-	pony->imu_const.J2      = 1.08263e-3;                            // Earth's dynamical form factor
+	pony->imu_const.mu      = 3986005e8;                             // Earth's geocentric gravitational constant (including the atmosphere), m^3/s^2
+	pony->imu_const.J2      = 1.08263e-3;                            // Earth's dynamical form factor, second order
 	pony->imu_const.e2      = 6.6943800229e-3;                       // Earth's ellipsoid first eccentricity squared
 	pony->imu_const.ge      = 9.7803267715;                          // Earth's normal gravity at the equator, m/s^2
 	pony->imu_const.fg      = 5.302440112e-3;                        // Earth's normal gravity flattening
@@ -435,7 +435,10 @@ void pony_init_gnss_settings(pony_gnss* gnss)
 	size_t i;
 
 	// locate settings within gnss group in configuration: outside all subgroups, either before or after all of them
-	pony_locatecfggroup("", gnss->cfg, gnss->cfglength, &(gnss->cfg_settings), &(gnss->settings_length));
+	if ( !pony_locatecfggroup("", gnss->cfg, gnss->cfglength, &(gnss->cfg_settings), &(gnss->settings_length)) ) {
+		gnss->cfg_settings        = NULL;
+		gnss->settings_length     = 0;
+	}
 	// mask for the sine of GNSS satellite elevation angle
 	gnss->settings.sinEl_mask     =   0;
 	// default stdev values
@@ -918,7 +921,6 @@ char pony_init_gnss(pony_gnss* gnss)
 	if (gnss == NULL)
 		return 0;
 	// gps
-	gnss->gps = NULL;
 	if (pony_locatecfggroup("gps:", gnss->cfg, gnss->cfglength, &groupptr, &grouplen)) {
 		gnss->gps = (pony_gnss_gps*)calloc(1, sizeof(pony_gnss_gps));
 
@@ -931,8 +933,9 @@ char pony_init_gnss(pony_gnss* gnss)
 		if (!pony_init_gnss_gps(gnss->gps, max_sat_count[gps], max_eph_count[gps]))
 			return 0;
 	}
+	else
+		gnss->gps = NULL;
 	// glonass
-	gnss->glo = NULL;
 	if (pony_locatecfggroup( "glo:", gnss->cfg, gnss->cfglength, &groupptr, &grouplen)) {
 		gnss->glo = (pony_gnss_glo*)calloc(1, sizeof(pony_gnss_glo));
 
@@ -945,8 +948,9 @@ char pony_init_gnss(pony_gnss* gnss)
 		if (!pony_init_gnss_glo(gnss->glo, max_sat_count[glo], max_eph_count[glo]))
 			return 0;
 	}
+	else
+		gnss->glo = NULL;
 	// galileo
-	gnss->gal = NULL;
 	if (pony_locatecfggroup("gal:", gnss->cfg, gnss->cfglength, &groupptr, &grouplen)) {
 		gnss->gal = (pony_gnss_gal*)calloc(1, sizeof(pony_gnss_gal));
 
@@ -959,8 +963,9 @@ char pony_init_gnss(pony_gnss* gnss)
 		if (!pony_init_gnss_gal(gnss->gal, max_sat_count[gal], max_eph_count[gal]))
 			return 0;
 	}
+	else
+		gnss->gal = NULL;
 	// beidou
-	gnss->bds = NULL;
 	if (pony_locatecfggroup("bds:", gnss->cfg, gnss->cfglength, &groupptr, &grouplen)) {
 		gnss->bds = (pony_gnss_bds*)calloc(1, sizeof(pony_gnss_bds));
 
@@ -973,6 +978,8 @@ char pony_init_gnss(pony_gnss* gnss)
 		if (!pony_init_gnss_bds(gnss->bds, max_sat_count[bds], max_eph_count[bds]))
 			return 0;
 	}
+	else
+		gnss->bds = NULL;
 	// gnss settings
 	pony_init_gnss_settings(gnss);
 	// gnss solution
@@ -1032,22 +1039,18 @@ void pony_free_gnss(pony_gnss* gnss)
 	*/
 char pony_init_air(pony_air* air)
 {
+	size_t i;
+
 	// validate
 	if (air == NULL)
 		return 0;
-	// default values
+	// default values, validity and std where applicable
 	air->t     = 0;
-	air->alt   = 0;
-	air->vv    = 0;
-	air->speed = 0;
-	// stdev
-	air->alt_std   = 30.0; // barometric altitude stdev
-	air->vv_std    =  0.5; // barometric altitude trend stdev
-	air->speed_std =  1.5; // airspeed measurement stdev
-	// validity flags
-	air->alt_valid   = 0;
-	air->vv_valid    = 0;
-	air->speed_valid = 0;
+	air->alt   = 0;         air->  alt_valid = 0; air->alt_std   = 30; // barometric altitude
+	air->vv    = 0;         air->   vv_valid = 0; air->vv_std    =  1; // barometric altitude trend
+	air->speed = 0;         air->speed_valid = 0; air->speed_std =  1; // measured airspeed
+	for (i = 0; i < 3; i++)
+		air->angle[i] = 0;  air->angle_valid = 0;
 
 	return 1;
 }
@@ -1068,6 +1071,60 @@ void pony_free_air(pony_air** air)
 	// air data
 	free((void*)(*air));
 	*air = NULL;
+}
+
+
+
+
+
+// magnetic data handling subroutines
+	/*
+		initialize magnetic data structure
+		input:
+			pony_mag* mag --- pointer to a magnetic data structure
+		return value:
+			1
+	*/
+char pony_init_mag(pony_mag* mag)
+{
+	size_t i;
+
+	// validate
+	if (mag == NULL)
+		return 0;
+	// default values
+	for (i = 0; i < 3; i++) {
+		mag->m[i] = 0;
+		mag->e[i] = 0;
+	}
+	// validity flags
+	mag->m_valid  = 0;
+	mag->e_valid  = 0;
+	// init solution data
+	if (!pony_init_sol(&(mag->sol), mag->cfg, mag->cfglength))
+		return 0;
+
+	return 1;
+}
+
+	/*
+		free magnetic data memory
+		input:
+			pony_mag* mag --- pointer to a magnetic data structure
+	*/
+void pony_free_mag(pony_mag** mag)
+{
+	// validate
+	if (mag == NULL || *mag == NULL)
+		return;
+	// configuration
+	(*mag)->cfg = NULL;
+	(*mag)->cfglength = 0;
+	// navigation solution
+	pony_free_sol(&((*mag)->sol));
+	// magnetic data
+	free((void*)(*mag));
+	*mag = NULL;
 }
 
 
@@ -1095,7 +1152,7 @@ char pony_init_ref(pony_ref* ref)
 	ref->g[1] = 0;
 	ref->g[2] = -pony->imu_const.ge*(1 + pony->imu_const.fg/2); // middle value
 	ref->g_valid = 0;
-	// drop the solution
+	// init solution data
 	if (!pony_init_sol(&(ref->sol), ref->cfg, ref->cfglength))
 		return 0;
 
@@ -1164,6 +1221,9 @@ void pony_free(void)
 
 	// air data
 	pony_free_air(&(pony->air));
+
+	// magnetic data
+	pony_free_mag(&(pony->mag));
 
 	// reference data
 	pony_free_ref(&(pony->ref));
@@ -1240,7 +1300,7 @@ char pony_init(char* cfg)
 		multi_imu_token [] = "imu[0]:",
 		multi_gnss_token[] = "gnss[0]:";
 	const size_t
-		multi_imu_index_position = 4,
+		multi_imu_index_position  = 4,
 		multi_gnss_index_position = 5;
 
 	size_t grouplen;
@@ -1362,6 +1422,27 @@ char pony_init(char* cfg)
 
 		// try to init
 		if (!pony_init_air(pony->air)) {
+			pony_free();
+			return 0;
+		}
+	}
+
+	// magnetic data init
+	pony->mag = NULL;
+	if (pony_locatecfggroup("mag:", pony->cfg, pony->cfglength, &cfgptr, &grouplen)) { // if the group found in configuration
+		// try to allocate memory
+		pony->mag = (pony_mag*)calloc(1, sizeof(pony_mag));
+		if (pony->mag == NULL) {
+			pony_free();
+			return 0;
+		}
+
+		// set configuration pointer
+		pony->mag->cfg = cfgptr;
+		pony->mag->cfglength = grouplen;
+
+		// try to init
+		if (!pony_init_mag(pony->mag)) {
 			pony_free();
 			return 0;
 		}
@@ -2190,11 +2271,11 @@ void pony_linal_mat2rpy(double* rpy, const double* R)
 
 	rpy[1] = atan2(R[2], sqrt(R[5]*R[5] + R[8]*R[8])); // pitch angle
 
-	if (fabs(R[2]) < 0.875) {        // pitch magnitude below 61 deg
+	if (fabs(R[2]) < 0.875) {        // sine threshold for pitch magnitude below ~61 deg
 		rpy[0] = -atan2(R[8], R[5]); // roll angle
 		rpy[2] =  atan2(R[0], R[1]); // yaw  angle
 	}
-	else {                           // pitch magnitude over 30 deg
+	else {                           // pitch magnitude over ~61 deg
 		dp =  atan2(R[3]-R[7], R[6]+R[4]);
 		dm = -atan2(R[3]+R[7], R[6]-R[4]);
 

@@ -1,4 +1,4 @@
-// Feb-2025
+// Nov-2025
 /*	pony_ins_gravity
 
 	pony plugins for gravity model calculations:
@@ -223,7 +223,7 @@ void pony_ins_gravity_normal(void)
 		h,		        // geographical altitude from reference ellipsoid
 		f    = 0,       // Earth ellipsoid flattening f = (a - b)/a
 		m    = 0,       // gravitational parameter, m = [u^2 a^2 b]/[GM], ratio between centrifugal and gravitational accelerations on the equator of a sphere having the same mass and volume as the Earth does
-		f4_4 = 0;       // coefficient for the second harmonic term, f4/4 = 5/2 f m - 1/2 f^2
+		f4_4 = 0;       // coefficient for the second harmonic term, f4/4 = [5/2 f m - 1/2 f^2]/4
 
 	double
 		sinlat,	        //   sine of latitude
@@ -248,12 +248,12 @@ void pony_ins_gravity_normal(void)
 		// gravitational parameter, as derived from section 3 of Geodetic Reference System 80 by H. Moritz (GRS-80):
 			// from ge = GM/ab (1 - m - m/6 e'q0'/q0),
 			// and  gp = GM/a^2 (1 + m/3 e'q0'/q0),
-			// and  f + fg = u^2 b / ge (1 + e'/2 q0'/q0)
-			// let  k   = 1/2 e'q0'/q0 = (f + fg)/(u^2 b) ge - 1,
-			// let  eps = 1 / (gp/ge*a/b - 1) = 1/((fg + 1)/sqrt(1 - e^2) - 1),
-			// then m   = 1/(k*(eps + 1/3) + eps + 1)
-		f4_4 = (f + pony->imu_const.fg)/(pony->imu_const.u*pony->imu_const.u*pony->imu_const.a*b_a)*pony->imu_const.ge - 1; // use f4_4 variable instead of k
-		m    = 1/((pony->imu_const.fg + 1)/b_a - 1);
+			// and  f + fg = u^2 b / ge (1 + e'/2 q0'/q0) = u^2 b / ge (1 + K)
+			// let  K   = 1/2 e'q0'/q0 = (f + fg)/(u^2 b) ge - 1,
+			// let  eps = 1 / (gp/ge*a/b - 1) = 1/((fg + 1)/(b/a) - 1),
+			// then m   = 1/(K*(eps + 1/3) + eps + 1)
+		f4_4 = (f + pony->imu_const.fg)/(pony->imu_const.u*pony->imu_const.u*pony->imu_const.a*b_a)*pony->imu_const.ge - 1; // use f4_4 variable to store K
+		m    = 1/((pony->imu_const.fg + 1)/b_a - 1);                                                                        // use m variable    to store eps
 		m    = 1/(f4_4*(m+1.0/3) + m + 1);
 		// coefficient for the second harmonic term
 		f4_4 = f/8*(5*m - f); // f4 = -1/2 f^2 + 5/2 f m, as in (2-115), Physical Geodesy, W.Heiskanen H.Moritz, 1993, p. 76, or section 3 of Geodetic Reference System 80 by H. Moritz (GRS-80), corrected for skipped minus sign

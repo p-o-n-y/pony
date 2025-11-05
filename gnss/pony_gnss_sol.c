@@ -1,4 +1,4 @@
-// Jan-2025
+// Nov-2025
 /*	pony_gnss_sol
 
 	pony plugins that provide GNSS navigation solutions:
@@ -110,7 +110,7 @@ void pony_gnss_sol_pos_code(void)
 		**x = NULL, **S = NULL,	// least squares and covariance square root matrix
 		**h = NULL, **K = NULL;	// current observation coefficients in measurement model and Kalman gain
 
-	size_t i, k, r;
+	size_t r;
 
 
 	// requires gnss structure initialized

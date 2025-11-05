@@ -1,4 +1,4 @@
-// Jan-2025
+// Nov-2025
 /*	pony_gnss_io_rinex
 
 	pony plugins for GNSS RINEX input/output:

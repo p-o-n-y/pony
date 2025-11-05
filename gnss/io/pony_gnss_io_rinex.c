@@ -1,4 +1,4 @@
-// Jan-2025
+// Nov-2025
 /*	pony_gnss_io_rinex
 
 	pony plugins for GNSS RINEX input/output:
@@ -621,10 +621,10 @@ char pony_gnss_io_rinex_v3_obs_file_header_read(pony_gnss *gnss, FILE *fp, char 
 
 	size_t tokens_found;
 	float version;
-	size_t i, sys, maxsat, *obs_count = NULL;
+	size_t i, sys, maxsat, *obs_count;
 	int scanned;
-	char rinex_type_sys, current_sys = 0, sys_obstypes_found = 0, glo_freq_slot_found = 0, flag, (**obs_types)[4] = NULL;
-	pony_gnss_sat *sat = NULL;
+	char rinex_type_sys, current_sys, sys_obstypes_found, glo_freq_slot_found, flag, (**obs_types)[4];
+	pony_gnss_sat *sat;
 
 
 	// validate
@@ -633,8 +633,9 @@ char pony_gnss_io_rinex_v3_obs_file_header_read(pony_gnss *gnss, FILE *fp, char 
 
 	// init counter
 	tokens_found = 0;
-	
+
 	// check starting label
+	rinex_type_sys = 0;
 	while ( !feof(fp) ) {
 		// read new line
 		if (fgets(buf, PONY_GNSS_IO_RINEX_BUFFER_SIZE, fp) == NULL) break;                 // break on end-of-file or read error
@@ -664,8 +665,9 @@ char pony_gnss_io_rinex_v3_obs_file_header_read(pony_gnss *gnss, FILE *fp, char 
 			return 0; // starting label is required
 	}
 	// check other labels
-	current_sys = 0;
-	flag = 0;
+	current_sys        = 0;
+	sys_obstypes_found = 0;
+	flag               = 0;
 	while (!feof(fp) && tokens_found) {
 		// read new line
 		if (fgets(buf, PONY_GNSS_IO_RINEX_BUFFER_SIZE, fp) == NULL) break;                 // break on end-of-file or read error
@@ -741,6 +743,7 @@ char pony_gnss_io_rinex_v3_obs_file_header_read(pony_gnss *gnss, FILE *fp, char 
 		}
 
 		// check if a token is found
+		glo_freq_slot_found = 0;
 		if ( pony_gnss_io_rinex_find_token(rinex_glo_freq_slot_label,buf+label_offset-1,label_len) && gnss->glo != NULL) {
 			printf("\n\t\t%s",buf);
 			if (!glo_freq_slot_found) {
@@ -835,16 +838,14 @@ char pony_gnss_io_rinex_obs_file_header_parse_sys_obstypes(size_t *obs_count, ch
 			current_sys_obs_index = 0;
 
 			for (; i < n &&           buf[i] >  ' '; i++); // skip all     printable
-			for (; i < n && buf[i] && buf[i] <= ' '; i++); // skip all non-printable
-
 
 		case 1: // continuation
 
 			// parse observation types
 			for (; i < n && buf[i] && current_sys_obs_index < *obs_count; current_sys_obs_index++) {
+				for (; i < n && buf[i] && buf[i] <= ' '; i++); // skip all non-printable
 				for (j = 0; i < n && buf[i] > ' ' && j < obstype_length; i++, j++)
 					(*obs_types)[current_sys_obs_index][j] = buf[i];
-
 				for (; i < n &&           buf[i] >  ' '; i++); // skip all     printable
 				for (; i < n && buf[i] && buf[i] <= ' '; i++); // skip all non-printable
 			}
@@ -1089,7 +1090,7 @@ char pony_gnss_io_rinex_eph_file_header_read(pony_gnss *gnss, FILE *fp, char *bu
 
 	// init counter
 	tokens_found = 0;
-	
+
 	// check starting label
 	rinex_type_sys = 0;
 	while ( !feof(fp) ) {
@@ -1368,7 +1369,7 @@ void pony_gnss_io_rinex_eph_file_records_read(
 	const char sys_id[sys_count+1] = "GREC"; // GNSS system identifiers: GPS, GLONASS, Galileo, BeiDou, see RINEX documentation
 	const size_t                       // gps glo gal bds
 		record_lines       [sys_count] = { 7,  3,  7,  7},
-		min_total_eph      [sys_count] = {35, 21, 33, 35};
+		min_total_eph      [sys_count] = {35, 21, 34, 35};
 	const int
 		min_update_interval[sys_count] = {61, 16,  6, 31}; // in minutes
 	const size_t sat_id_width = 3, hdr_eph = 9;
@@ -1401,6 +1402,8 @@ void pony_gnss_io_rinex_eph_file_records_read(
 				for (i = 0; i < maxeph; i++)
 					sat[*sn-1].eph[i] = eph[i];
 				sat[*sn-1].eph_valid = 1;
+				//debug print for troubleshooting
+				//printf("\ncopied for %c%02d epoch %04.0f/%02.0f/%02.0f %02.0f:%02.0f:%05.2f",sys_id[sys],*sn, eph[0],eph[1],eph[2],eph[3],eph[4],eph[5]);
 			}
 			else if (refepoch_flag && pony_time_epochs_compare(&satepoch, gnss_epoch) >= 0 && pony_time_epochs_compare(&satepoch, &epoch) < 0)
 				break;
@@ -1469,7 +1472,6 @@ size_t pony_gnss_io_rinex_eph_file_parse_record_lines(double *eph, const size_t 
 	const size_t rec_per_line = 4, rec_width = 19, blank_width = 4;
 
 	size_t i, k, line, n, total;
-	int scanned;
 	char c;
 
 	// validate
@@ -1483,7 +1485,7 @@ size_t pony_gnss_io_rinex_eph_file_parse_record_lines(double *eph, const size_t 
 		pony_gnss_io_rinex_charrep(buf, 'D', 'E');
 		pony_gnss_io_rinex_charrep(buf, 'd', 'e');
 		// parse records
-		for (i = 0, k = blank_width, scanned = 0; i < rec_per_line && total < maxeph; i++, total++) {
+		for (i = 0, k = blank_width; i < rec_per_line && total < maxeph; i++, total++) {
 			if (k >= n-rec_width || buf[k] == 0) // end of line reached
 				break;
 			// advance current position
@@ -1491,11 +1493,9 @@ size_t pony_gnss_io_rinex_eph_file_parse_record_lines(double *eph, const size_t 
 			// save next character, null-terminate, scan and restore character
 			c = buf[k];
 			buf[k] = 0;
-			scanned = sscanf(buf+k-rec_width, "%lg", &(eph[total]));
+			if (sscanf(buf+k-rec_width, "%lg", &(eph[total])) < 1)
+				eph[total] = 0; // blank fields are recommended to set zero as per RINEX3.05 Section 6.5 "Missing items"
 			buf[k] = c;
-			// check
-			if (scanned < 1) // last records may be spare, containing either blanks or zeros
-				break;       // currently, bail out on blanks, do not count them in total parsed records
 		}
 	}
 

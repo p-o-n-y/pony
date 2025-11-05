@@ -1,4 +1,4 @@
-// Feb-2025
+// Nov-2025
 // PONY core header file
 
 #ifndef PONY_H_
@@ -7,7 +7,7 @@
 #include <stddef.h>
 
 // PONY core declarations
-#define PONY_BUS_VERSION 18 // current bus version
+#define PONY_BUS_VERSION 19 // current bus version
 
 
 
@@ -71,7 +71,7 @@ typedef struct {
 		// Earth parameters as in GRS-80 by H. Moritz, Journal of Geodesy (2000) 74 (1): pp. 128-162
 		u,       // Earth rotation rate, rad/s
 		a,       // Earth ellipsoid semi-major axis, m
-		mu,      // Earth geocentric gravitational constant (including the atmosphere)
+		mu,      // Earth geocentric gravitational constant (including the atmosphere), m^3/s^2
 		J2,      // Earth's dynamical form factor, second order
 		e2,      // Earth ellipsoid first eccentricity squared
 		ge,      // Earth normal gravity at the equator, m/s^2
@@ -342,7 +342,28 @@ typedef struct {
 	double speed;       // airspeed
 	double speed_std;   // estimated standard deviation, <0 if undefined
 	char   speed_valid; // validity flag (0/1)
+
+	double angle[3];    // aerodynamic angles, e.g. Angle of Attack (AoA, alpha), Angle of Sideslip (AoS, beta), and possibly Angle of Bank (AoB, gamma), when needed
+	char   angle_valid; // validity flag (0/1), or a number of valid components, or a bitfield
 } pony_air;
+
+
+
+
+
+// magnetic data
+typedef struct {
+	char*    cfg;       // pointer to magnetic data configuration substring
+	size_t   cfglength; // magnetic data configuration substring length
+
+	double   m[3];      // up to 3 magnetometer measurements
+	char     m_valid;   // validity flag (0/1), or a number of valid components, or a bitfield
+
+	double   e[3];      // local Earth's magnetic field
+	char     e_valid;   // validity flag (0/1), or a number of valid components, or a bitfield
+
+	pony_sol sol;       // current navigation solution based on/used for magnetic data calculations
+} pony_mag;
 
 
 
@@ -356,9 +377,9 @@ typedef struct {
 	double t;         // reference time
 
 	double g[3];      // reference gravity acceleration vector
-	char   g_valid;   // validity flag (0/1), or a number of valid components
+	char   g_valid;   // validity flag (0/1), or a number of valid components, or a bitfield
 
-	pony_sol sol;     // reference data
+	pony_sol sol;     // reference trajectory
 } pony_ref;
 
 
@@ -420,6 +441,7 @@ typedef struct {
 	size_t          gnss_count;      // number of gnss instances
 
 	pony_air*       air;             // air data subsystem pointer
+	pony_mag*       mag;             // magnetic data subsystem pointer
 	pony_ref*       ref;             // reference data subsystem pointer
 
 	double          t;               // system time (as per main clock for integrated systems)
